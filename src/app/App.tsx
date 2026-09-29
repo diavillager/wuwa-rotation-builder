@@ -2,12 +2,20 @@ import { createRotation, type Cycle } from '../domain/rotation'
 
 const shell = createRotation(['slot-one', 'slot-two', 'slot-three'])
 
-function CyclePanel({ title, cycle }: { title: string; cycle: Cycle }) {
+function CyclePanel({
+  label,
+  title,
+  cycle,
+}: {
+  label: string
+  title: string
+  cycle: Cycle
+}) {
   return (
-    <section className="cycle-panel" aria-label={`${title} 사이클`}>
+    <section className="cycle-panel" aria-label={title}>
       <div className="section-heading">
         <div>
-          <span className="eyebrow">CYCLE</span>
+          <span className="eyebrow">{label}</span>
           <h2>{title}</h2>
         </div>
         <span className="status">도메인 기반 준비</span>
@@ -37,7 +45,7 @@ export function App() {
       <header className="page-heading">
         <div>
           <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
-          <h1>로테이션 빌더</h1>
+          <h1>WUWA Rotation Builder</h1>
         </div>
         <span className="foundation-badge">Foundation</span>
       </header>
@@ -45,7 +53,7 @@ export function App() {
       <section className="party-panel" aria-label="파티 편성">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">PARTY</span>
+            <span className="eyebrow">PARTY SETUP</span>
             <h2>파티 편성</h2>
           </div>
           <p>3인 파티 · 편성 기능 준비 중</p>
@@ -67,11 +75,11 @@ export function App() {
       </section>
 
       <div className="workspace-grid">
-        <aside className="skills-panel" aria-label="스킬 진열">
+        <aside className="skills-panel" aria-label="공명자 스킬">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">SKILLS</span>
-              <h2>스킬 진열</h2>
+              <span className="eyebrow">RESONATOR SKILLS</span>
+              <h2>공명자 스킬</h2>
             </div>
           </div>
           <div className="skills-empty">
@@ -81,8 +89,16 @@ export function App() {
           </div>
         </aside>
         <div className="cycles">
-          <CyclePanel title="개막" cycle={shell.opening} />
-          <CyclePanel title="반복" cycle={shell.repeat} />
+          <CyclePanel
+            label="OPENING CYCLE"
+            title="개막 사이클"
+            cycle={shell.opening}
+          />
+          <CyclePanel
+            label="REPEAT CYCLE"
+            title="반복 사이클"
+            cycle={shell.repeat}
+          />
         </div>
       </div>
       <footer>
