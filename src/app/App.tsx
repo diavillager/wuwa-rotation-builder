@@ -28,6 +28,7 @@ import {
 import {
   createContinuityDemoRotation,
   createDemoRotation,
+  createInputDemoRotation,
   demoCatalog,
 } from './demo'
 import { projectCycle } from './editor-projection'
@@ -82,7 +83,9 @@ export function App() {
     demo
       ? new URLSearchParams(window.location.search).get('demo') === 'continuity'
         ? createContinuityDemoRotation()
-        : createDemoRotation()
+        : new URLSearchParams(window.location.search).get('demo') === 'input'
+          ? createInputDemoRotation()
+          : createDemoRotation()
       : createRotation(['slot-one', 'slot-two', 'slot-three']),
   )
   const [focusedCycle, setFocusedCycle] = useState<CycleId>('opening')

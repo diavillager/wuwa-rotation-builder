@@ -41,13 +41,16 @@ export class InputCapture {
   constructor(private readonly order: 'press' | 'release') {}
 
   press(control: CaptureControl, target: CaptureTarget, now: number): boolean {
-    if (this.pending.some((item) => item.control === control)) return false
+    if (this.pending.some((item) => item.control === control && !item.result))
+      return false
     this.pending.push({ control, target: { ...target }, startedAt: now })
     return true
   }
 
   release(control: CaptureControl, now: number): CapturedInput[] {
-    const item = this.pending.find((candidate) => candidate.control === control)
+    const item = this.pending.find(
+      (candidate) => candidate.control === control && !candidate.result,
+    )
     if (!item || item.result) return []
     item.result = {
       control,

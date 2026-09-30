@@ -1,5 +1,5 @@
 import { createSwitch, insertInput, type Rotation } from '../domain/rotation'
-import type { CharacterCatalog } from './catalog'
+import type { CatalogCharacter, CharacterCatalog } from './catalog'
 import type { CapturedInput } from './input-capture'
 
 export function applyCapturedInput(
@@ -28,8 +28,8 @@ export function applyCapturedInput(
   const destination = catalog.characters.find((item) => item.id === toId)
   if (!destination)
     throw new Error('교체할 슬롯의 공명자를 먼저 선택해 주세요.')
-  const auto = (skillRef: string | undefined) => {
-    if (!skillRef)
+  const auto = (owner: CatalogCharacter, skillRef: string | undefined) => {
+    if (!skillRef || !owner.skills.some((item) => item.id === skillRef))
       throw new Error('검수된 자동 행동 데이터가 없어 교체할 수 없습니다.')
     return { columnId: nextId(), actionId: nextId(), skillRef }
   }
@@ -41,14 +41,17 @@ export function applyCapturedInput(
           switchId: nextId(),
           kind: 'normal',
           toId,
-          normalSwitchAttack: auto(destination.autoActions?.normalSwitchAttack),
+          normalSwitchAttack: auto(
+            destination,
+            destination.autoActions?.normalSwitchAttack,
+          ),
         }
       : {
           switchId: nextId(),
           kind: 'concerto',
           toId,
-          outro: auto(source.autoActions?.outro),
-          intro: auto(destination.autoActions?.intro),
+          outro: auto(source, source.autoActions?.outro),
+          intro: auto(destination, destination.autoActions?.intro),
         },
   )
 }

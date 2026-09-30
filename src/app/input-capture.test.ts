@@ -53,4 +53,18 @@ describe('실제 입력 판정', () => {
     capture.cancel()
     expect(capture.release('LMB', 1000)).toEqual([])
   })
+
+  it('먼저 누른 hold를 기다리는 동안 다른 키의 여러 tap을 보존한다', () => {
+    const capture = new InputCapture('press')
+    capture.press('Q', { cycleId: 'opening' }, 0)
+    capture.press('E', { cycleId: 'opening' }, 10)
+    capture.release('E', 20)
+    expect(capture.press('E', { cycleId: 'opening' }, 30)).toBe(true)
+    capture.release('E', 40)
+    expect(capture.release('Q', 500).map((item) => item.control)).toEqual([
+      'Q',
+      'E',
+      'E',
+    ])
+  })
 })

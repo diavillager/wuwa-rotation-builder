@@ -181,15 +181,13 @@ describe('브라우저 이벤트와 Rotation 통합', () => {
     } as DOMRect)
     Object.defineProperty(scroll, 'clientWidth', { value: 90 })
     Object.defineProperty(scroll, 'clientHeight', { value: 90 })
-    document
-      .querySelector('#empty')!
-      .dispatchEvent(
-        new MouseEvent('mouseover', {
-          bubbles: true,
-          clientX: 95,
-          clientY: 20,
-        }),
-      )
+    document.querySelector('#empty')!.dispatchEvent(
+      new MouseEvent('mouseover', {
+        bubbles: true,
+        clientX: 95,
+        clientY: 20,
+      }),
+    )
     f.key('keydown', 'KeyE', 0)
     f.key('keyup', 'KeyE', 10)
     expect(f.state().opening.columns).toEqual([])

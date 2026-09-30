@@ -127,6 +127,11 @@ export function createDemoRotation() {
   })
 }
 
+/** 실제 입력 캡처를 처음부터 시험하기 위한 빈 두 Cycle. */
+export function createInputDemoRotation() {
+  return createRotation(['demo-a', 'demo-b', 'demo-c'])
+}
+
 /** 중간 공명자 교체 후 연결선 단절 검증용 가상 로테이션. */
 export function createContinuityDemoRotation() {
   let rotation = createRotation(['demo-a', 'demo-b', 'demo-c'])
