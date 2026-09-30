@@ -28,8 +28,9 @@ npm run build
 
 - [확정 요구사항 체크리스트](docs/requirements-checklist.md): 제품 요구사항의 최우선 기준
 - [PRD](docs/PRD.md): 구현 기준
-- [프로젝트 기반 spec](specs/2026-09-30-000-project-foundation.md): 이번 단계의 설계와 범위
-- [로테이션 도메인 연산 spec](specs/2026-09-30-001-rotation-domain-operations.md): 다음 도메인 작업의 범위와 테스트 계획
+- [프로젝트 기반 spec](specs/2026-09-30-000-project-foundation.md): 기반 구축의 설계와 범위
+- [로테이션 도메인 연산 spec](specs/2026-09-30-001-rotation-domain-operations.md): 도메인 편집 연산의 범위와 테스트 계획
+- [파티·타임라인 Editor 연결 spec](specs/2026-09-30-002-party-timeline-editor.md): 앱 Shell과 도메인 연산 연결 계획
 - [AGENTS.md](AGENTS.md): 저장소 작업 지침
 
 `specs/`는 기능별 구현 계획을 담으며 체크리스트나 PRD를 대체하지 않습니다.
