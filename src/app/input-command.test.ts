@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createRotation,
   reorderParty,
+  replacePartyCharacter,
   setActiveCharacter,
 } from '../domain/rotation'
 import { applyCapturedInput } from './input-command'
@@ -17,6 +18,45 @@ const input = (control: CaptureControl, gesture: 'tap' | 'hold' = 'tap') => ({
 })
 
 describe('캡처 결과의 도메인 연결', () => {
+  it.each(['demo-d', 'demo-e', 'demo-f'])(
+    '공명자를 %s로 변경한 뒤 숫자키로 들어오고 나갈 수 있다',
+    (replacementId) => {
+      const original = replacePartyCharacter(
+        createRotation(['demo-a', 'demo-b', 'demo-c']),
+        1,
+        replacementId,
+      )
+      for (const gesture of ['tap', 'hold'] as const) {
+        const entered = applyCapturedInput(
+          original,
+          demoCatalog,
+          input('2', gesture),
+          nextId,
+        )
+        expect(entered.opening.activeCharacterId).toBe(replacementId)
+        expect(entered.opening.transitions[0]).toMatchObject({
+          fromId: 'demo-a',
+          toId: replacementId,
+        })
+        expect(entered.opening.columns.at(-1)?.action).toMatchObject({
+          skillRef: `${replacementId}-${gesture === 'tap' ? 'normal' : 'intro'}`,
+        })
+        const exited = applyCapturedInput(
+          entered,
+          demoCatalog,
+          input('3', gesture),
+          nextId,
+        )
+        expect(exited.opening.activeCharacterId).toBe('demo-c')
+        expect(exited.opening.transitions[1].fromId).toBe(replacementId)
+        if (gesture === 'hold')
+          expect(exited.opening.columns.at(-2)?.action).toMatchObject({
+            skillRef: `${replacementId}-outro`,
+          })
+        expect(exited.repeat).toBe(original.repeat)
+      }
+    },
+  )
   it('같은 번호는 tap/hold 모두 카탈로그 조회나 ID 생성 없이 무시한다', () => {
     const original = createRotation(['demo-a', 'demo-b', 'demo-c'])
     for (const gesture of ['tap', 'hold'] as const) {

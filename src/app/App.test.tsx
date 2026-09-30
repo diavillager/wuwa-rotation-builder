@@ -46,6 +46,35 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('파티 슬롯 공명자를 변경한 뒤 숫자키로 새 공명자에게 교체한다', async () => {
+    await act(async () => {
+      document.querySelectorAll<HTMLButtonElement>('.party-slot')[1].click()
+    })
+    await act(async () => {
+      document
+        .querySelector<HTMLButtonElement>('.character-options button')!
+        .click()
+    })
+    expect(document.querySelector<HTMLElement>('.workspace-grid')!.hidden).toBe(
+      false,
+    )
+    await hover(grid())
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 10)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-e')
+    expect(grid().querySelector('.auto-card')?.textContent).toContain(
+      '데모 E 교체 공격',
+    )
+    await key('keydown', 'Digit3')
+    await key('keyup', 'Digit3', 200)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-c')
+    expect(grid().textContent).toContain('데모 E 반주')
+    expect(document.querySelector('[role="status"]')).toBeNull()
+  })
   it.each(['opening', 'repeat'])(
     '%s의 새 블록만 따라 스크롤하고 보이는 블록과 생성 없는 명령은 위치를 보존한다',
     async (cycleId) => {
