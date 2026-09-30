@@ -155,45 +155,18 @@ h2 {
 .cycle-panel {
   padding: 24px;
 }
-.timeline {
-  overflow-x: auto;
-  margin-top: 20px;
-  border: 1px solid #34414b;
-  border-radius: 10px;
-}
-.timeline-row {
-  display: grid;
-  grid-template-columns: 150px minmax(430px, 1fr);
-  min-height: 61px;
-}
-.timeline-row + .timeline-row {
-  border-top: 1px solid #34414b;
-}
 .line-label {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 0 14px;
-  background: #202932;
+  background: transparent;
   color: #d1dbdf;
   font-size: 13px;
-  border-right: 1px solid #34414b;
 }
 .line-number {
   color: #84aca5;
   font-size: 11px;
-}
-.line-track {
-  display: flex;
-  align-items: center;
-  padding: 0 18px;
-  background: repeating-linear-gradient(
-    90deg,
-    #1a232b 0,
-    #1a232b 78px,
-    #26323a 79px,
-    #1a232b 80px
-  );
 }
 .empty-hint {
   font-size: 12px;
@@ -307,86 +280,42 @@ button {
 }
 .timeline-grid {
   display: grid;
+  position: relative;
   width: max-content;
   min-width: 100%;
+  background: #1a232b;
 }
 .timeline-row-fragment {
   display: contents;
 }
-.timeline-corner,
-.timeline-column-head {
-  min-height: 54px;
-  padding: 8px;
-  background: #1c2830;
-  border-bottom: 1px solid #34414b;
-  border-right: 1px solid #34414b;
-}
-.timeline-corner {
-  color: #8eb4ad;
-  font-size: 11px;
-  display: flex;
-  align-items: center;
-}
-.timeline-column-head {
-  position: relative;
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-end;
-}
-.column-index {
-  color: #708b8e;
-  font-size: 11px;
-}
-.transition-mark {
+.timeline-wires {
   position: absolute;
+  top: 0;
   left: 0;
-  top: 2px;
-  transform: translateX(-18%);
-  z-index: 1;
-  max-width: 130px;
-  padding: 3px 5px;
-  border-radius: 5px;
-  background: #425e58;
-  color: #e7f4ed;
-  font-size: 9px;
-  white-space: nowrap;
-}
-.transition-overlay {
-  position: absolute;
-  inset: 0;
   pointer-events: none;
-}
-.transition-path {
-  position: absolute;
-  left: -19px;
-  top: 54px;
-  width: 38px;
-  height: 216px;
   overflow: visible;
-  z-index: 2;
-  fill: #c6ede2;
+  z-index: 1;
+  fill: none;
 }
-.transition-path line {
-  stroke: #a6dace;
+.wire-flow {
+  stroke: #66847e;
   stroke-width: 2;
+  stroke-linejoin: round;
 }
-.transition-mark + .transition-mark {
-  top: 23px;
-}
-.transition-mark small {
-  display: block;
-  color: #bde0d5;
+.wire-transition {
+  stroke: #a6dace;
+  stroke-width: 3;
+  stroke-linejoin: round;
 }
 .line-label {
   border: 0;
-  border-right: 1px solid #34414b;
-  border-bottom: 1px solid #34414b;
   text-align: left;
   min-height: 72px;
 }
 .line-label.active-line {
   color: #f2fbf7;
   background: #315047;
+  border-radius: 8px;
 }
 .line-label:hover {
   background: #35544d;
@@ -396,17 +325,14 @@ button {
   padding: 7px;
   display: flex;
   align-items: center;
-  border-right: 1px solid #34414b;
-  border-bottom: 1px solid #34414b;
-  background: #1a232b;
-}
-.timeline-cell:empty {
-  background: #192129;
+  background: transparent;
 }
 .end-cell {
   min-width: 150px;
 }
 .input-card {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: stretch;
   gap: 4px;
@@ -455,6 +381,8 @@ button {
   color: #d6eadc;
 }
 .auto-card {
+  position: relative;
+  z-index: 2;
   width: 100%;
   padding: 7px;
   border: 1px solid #866f9c;

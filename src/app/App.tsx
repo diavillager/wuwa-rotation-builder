@@ -14,7 +14,6 @@ import {
   type CycleId,
   type InputBlock,
   type Rotation,
-  type Transition,
 } from '../domain/rotation'
 import {
   ELEMENTS,
@@ -25,6 +24,7 @@ import {
 } from './catalog'
 import { createDemoRotation, demoCatalog } from './demo'
 import { projectCycle } from './editor-projection'
+import { TimelineWires } from './TimelineWires'
 
 type DragItem =
   | { kind: 'party'; id: string }
@@ -176,6 +176,7 @@ export function App() {
   ) => (
     <div
       className="input-card"
+      data-action-column={columnId}
       draggable
       aria-label={`${action.input} 입력, 연결 스킬 ${action.skills.length}개`}
       onDragStart={(event) => {
@@ -279,28 +280,6 @@ export function App() {
     const view = projectCycle(rotation, cycle)
     const title = cycleId === 'opening' ? '개막 사이클' : '반복 사이클'
     const tracks = `148px ${view.columns.map((item) => `minmax(${item.width}px, max-content)`).join(' ')} 150px`
-    const transitionMark = (transition: Transition, sequence: number) => {
-      const fromY = 36 + rotation.party.indexOf(transition.fromId) * 72
-      const toY = 36 + rotation.party.indexOf(transition.toId) * 72
-      return (
-        <span className="transition-overlay" key={transition.switchId}>
-          <span className="transition-mark" style={{ top: 2 + sequence * 20 }}>
-            {characterName(catalog, transition.fromId)} →{' '}
-            {characterName(catalog, transition.toId)}
-            <small>{transition.kind === 'concerto' ? '협주' : '일반'}</small>
-          </span>
-          <svg
-            className="transition-path"
-            viewBox="0 0 38 216"
-            aria-hidden="true"
-          >
-            <line x1="9" y1={fromY} x2="29" y2={toY} />
-            <circle cx="9" cy={fromY} r="3" />
-            <circle cx="29" cy={toY} r="4" />
-          </svg>
-        </span>
-      )
-    }
     return (
       <section
         className={`cycle-panel ${focusedCycle === cycleId ? 'focused-cycle' : ''}`}
@@ -323,20 +302,11 @@ export function App() {
             className="timeline-grid"
             style={{ gridTemplateColumns: tracks }}
           >
-            <div className="timeline-corner">전역 시간축 →</div>
-            {view.columns.map((column, index) => (
-              <div className="timeline-column-head" key={column.id}>
-                {view.boundaries[index].transitions.map(transitionMark)}
-                <span className="column-index">{index + 1}</span>
-              </div>
-            ))}
-            <div className="timeline-column-head">
-              {view.boundaries.at(-1)?.transitions.map(transitionMark)}
-            </div>
             {view.party.map((id, lineIndex) => (
               <div className="timeline-row-fragment" key={id}>
                 <button
                   className={`line-label ${cycle.activeCharacterId === id ? 'active-line' : ''}`}
+                  data-row-owner={id}
                   onClick={() => {
                     setFocusedCycle(cycleId)
                     run((state) => setActiveCharacter(state, cycleId, id))
@@ -364,6 +334,7 @@ export function App() {
                   <div
                     className="timeline-cell"
                     key={column.id}
+                    data-column-cell={column.id}
                     onDragOver={(event) => {
                       if (drag?.kind === 'input' && drag.cycleId === cycleId)
                         event.preventDefault()
@@ -384,6 +355,7 @@ export function App() {
                       ) : (
                         <div
                           className="auto-card"
+                          data-action-column={column.id}
                           onMouseEnter={() =>
                             setHover({
                               kind: 'auto',
@@ -439,6 +411,11 @@ export function App() {
                 </div>
               </div>
             ))}
+            <TimelineWires
+              columns={cycle.columns}
+              transitions={cycle.transitions}
+              party={rotation.party}
+            />
           </div>
         </div>
       </section>
