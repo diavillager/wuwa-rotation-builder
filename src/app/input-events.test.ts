@@ -9,6 +9,7 @@ const disposers: (() => void)[] = []
 afterEach(() => {
   for (const dispose of disposers.splice(0)) dispose()
   document.body.innerHTML = ''
+  vi.useRealTimers()
 })
 
 function fixture() {
@@ -66,6 +67,42 @@ function fixture() {
 }
 
 describe('브라우저 이벤트와 Rotation 통합', () => {
+  it('500ms 타이머에서 F Hold를 만들고 추가 입력과 release 중복을 막는다', () => {
+    vi.useFakeTimers()
+    const f = fixture()
+    f.move('#empty')
+    f.key('keydown', 'KeyF', 0)
+    f.setTime(499)
+    vi.advanceTimersByTime(499)
+    expect(f.state().opening.columns).toHaveLength(0)
+    f.setTime(500)
+    vi.advanceTimersByTime(1)
+    expect(f.state().opening.columns[0].action).toMatchObject({
+      input: 'F',
+      gesture: 'hold',
+    })
+    f.key('keydown', 'KeyE', 600)
+    f.key('keyup', 'KeyE', 700)
+    f.key('keyup', 'KeyF', 2000)
+    expect(f.state().opening.columns).toHaveLength(1)
+  })
+
+  it('Hold 확정 전에 이탈하거나 blur하면 예약된 생성을 취소한다', () => {
+    vi.useFakeTimers()
+    const f = fixture()
+    for (const stop of [
+      () => f.move('#outside'),
+      () => window.dispatchEvent(new Event('blur')),
+      () => f.adapter.dispose(),
+    ]) {
+      f.move('#empty')
+      f.key('keydown', 'KeyF', 0)
+      stop()
+      f.setTime(1000)
+      vi.advanceTimersByTime(1000)
+    }
+    expect(f.state().opening.columns).toHaveLength(0)
+  })
   it('키 hold 중 추가 키와 마우스는 기록하지 않고 다음 새 press부터 받는다', () => {
     const f = fixture()
     f.move('#empty')
@@ -99,9 +136,9 @@ describe('브라우저 이벤트와 Rotation 통합', () => {
     f.move('#empty')
     f.key('keydown', 'KeyE', 0)
     f.key('keydown', 'KeyE', 100, true)
-    f.key('keyup', 'KeyE', 399)
+    f.key('keyup', 'KeyE', 499)
     f.key('keydown', 'Digit2', 500)
-    f.key('keyup', 'Digit2', 900)
+    f.key('keyup', 'Digit2', 1000)
     expect(f.state().opening.columns.map((item) => item.action.type)).toEqual([
       'input',
       'autoAction',
@@ -173,7 +210,7 @@ describe('브라우저 이벤트와 Rotation 통합', () => {
     })
     empty.dispatchEvent(menu)
     expect(menu.defaultPrevented).toBe(true)
-    f.setTime(400)
+    f.setTime(500)
     empty.dispatchEvent(new MouseEvent('mouseup', { button: 2, bubbles: true }))
     expect(f.state().opening.columns[0].action).toMatchObject({
       input: 'RMB',

@@ -27,6 +27,7 @@ afterEach(async () => {
   Reflect.deleteProperty(document, 'elementFromPoint')
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 const grid = (cycleId = 'opening') =>
   document.querySelector(`[data-capture-cycle="${cycleId}"]`)!
@@ -45,6 +46,54 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('release 전에 F Hold와 협주 교체를 렌더링하며 release에서 중복하지 않는다', async () => {
+    vi.useFakeTimers()
+    await hover(grid())
+    await key('keydown', 'KeyF')
+    time += 499
+    await act(async () => {
+      vi.advanceTimersByTime(499)
+    })
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(0)
+    time += 1
+    await act(async () => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(grid().querySelector('.input-card')?.textContent).toContain('FHold')
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await key('keyup', 'KeyF', 1000)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+    await key('keydown', 'Digit2')
+    time += 500
+    await act(async () => {
+      vi.advanceTimersByTime(500)
+    })
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+    await key('keyup', 'Digit2', 1000)
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
+  })
+  it('공명자 선택 중 편집 영역을 숨기고 닫으면 입력 내용을 보존해 표시한다', async () => {
+    await hover(grid())
+    await key('keydown', 'KeyF')
+    await key('keyup', 'KeyF', 10)
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.party-slot')!.click(),
+    )
+    const workspace = document.querySelector<HTMLElement>('.workspace-grid')!
+    expect(workspace.hidden).toBe(true)
+    expect(document.querySelector('.character-selector')).not.toBeNull()
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('.selector-heading > button')!
+        .click(),
+    )
+    expect(workspace.hidden).toBe(false)
+    expect(grid().querySelector('.input-card')?.textContent).toContain('FTap')
+  })
   it('커서를 옮기지 않고 Backspace를 반복해 다음 블록을 삭제한다', async () => {
     await hover(grid())
     for (let index = 0; index < 3; index++) {
@@ -85,7 +134,7 @@ describe('App 실제 입력 연결', () => {
   it('협주 자동 행동 삭제 시 linked pair와 블록 없는 독립 교체선을 제거한다', async () => {
     await hover(grid())
     await key('keydown', 'Digit2')
-    await key('keyup', 'Digit2', 400)
+    await key('keyup', 'Digit2', 500)
     expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
     expect(grid().querySelectorAll('.wire-transition')).toHaveLength(1)
     Object.defineProperty(document, 'elementFromPoint', {
@@ -112,7 +161,7 @@ describe('App 실제 입력 연결', () => {
   })
   it('같은 번호의 tap/hold는 안내와 블록 없이 무시한다', async () => {
     await hover(grid())
-    for (const duration of [10, 400]) {
+    for (const duration of [10, 500]) {
       await key('keydown', 'Digit1')
       await key('keyup', 'Digit1', duration)
     }
@@ -131,7 +180,7 @@ describe('App 실제 입력 연결', () => {
     expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
     expect(grid().querySelector('.input-card')?.textContent).toContain('QHold')
     await key('keydown', 'Digit2')
-    await key('keyup', 'Digit2', 400)
+    await key('keyup', 'Digit2', 500)
     expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),

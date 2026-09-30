@@ -1,6 +1,6 @@
 export type CharacterId = string
 export type CycleId = 'opening' | 'repeat'
-export type InputControl = 'Q' | 'E' | 'R' | 'T' | 'Space' | 'LMB' | 'RMB'
+export type InputControl = 'Q' | 'E' | 'R' | 'T' | 'F' | 'Space' | 'LMB' | 'RMB'
 export type Gesture = 'tap' | 'hold'
 export type AutoActionKind = 'normalSwitchAttack' | 'intro' | 'outro'
 
@@ -9,6 +9,7 @@ const INPUT_CONTROLS: readonly InputControl[] = [
   'E',
   'R',
   'T',
+  'F',
   'Space',
   'LMB',
   'RMB',

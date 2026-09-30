@@ -6,7 +6,7 @@
 
 ## 관련 PRD 요구사항
 
-- `docs/requirements-checklist.md` 3–4절: 지원 입력, 400ms tap/hold, 빈 영역 캡처, Shared Timeline, 삽입 위치, Transition·AutoAction.
+- `docs/requirements-checklist.md` 3–4절: 지원 입력, 500ms tap/hold, 빈 영역 캡처, Shared Timeline, 삽입 위치, Transition·AutoAction.
 - `docs/PRD.md` 3, 5절: I1–I5와 도메인 데이터 구조.
 - `docs/PRD.md` 6절: 실제 입력 시스템과 RMB context menu 범위.
 - `docs/PRD.md` 9.2, 10절: active line 삽입, 숫자키 교체, 자동 행동과 suppression.
@@ -15,7 +15,7 @@
 
 ## 범위
 
-1. `Q/E/R/T/Space/LMB/RMB`의 최초 press와 release를 캡처하고, 지속 시간이 400ms 미만이면 tap, 이상이면 hold로 판정한다. WASD와 지원하지 않는 입력은 기록하지 않고 키보드 자동 repeat는 중복 press로 처리하지 않는다.
+1. `Q/E/R/T/F/Space/LMB/RMB`의 최초 press와 release를 캡처하고, 지속 시간이 500ms 미만이면 tap, 이상이면 hold로 판정한다. WASD와 지원하지 않는 입력은 기록하지 않고 키보드 자동 repeat는 중복 press로 처리하지 않는다.
    한 번에 하나의 입력만 캡처하며, 진행 중인 입력 외의 추가 press와 그 release는 기록하지 않는다.
 2. 사이클 내부의 빈 영역 hover에서만 캡처한다. InputBlock·SkillBlock·AutoAction, 공명자 라인 조작, 스크롤바 및 다른 조작 UI는 빈 영역에서 제외한다. 모달·드래그·텍스트 편집 중의 오캡처를 방지한다.
 3. 일반 입력은 해당 Cycle의 active line에 스킬 없는 InputBlock을 만들고 `insertInput`으로 삽입한다. 기존 삽입 위치와 후속 Transition·AutoAction의 의미를 보존한다.
@@ -35,13 +35,14 @@
 ## 사용자 동작 및 UX
 
 - 사용자가 편집하려는 Cycle의 빈 영역에 마우스를 두고 입력하면 그 Cycle의 active line에 행동이 생성된다. 왼쪽 스킬 진열의 기존 라인 선택 동작과 각 Cycle의 active line 독립성을 유지한다.
-- InputBlock은 release 후 tap/hold 판정이 완료됐을 때 생성한다. 스킬은 사용자가 기존 진열에서 직접 연결한다.
+- Tap은 500ms 이전 release 시 생성하고, Hold는 press 후 500ms에 release 없이 생성한다. Hold 이후 release까지 추가 입력을 무시하고 release 시 중복 생성하지 않는다. 스킬은 사용자가 기존 진열에서 직접 연결한다.
 - Q Hold 도중 E Tap을 수행하면 Q Hold만 기록한다. 키보드와 마우스를 합쳐 하나의 진행 중 입력을 관리하고 추가 입력을 큐에 넣지 않는다.
 - 라인 아이콘 클릭은 편집 라인만 변경하며 입력·교체·자동 행동을 만들지 않는다.
 - 숫자키는 별도의 입력 카드로 나타나지 않는다. 기존 renderer가 Transition의 라인 이동과 독립 AutoAction 열을 표시한다.
 - 현재 active 공명자의 파티 번호는 tap/hold 모두 안내 없이 무시한다. Rotation과 편집 대상 및 기존 안내 상태를 변경하지 않는다.
 - 공명자 변경으로 끊어진 사이클은 자동으로 연결하지 않는다. 사용자가 입력·교체 명령과 기존 편집 조작을 사용해 다시 편집한다. 임의 위치에 Transition을 만드는 새로운 조작은 이번 범위에 추가하지 않는다.
 - 빈 영역을 벗어나거나 다른 Cycle로 이동하면 진행 중 입력을 취소한다. blur·드래그·모달·텍스트 편집 시작 시에도 미확정 입력을 정리한다.
+- 이미 생성한 Hold는 영역 이탈이나 release 때문에 삭제하지 않는다. 공명자 선택창을 열면 스킬 진열과 두 Cycle 영역을 숨기고, 선택창을 닫으면 기존 편집 내용을 그대로 다시 보여준다.
 
 ## 도메인 데이터에 미치는 영향
 
@@ -54,7 +55,7 @@
 
 ## 주요 구현 방법
 
-1. UI와 독립된 입력 판정 모듈에서 단일 control의 최초 press 시각과 release를 관리한다. 시간 공급자를 주입해 400ms 경계를 테스트하고, repeat·중복 press·진행 중 추가 press 및 대응 press 없는 release를 걸러낸다.
+1. UI와 독립된 입력 판정 모듈에서 단일 control의 최초 press 시각과 Hold 확정 여부를 관리한다. 이벤트 어댑터의 500ms 타이머가 Hold를 확정하며, 판정 모듈은 release 중복을 막는다. 시간 공급자를 주입해 경계를 테스트하고 repeat·중복 press·진행 중 추가 press 및 대응 press 없는 release를 걸러낸다. 취소·blur·해제 시 예약된 타이머를 정리한다.
 2. DOM 이벤트 어댑터에서 Cycle의 빈 영역 여부, 포커스, 모달과 드래그 상태를 검사한다. 기존 Backspace·wheel·drag 핸들러와 캡처 대상이 겹치지 않게 한다. 리스너 해제 및 화면 비활성화 시 진행 중 입력을 정리한다.
 3. 입력 결과를 일반 입력과 숫자키 교체 명령으로 변환하는 계층을 둔다. 일반 입력은 `insertInput`, 교체는 `createSwitch`를 호출하고 성공한 새 Rotation만 반영한다. 이벤트 핸들러에 Timeline 변경 로직을 복제하지 않는다.
 4. Column·action·switch ID는 식별자 생성기를 통해 발급하고, 연관 AutoAction ID도 같은 명령 생성 과정에서 준비한다.
@@ -63,7 +64,7 @@
 
 ## 예외 및 edge case
 
-- 정확히 400ms인 입력, 장시간 hold, 키 자동 repeat, 중복 press, 대응 press 없는 release.
+- 정확히 500ms인 입력, 장시간 hold, 키 자동 repeat, 중복 press, 대응 press 없는 release.
 - press/release 사이 hover 영역·Cycle·active line·파티·포커스가 바뀌는 경우와 여러 control을 동시에 누르는 경우.
 - 브라우저 blur, 문서 비활성화, 컴포넌트 해제, 드래그 시작 또는 모달 열림에 따른 입력 상태 정리.
 - 빈 Cycle, 기존 outgoing Transition 직전, 협주 outro 직전 및 suppression된 교체가 있는 라인에서 입력 삽입.
@@ -72,7 +73,7 @@
 
 ## 테스트 계획
 
-- 시간 제어 테스트로 399ms tap, 400ms hold, 장시간 hold 및 repeat 중복 방지를 검증한다. 지원 control과 제외 입력을 모두 확인한다.
+- 시간 제어 테스트로 499ms tap, 500ms hold, 장시간 hold 및 repeat 중복 방지를 검증한다. 지원 control과 제외 입력을 모두 확인한다.
 - 빈 영역에서 키·마우스 입력 후 해당 Cycle의 active owner에 스킬 없는 입력이 정확히 한 번 생기는지 확인한다.
 - 블록·스킬·공명자 조작·모달·텍스트 입력·드래그·사이클 밖에서 행동이 생성되지 않는지 확인한다. RMB context menu 제한 범위도 확인한다.
 - 두 Cycle의 입력과 active line 독립성, 파티 재정렬 후 숫자키의 목적 공명자, 동일 슬롯 및 참조 누락 시 원본 보존을 검증한다.

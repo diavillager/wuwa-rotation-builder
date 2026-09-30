@@ -1,6 +1,7 @@
 import type { CycleId } from '../domain/rotation'
 import {
   InputCapture,
+  HOLD_MS,
   keyboardControl,
   mouseControl,
   type CapturedInput,
@@ -26,6 +27,32 @@ export function attachCaptureEvents(
   let cycleId: CycleId | null = null
   let point: { x: number; y: number } | null = null
   let rmbContext = false
+  let holdTimer: number | undefined
+  const clearHoldTimer = () => {
+    if (holdTimer !== undefined) win.clearTimeout(holdTimer)
+    holdTimer = undefined
+  }
+  const cancelPending = () => {
+    clearHoldTimer()
+    capture.cancel()
+  }
+  const start = (
+    control: Parameters<InputCapture['press']>[0],
+    id: CycleId,
+  ) => {
+    const accepted = capture.press(control, { cycleId: id }, now())
+    if (accepted)
+      holdTimer = win.setTimeout(() => {
+        holdTimer = undefined
+        if (!refresh()) {
+          capture.cancel()
+          return
+        }
+        const inputs = capture.expire(now())
+        if (inputs.length) options.commit(inputs)
+      }, HOLD_MS)
+    return accepted
+  }
   const typing = () =>
     doc.activeElement instanceof win.Element &&
     !!doc.activeElement.closest(
@@ -56,7 +83,7 @@ export function attachCaptureEvents(
   const update = (target: EventTarget | null, x: number, y: number) => {
     const next = targetCycle(target, x, y)
     if (next !== cycleId || options.blocked() || typing()) {
-      capture.cancel()
+      cancelPending()
       rmbContext = false
     }
     cycleId = next
@@ -66,7 +93,7 @@ export function attachCaptureEvents(
     if (point && doc.elementFromPoint)
       update(doc.elementFromPoint(point.x, point.y), point.x, point.y)
     if (options.blocked() || typing()) {
-      capture.cancel()
+      cancelPending()
       rmbContext = false
       return null
     }
@@ -92,12 +119,14 @@ export function attachCaptureEvents(
     )
       return
     event.preventDefault()
-    if (!event.repeat) capture.press(control, { cycleId: id }, now())
+    if (!event.repeat) start(control, id)
   }
   const onKeyUp = (event: KeyboardEvent) => {
     const control = keyboardControl(event.code)
-    if (!control || !refresh()) return
+    if (!control) return
+    refresh()
     const inputs = capture.release(control, now())
+    if (inputs.length) clearHoldTimer()
     if (inputs.length) {
       event.preventDefault()
       options.commit(inputs)
@@ -110,15 +139,19 @@ export function attachCaptureEvents(
     if (!control || !id || event.ctrlKey || event.altKey || event.metaKey)
       return
     event.preventDefault()
-    const accepted = capture.press(control, { cycleId: id }, now())
+    const accepted = start(control, id)
     if (control === 'RMB') rmbContext = accepted
   }
   const onUp = (event: MouseEvent) => {
     update(event.target, event.clientX, event.clientY)
     const control = mouseControl(event.button)
-    if (!control || !refresh()) return
+    if (!control) return
+    refresh()
     const inputs = capture.release(control, now())
-    if (inputs.length) options.commit(inputs)
+    if (inputs.length) {
+      clearHoldTimer()
+      options.commit(inputs)
+    }
   }
   const onContext = (event: MouseEvent) => {
     const captured =
@@ -129,13 +162,17 @@ export function attachCaptureEvents(
       event.preventDefault()
   }
   function reset() {
-    capture.cancel()
+    cancelPending()
     cycleId = null
     point = null
     rmbContext = false
   }
   const onVisibility = () => {
-    if (doc.hidden) reset()
+    if (doc.hidden) hardReset()
+  }
+  function hardReset() {
+    reset()
+    capture.reset()
   }
   const listeners = [
     ['mousemove', onMove],
@@ -152,14 +189,14 @@ export function attachCaptureEvents(
   ] as const
   for (const [name, listener] of listeners)
     doc.addEventListener(name, listener as EventListener, true)
-  win.addEventListener('blur', reset)
+  win.addEventListener('blur', hardReset)
   return {
     cancel: reset,
     dispose: () => {
-      reset()
+      hardReset()
       for (const [name, listener] of listeners)
         doc.removeEventListener(name, listener as EventListener, true)
-      win.removeEventListener('blur', reset)
+      win.removeEventListener('blur', hardReset)
     },
   }
 }

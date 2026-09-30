@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { InputCapture, keyboardControl, mouseControl } from './input-capture'
 
 describe('실제 입력 판정', () => {
+  it('500ms에 release 없이 Hold를 확정하고 release까지 중첩 입력을 막는다', () => {
+    const capture = new InputCapture()
+    capture.press('F', { cycleId: 'opening' }, 0)
+    expect(capture.expire(499)).toEqual([])
+    expect(capture.expire(500)).toEqual([
+      { control: 'F', gesture: 'hold', target: { cycleId: 'opening' } },
+    ])
+    expect(capture.expire(1000)).toEqual([])
+    capture.cancel()
+    expect(capture.press('E', { cycleId: 'opening' }, 1100)).toBe(false)
+    expect(capture.release('F', 2000)).toEqual([])
+    expect(capture.press('E', { cycleId: 'opening' }, 2100)).toBe(true)
+  })
   it('지원 control만 변환한다', () => {
     expect(
       [
@@ -9,24 +22,25 @@ describe('실제 입력 판정', () => {
         'KeyE',
         'KeyR',
         'KeyT',
+        'KeyF',
         'Space',
         'Digit1',
         'Digit2',
         'Digit3',
       ].map(keyboardControl),
-    ).toEqual(['Q', 'E', 'R', 'T', 'Space', '1', '2', '3'])
+    ).toEqual(['Q', 'E', 'R', 'T', 'F', 'Space', '1', '2', '3'])
     expect(keyboardControl('KeyW')).toBeUndefined()
     expect([0, 1, 2].map(mouseControl)).toEqual(['LMB', undefined, 'RMB'])
   })
 
-  it('399ms tap과 400ms hold를 구분하며 repeat와 대응 press 없는 release를 무시한다', () => {
+  it('499ms tap과 500ms hold를 구분하며 repeat와 대응 press 없는 release를 무시한다', () => {
     const capture = new InputCapture()
     expect(capture.release('E', 0)).toEqual([])
     expect(capture.press('E', { cycleId: 'opening' }, 0)).toBe(true)
     expect(capture.press('E', { cycleId: 'opening' }, 100)).toBe(false)
-    expect(capture.release('E', 399)[0].gesture).toBe('tap')
+    expect(capture.release('E', 499)[0].gesture).toBe('tap')
     capture.press('RMB', { cycleId: 'repeat' }, 500)
-    expect(capture.release('RMB', 900)[0]).toEqual({
+    expect(capture.release('RMB', 1000)[0]).toEqual({
       control: 'RMB',
       gesture: 'hold',
       target: { cycleId: 'repeat' },
@@ -63,6 +77,6 @@ describe('실제 입력 판정', () => {
     expect(capture.press('LMB', { cycleId: 'opening' }, 700)).toBe(true)
     expect(capture.press('RMB', { cycleId: 'opening' }, 710)).toBe(false)
     expect(capture.release('LMB', 800)[0].control).toBe('LMB')
-    expect(capture.release('RMB', 900)).toEqual([])
+    expect(capture.release('RMB', 1000)).toEqual([])
   })
 })

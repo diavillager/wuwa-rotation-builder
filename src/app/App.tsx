@@ -642,7 +642,7 @@ export function App() {
           </div>
         )}
       </section>
-      <div className="workspace-grid">
+      <div className="workspace-grid" hidden={selectingSlot !== null}>
         <aside className="skills-panel" aria-label="공명자 스킬">
           <div className="section-heading">
             <div>
@@ -685,7 +685,9 @@ export function App() {
           {renderCycle('repeat')}
         </div>
       </div>
-      <footer>빈 사이클 영역에서 입력 · 400ms 이상 Hold · 숫자키로 교체</footer>
+      <footer hidden={selectingSlot !== null}>
+        빈 사이클 영역에서 입력 · 500ms 후 Hold 생성 · 숫자키로 교체
+      </footer>
       {pendingReplacement && (
         <div className="confirm-backdrop">
           <div
