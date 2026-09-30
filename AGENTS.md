@@ -159,14 +159,15 @@ Editor Renderer와 Export Renderer도 같은 Rotation 데이터를 사용하되 
 
 의미 있는 새로운 기능을 추가할 때는 구현 전에 `specs/` 디렉터리에 해당 기능의 spec 문서를 작성한다.
 
+spec 문서를 작성할 때 파일명은 `(year)-(month)-(day)-(number)-(file name).md` 형식을 따른다. 날짜는 문서를 처음 작성한 날짜로 쓰고, 같은 날짜의 번호는 `000`부터 세 자리로 순서대로 부여한다.
+
 예:
 
 ```text
 specs/
-├─ input-capture.md
-├─ timeline-editor.md
-├─ png-export.md
-└─ character-sync.md
+├─ 2026-09-30-000-first-file.md
+├─ 2026-09-30-001-second-file.md
+└─ 2026-10-01-000-third-file.md
 ```
 
 spec 문서는 최소한 다음 내용을 다룬다.

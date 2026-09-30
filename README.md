@@ -28,7 +28,7 @@ npm run build
 
 - [확정 요구사항 체크리스트](docs/requirements-checklist.md): 제품 요구사항의 최우선 기준
 - [PRD](docs/PRD.md): 구현 기준
-- [프로젝트 기반 spec](specs/project-foundation.md): 이번 단계의 설계와 범위
+- [프로젝트 기반 spec](specs/2026-09-30-000-project-foundation.md): 이번 단계의 설계와 범위
 - [AGENTS.md](AGENTS.md): 저장소 작업 지침
 
 `specs/`는 기능별 구현 계획을 담으며 체크리스트나 PRD를 대체하지 않습니다.
