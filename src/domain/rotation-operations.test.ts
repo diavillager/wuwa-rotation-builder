@@ -403,4 +403,16 @@ describe('SkillBlock 편집', () => {
       addSkill(start, 'opening', 'auto', { id: 's', skillRef: 'x', stage: 0 }),
     ).toThrow()
   })
+
+  it('개막과 반복이 같은 Timeline 상태를 공유하면 편집 전에 거부한다', () => {
+    const state = createRotation(['a', 'b', 'c'])
+    const aliased: Rotation = {
+      ...state,
+      repeat: { ...state.repeat, columns: state.opening.columns },
+    }
+    expect(() => assertRotation(aliased)).toThrow('독립 상태')
+    expect(() => setActiveCharacter(aliased, 'repeat', 'b')).toThrow(
+      '독립 상태',
+    )
+  })
 })

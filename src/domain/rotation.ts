@@ -102,6 +102,13 @@ export function assertRotation(rotation: Rotation): void {
   ) {
     throw new Error('파티 구성이 유효하지 않습니다.')
   }
+  if (
+    rotation.opening === rotation.repeat ||
+    rotation.opening.columns === rotation.repeat.columns ||
+    rotation.opening.transitions === rotation.repeat.transitions ||
+    rotation.opening.suppression === rotation.repeat.suppression
+  )
+    throw new Error('개막과 반복 Cycle은 독립 상태여야 합니다.')
   for (const cycle of [rotation.opening, rotation.repeat]) {
     if (!rotation.party.includes(cycle.activeCharacterId))
       throw new Error('활성 공명자가 파티에 없습니다.')
