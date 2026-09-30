@@ -225,7 +225,6 @@ button {
   flex-shrink: 0;
 }
 .selector-heading button,
-.element-tabs button,
 .character-options button {
   border: 1px solid #52626a;
   border-radius: 8px;
@@ -235,23 +234,33 @@ button {
 }
 .element-tabs {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
+  overflow: hidden;
   margin-left: auto;
+  border: 1px solid #52626a;
+  border-radius: 8px;
+  background: #202932;
 }
 .element-tabs button {
   min-width: 88px;
-  padding-inline: 16px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #e4eeee;
+}
+.element-tabs button + button {
+  border-left: 1px solid #52626a;
 }
 .element-tabs button.selected {
-  border-color: #8fc9b8;
   background: #315047;
   color: #f2fbf7;
 }
-.element-tabs button:hover,
+.element-tabs button:hover {
+  background: #35544d;
+}
 .element-tabs button:focus-visible {
-  border-color: #8fc9b8;
+  outline: 2px solid #8fc9b8;
+  outline-offset: -2px;
 }
 .character-options {
   display: flex;
