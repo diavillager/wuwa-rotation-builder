@@ -67,15 +67,15 @@ function fixture() {
 }
 
 describe('브라우저 이벤트와 Rotation 통합', () => {
-  it('500ms 타이머에서 F Hold를 만들고 추가 입력과 release 중복을 막는다', () => {
+  it('200ms 타이머에서 F Hold를 만들고 추가 입력과 release 중복을 막는다', () => {
     vi.useFakeTimers()
     const f = fixture()
     f.move('#empty')
     f.key('keydown', 'KeyF', 0)
-    f.setTime(499)
-    vi.advanceTimersByTime(499)
+    f.setTime(199)
+    vi.advanceTimersByTime(199)
     expect(f.state().opening.columns).toHaveLength(0)
-    f.setTime(500)
+    f.setTime(200)
     vi.advanceTimersByTime(1)
     expect(f.state().opening.columns[0].action).toMatchObject({
       input: 'F',
@@ -136,7 +136,7 @@ describe('브라우저 이벤트와 Rotation 통합', () => {
     f.move('#empty')
     f.key('keydown', 'KeyE', 0)
     f.key('keydown', 'KeyE', 100, true)
-    f.key('keyup', 'KeyE', 499)
+    f.key('keyup', 'KeyE', 199)
     f.key('keydown', 'Digit2', 500)
     f.key('keyup', 'Digit2', 1000)
     expect(f.state().opening.columns.map((item) => item.action.type)).toEqual([
@@ -210,7 +210,7 @@ describe('브라우저 이벤트와 Rotation 통합', () => {
     })
     empty.dispatchEvent(menu)
     expect(menu.defaultPrevented).toBe(true)
-    f.setTime(500)
+    f.setTime(200)
     empty.dispatchEvent(new MouseEvent('mouseup', { button: 2, bubbles: true }))
     expect(f.state().opening.columns[0].action).toMatchObject({
       input: 'RMB',

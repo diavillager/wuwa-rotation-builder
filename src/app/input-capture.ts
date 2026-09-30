@@ -1,7 +1,7 @@
 import type { CycleId, Gesture, InputControl } from '../domain/rotation'
 
 export type CaptureControl = InputControl | '1' | '2' | '3'
-export const HOLD_MS = 500
+export const HOLD_MS = 200
 export interface CaptureTarget {
   cycleId: CycleId
 }

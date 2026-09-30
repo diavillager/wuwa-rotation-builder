@@ -46,13 +46,58 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('200ms에 생성된 RMB Hold 위의 메뉴를 막고 release는 중복 생성하지 않는다', async () => {
+    vi.useFakeTimers()
+    await act(async () => {
+      grid().dispatchEvent(
+        new MouseEvent('mousedown', { button: 2, bubbles: true }),
+      )
+    })
+    time = 200
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    const card = grid().querySelector('.input-card')!
+    expect(card.textContent).toContain('RMBHold')
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => card,
+    })
+    await hover(card)
+    for (const target of [card, card.querySelector('.input-key')!]) {
+      const menu = new MouseEvent('contextmenu', {
+        button: 2,
+        bubbles: true,
+        cancelable: true,
+      })
+      await act(async () => {
+        target.dispatchEvent(menu)
+      })
+      expect(menu.defaultPrevented).toBe(true)
+    }
+    await act(async () => {
+      card.dispatchEvent(
+        new MouseEvent('mouseup', { button: 2, bubbles: true }),
+      )
+    })
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+    const outsideMenu = new MouseEvent('contextmenu', {
+      button: 2,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      document.querySelector('header')!.dispatchEvent(outsideMenu)
+    })
+    expect(outsideMenu.defaultPrevented).toBe(false)
+  })
   it('release 전에 F Hold와 협주 교체를 렌더링하며 release에서 중복하지 않는다', async () => {
     vi.useFakeTimers()
     await hover(grid())
     await key('keydown', 'KeyF')
-    time += 499
+    time += 199
     await act(async () => {
-      vi.advanceTimersByTime(499)
+      vi.advanceTimersByTime(199)
     })
     expect(grid().querySelectorAll('.input-card')).toHaveLength(0)
     time += 1
@@ -65,9 +110,9 @@ describe('App 실제 입력 연결', () => {
     await key('keyup', 'KeyF', 1000)
     expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
     await key('keydown', 'Digit2')
-    time += 500
+    time += 200
     await act(async () => {
-      vi.advanceTimersByTime(500)
+      vi.advanceTimersByTime(200)
     })
     expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
     expect(

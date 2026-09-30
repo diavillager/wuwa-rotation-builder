@@ -23,12 +23,12 @@
 ## 3. 입력과 스킬
 
 - [x] Input-first: 실제 입력을 기록하며 키만 보고 스킬 의미를 추론하지 않는다.
-- [x] 캡처 대상은 `Q/E/R/T/F/Space/1/2/3/LMB/RMB`; `WASD`는 제외한다. gesture는 `tap|hold`, 공통 hold 기준은 500ms다.
-- [x] press 후 500ms 전에 release하면 tap을 생성한다. 500ms가 되면 release를 기다리지 않고 hold를 한 번 생성한다. release 시 중복 생성하지 않으며 키보드 자동 repeat `keydown`을 여러 입력으로 기록하지 않는다.
+- [x] 캡처 대상은 `Q/E/R/T/F/Space/1/2/3/LMB/RMB`; `WASD`는 제외한다. gesture는 `tap|hold`, 공통 hold 기준은 200ms다.
+- [x] press 후 200ms 전에 release하면 tap을 생성한다. 200ms가 되면 release를 기다리지 않고 hold를 한 번 생성한다. release 시 중복 생성하지 않으며 키보드 자동 repeat `keydown`을 여러 입력으로 기록하지 않는다.
 - [x] 한 번에 하나의 입력만 캡처한다. 먼저 누른 입력이 진행 중이면 추가 키·마우스 press는 무시하며, 무시한 입력은 나중 release 때도 기록하지 않는다.
 - [x] 캡처 중 빈 영역을 벗어나거나 다른 Cycle로 이동하면 진행 중 입력을 취소한다.
 - [x] 입력 캡처는 사이클 필드의 빈 영역 hover에서만 활성화된다. 빈 영역은 사이클 내부이며 블록 또는 조작 UI를 가리키지 않는 위치다. LMB/RMB도 실제 입력으로 생성한다.
-- [x] RMB를 빈 사이클 영역에서 Rotation 입력으로 캡처할 때만 브라우저 context menu를 막는다. 사이클 밖과 다른 UI의 일반 RMB 동작은 불필요하게 막지 않는다.
+- [x] RMB를 빈 사이클 영역에서 Rotation 입력으로 캡처할 때와 InputBlock(연결 스킬 포함) 위에서는 브라우저 context menu를 막는다. Hold 생성 후 커서 아래에 나타난 블록에도 적용한다. 사이클 밖과 다른 UI의 일반 RMB 동작은 불필요하게 막지 않는다.
 - [x] 숫자키 tap은 일반 교체, hold는 협주 교체 편집 명령이다.
 - [x] 현재 active 공명자의 파티 번호를 누르면 tap/hold 모두 안내 없이 무시하고 행동·교체를 생성하지 않는다.
 - [x] 스킬 진열에는 해당 사이클의 active line 공명자 스킬만 표시한다. MVP에는 카테고리 그룹/필터가 없다. 파일명을 노출하지 않고 displayName을 사람이 검수한다.

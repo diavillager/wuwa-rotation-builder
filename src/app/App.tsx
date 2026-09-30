@@ -288,6 +288,7 @@ export function App() {
       data-action-column={columnId}
       data-action-id={action.id}
       data-skill-count={action.skills.length}
+      onContextMenu={(event) => event.preventDefault()}
       draggable
       aria-label={`${action.input} 입력, 연결 스킬 ${action.skills.length}개`}
       onDragStart={(event) => {
@@ -686,7 +687,7 @@ export function App() {
         </div>
       </div>
       <footer hidden={selectingSlot !== null}>
-        빈 사이클 영역에서 입력 · 500ms 후 Hold 생성 · 숫자키로 교체
+        빈 사이클 영역에서 입력 · 200ms 후 Hold 생성 · 숫자키로 교체
       </footer>
       {pendingReplacement && (
         <div className="confirm-backdrop">

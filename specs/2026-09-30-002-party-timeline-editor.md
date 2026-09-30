@@ -24,7 +24,7 @@
 
 ## 이번 작업의 비범위
 
-- 실제 키·마우스 입력의 press/release 캡처, 500ms tap/hold 판정 및 숫자키 교체 생성. 별도 입력 캡처 spec에서 다룬다.
+- 실제 키·마우스 입력의 press/release 캡처, 200ms tap/hold 판정 및 숫자키 교체 생성. 별도 입력 캡처 spec에서 다룬다.
 - 공명자 전체 데이터 수집, `wuwa-character-sync`, 미검수 스킬 또는 AutoAction 의미의 자동 확정.
 - 서로 다른 InputBlock 사이의 SkillBlock 직접 이동, Transition 직접 선택·삭제 UI.
 - Undo/Redo UI와 이력, IndexedDB 프로젝트 관리, JSON Import/Export, PNG Export, 배포.
