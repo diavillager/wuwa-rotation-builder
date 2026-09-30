@@ -1,0 +1,315 @@
+# `wuwa-rotation-builder` 제품 요구사항 문서
+
+상태: Codex 구현 기준 · 작성일: 2026-09-29  
+언어: 한국어 우선 · 대상: 데스크톱 · 저장소: `wuwa-rotation-builder`
+
+이 문서는 [확정 요구사항 체크리스트](requirements-checklist.md)를 기준으로 작성했다. **“해야 한다”는 확정 제품 요구사항**, “구현 권장사항”과 “추후 결정”은 아직 확정되지 않은 선택이다.
+
+## 1. 제품 목표
+
+Wuthering Waves의 3인 파티가 수행하는 개막 및 반복 로테이션을 **실제 키·마우스 입력 순서**로 기록하고, 각 입력에 관련 스킬을 사람이 연결해 시각화한다. 사용자는 파티, 시간 순서, 일반/협주 교체 및 자동 행동을 편집하고 두 가지 PNG 보기와 JSON 백업으로 결과를 공유할 수 있어야 한다.
+
+개발은 GitHub 원본 저장소와 localhost를 중심으로 진행한다. 대상 공명자 데이터가 모두 들어간 뒤 첫 배포를 진행하며 배포처는 추후 결정한다.
+
+## 2. MVP 범위와 제외
+
+**MVP 포함**
+
+- 3인 파티 편성, 순서 변경 및 공명자 교체.
+- 개막/반복 사이클의 입력·스킬·교체·자동 행동 편집.
+- 해당 공명자의 검수된 스킬 진열.
+- 전체 정보/조작 중심 PNG Export.
+- 새 프로젝트 생성·이름 변경·복제·삭제, 여러 로테이션의 IndexedDB 자동저장, JSON Import/Export, 열린 로테이션 편집 Undo/Redo.
+- 로컬 공명자 데이터와 개발용 `wuwa-character-sync` 작업 흐름.
+
+**MVP 제외**: 로그인, 클라우드 저장, 커뮤니티 DB, 자동 DPS 산출, 자동 협주 게이지 계산, 자동 로테이션 추천. 앱은 입력키로 사용 스킬을 추론하지 않는다.
+
+## 3. 반드시 지킬 다섯 불변조건
+
+> **I1 · Input-first** — InputBlock은 사용자의 실제 입력을 기록한다. 키를 스킬 의미로 자동 변환하지 않는다. 스킬 연결은 사용자가 구성한다.
+>
+> **I2 · 전역 열 단일 행동** — 한 Cycle의 3라인은 하나의 `TimelineColumn[]` 시간 순서를 공유하며, 각 열에는 3라인을 통틀어 행동 블록(InputBlock 또는 AutoActionBlock) 하나만 있다.
+>
+> **I3 · AutoAction 읽기 전용** — 자동 행동은 독립 열에 놓이며 삭제 외의 직접 편집, 이동, 스킬 추가, stage 변경을 허용하지 않는다.
+>
+> **I4 · Transition 무열** — 교체는 시간축 열이 아니다. Editor와 전체 정보 Export에서는 라인 이동으로 표현하고 조작 중심 Export에서만 숫자키 입력 블록으로 펼친다.
+>
+> **I5 · 두 사이클 독립** — 개막과 반복은 내용, 시간축, active line이 독립이다. 파티 구성과 순서만 공유한다.
+
+## 4. 정보 구조와 화면 레이아웃
+
+```text
+┌──────────────── 전체 너비 파티 편성 ────────────────┐
+│              3개 슬롯 및 순서 변경                 │
+├────────── 스킬 진열 ──────────┬──── 사이클 편집 ────┤
+│ active line 공명자의 스킬    │ 개막: 3라인        │
+│                             │ 반복: 3라인        │
+└─────────────────────────────┴─────────────────────┘
+```
+
+사이클 편집 필드의 위쪽은 개막, 아래쪽은 반복이다. 각 Cycle은 3라인과 독립적인 active line 및 시간축을 가진다. Editor의 시간축은 가로로 스크롤한다. Export에서는 3개 라인을 한 묶음으로 유지하며 묶음 단위로 줄바꿈한다. 빈 사이클은 출력하지 않는다.
+
+새 프로젝트에서는 개막과 반복의 active line이 모두 현재 파티의 첫 번째 슬롯으로 시작한다. 이후 각 Cycle의 active line은 서로 독립적으로 변경된다.
+
+파티 편성 필드는 전체 너비다. 스킬 진열은 아래 좌측, 사이클 편집은 아래 우측이다. 정확한 크기·색·간격은 확정하지 않는다.
+
+## 5. 데이터 모델과 불변조건
+
+아래는 의미 모델이며 정확한 TypeScript 필드명이나 영속 포맷을 강제하는 스키마는 아니다.
+
+```ts
+type Project = {
+  id: string
+  name: string
+  createdAt: string
+  updatedAt: string
+  party: [CharacterRef, CharacterRef, CharacterRef]
+  opening: Cycle
+  repeat: Cycle
+}
+
+type Cycle = {
+  activeLine: 0 | 1 | 2
+  columns: TimelineColumn[]
+  transitions: Transition[] // 열 사이의 교체 관계
+  suppression: SwitchSuppression[]
+}
+
+type TimelineColumn = {
+  action: InputBlock | AutoActionBlock // 행동 하나
+  line: 0 | 1 | 2
+}
+
+type InputBlock = {
+  id: string
+  input: 'Q' | 'E' | 'R' | 'T' | 'Space' | 'LMB' | 'RMB'
+  gesture: 'tap' | 'hold'
+  skills: SkillBlock[]
+}
+
+type SkillBlock = { id: string; skillRef: string; stage: number }
+type AutoActionBlock = {
+  id: string
+  kind: 'normalSwitchAttack' | 'intro' | 'outro'
+  skillRef: string
+  switchId: string
+}
+
+type Transition = {
+  switchId: string
+  fromLine: 0 | 1 | 2
+  toLine: 0 | 1 | 2
+  kind: 'normal' | 'concerto'
+  key: '1' | '2' | '3'
+  // 행동 열 사이의 순서를 가리키는 anchor. 자체 열은 없음.
+}
+```
+
+`CharacterRef`, Transition의 anchor, suppression의 정확한 영속 필드는 구현 단계에서 정한다. 다음 의미 제약은 필수다.
+
+- 파티 슬롯은 정확히 3개이며 같은 공명자를 중복 배치하지 않는다. 두 Cycle은 동일 파티 슬롯 순서를 참조한다.
+- 각 Cycle의 `columns`는 단일 전역 순서다. 각 열에는 한 라인의 행동 하나만 저장한다. 세 라인을 각각 독립적인 시간 배열로 저장한 뒤 화면에서 맞추는 모델로 취급하지 않는다.
+- 열 폭은 그 열의 행동 블록 폭에 맞춰 커지고, 다른 두 라인의 빈 공간까지 같은 폭을 차지하여 X 정렬이 유지된다.
+- 파티 순서 변경은 행동의 시간 순서를 바꾸지 않는다. InputBlock, AutoAction 및 관련 사이클 내용은 소유 공명자와 함께 이동한다. `1/2/3` 또는 `line 0/1/2`는 현재 표시 위치이며, 재정렬 후 기존 행동·Transition·linked AutoAction이 다른 공명자의 것으로 바뀌거나 잘못된 공명자를 참조해서는 안 된다.
+- InputBlock의 `skills`는 빈 배열일 수 있고 순서를 유지한다. 동일 `skillRef`를 여러 번 넣을 수 있다. SkillBlock의 `stage` 최솟값은 0이며, `stage=0`은 “0단”이 아니라 단수 표시가 없다는 뜻이다.
+- AutoAction에는 입력 gesture 및 stage가 없다. 협주 교체의 outro/intro는 같은 `switchId`로 연결되지만 **각각 별도의 열**이다.
+- Transition은 열 사이에 놓인다. 삭제된 자동 행동의 suppression은 영속되는 프로젝트 편집 상태이며, 해당 교체가 남아 있는 동안 재렌더·IndexedDB 저장/로드·JSON Export/Import 후에도 유지되어 자동 행동이 재생성되지 않아야 한다.
+- 모든 편집 후 불변조건을 만족해야 한다. Undo/Redo 및 JSON Import로 복원한 상태에도 동일하게 적용한다.
+
+## 6. 입력 시스템
+
+지원 입력은 `Q/E/R/T/Space/1/2/3/LMB/RMB`다. `WASD`는 캡처 대상이 아니다. 공통 400ms 기준으로 tap 또는 hold를 기록한다. 이는 키·마우스 버튼 모두에 적용한다. 숫자키 tap은 일반 교체, 숫자키 hold는 협주 교체를 생성하는 **편집 명령**이다.
+
+Tap/Hold는 최초 press(`keydown`/`mousedown` 등)부터 해당 release까지의 지속 시간으로 판정한다. **400ms 미만은 tap, 400ms 이상은 hold**다. 키보드의 자동 repeat `keydown`은 여러 입력으로 기록하지 않는다.
+
+사이클 필드 내부의 **빈 영역을 hover**할 때만 실제 입력을 캡처한다. 빈 영역은 InputBlock, SkillBlock 및 조작 UI 위가 아닌 곳이다. LMB/RMB도 별도 생성 버튼이 아니라 실제 클릭/누름으로 생성한다. 다른 UI를 조작하거나 빈 영역 밖에 있을 때 키 입력으로 블록을 만들지 않는다.
+
+RMB를 사이클 필드의 빈 영역에서 Rotation 입력으로 캡처할 때만 브라우저 context menu를 막는다. 사이클 밖이나 다른 UI의 일반 RMB 동작은 불필요하게 막지 않는다.
+
+일반 입력은 현재 사이클의 active line에 InputBlock을 만든다. 키만으로 스킬을 추론하거나 자동 연결하지 않는다. 라인 아이콘 클릭은 해당 Cycle의 active line만 바꾸며 Transition/AutoAction을 생성하지 않는다.
+
+## 7. 파티 편성
+
+파티는 3슬롯 고정이다. 슬롯 클릭 시 공명자 선택창을 연다. 선택창은 융용, 인멸, 기류, 전도, 회절, 응결의 6속성으로 분류한다. 이미 다른 슬롯에 있는 공명자는 중복 선택할 수 없다.
+
+슬롯 또는 사이클 좌측 공명자 아이콘 드래그로 파티 순서를 바꾼다. 재배열 시 개막·반복의 공명자 라인 **순서와 그 라인에 속한 내용**을 함께 옮기되, Timeline 행동의 시간 순서는 바꾸지 않는다. 두 Cycle의 active line은 각각 독립적으로 유지한다. 재배열 후 active line의 실제 공명자와 화면 표시가 어긋나지 않아야 하며, 기존 행동·Transition·linked AutoAction의 소유 공명자도 유지되어야 한다.
+
+기존 슬롯의 공명자를 다른 공명자로 교체하면 그 슬롯 공명자의 개막·반복 라인 내용을 초기화하고 사용자에게 경고를 표시한다. 이 편집은 Undo/Redo 대상이다. 교체가 다른 라인의 Transition/연결 자동 행동에 미치는 참조 무결성은 유지해야 한다. 세부 정리 UX는 구현 권장사항에 둔다.
+
+## 8. 스킬 진열
+
+스킬 진열은 사용자가 현재 편집 중인 Cycle의 active line 공명자 스킬만 보여준다. MVP에는 카테고리 그룹과 필터를 넣지 않는다. 원본 파일명을 UI에 노출하지 않고 사람이 검수한 `displayName`을 쓴다. 진열 SkillBlock과 다중 InputBlock 내부의 SkillBlock은 같은 카드 디자인을 사용한다.
+
+진열의 스킬을 InputBlock에 드롭해 연결한다. 0개인 경우 첫 스킬을 추가한다. 기존 스킬이 1개인 경우 두 번째 스킬은 항상 뒤에 추가한다. 2개 이상인 경우 드롭 위치에 따라 앞·사이·뒤에 삽입한다. 연결 순서와 동일 `skillRef`의 중복을 보존한다.
+
+## 9. 사이클 편집 UX
+
+### 9.1 블록 표시와 직접 조작
+
+- InputBlock은 실제 조작을 나타내는 컨테이너다. 연결 스킬 0개도 허용한다.
+- SkillBlock이 하나면 InputBlock과 시각·조작상 하나의 카드로 합친다. 이 합성 카드 hover+Delete는 InputBlock 전체를 삭제한다.
+- 스킬이 2개 이상이면 외곽 안에 각각 별도의 SkillBlock 카드를 좌→우로 둔다. 단일/다중 외곽의 높이는 같고, 내용에 따라 폭만 늘어난다.
+- 여러 SkillBlock은 드래그로 순서를 변경한다. SkillBlock hover+Wheel Up은 해당 `stage`를 1 증가시키고 Wheel Down은 1 감소시킨다. SkillBlock hover+Delete는 해당 스킬만 삭제한다. InputBlock hover+Delete는 입력과 연결 스킬 전체를 삭제한다.
+- InputBlock 드래그는 같은 Cycle의 **전역 Timeline 순서**를 재배열한다. 다른 공명자의 블록 사이를 지나 배치할 수 있지만, 드래그한 블록의 소유 공명자는 바뀌지 않고 화면에서도 그 공명자 라인에 계속 렌더링된다. 다른 공명자 라인으로의 수직 이동과 개막↔반복 Cycle 사이의 직접 드래그 이동은 MVP에서 금지한다.
+- hover는 대상 지정, wheel은 값 변경, Delete는 삭제, drag는 이동/삽입, 키보드와 마우스는 실제 입력 생성에 쓴다. 지속적인 선택 상태는 최소화한다.
+
+Skill 표시가 켜진 곳에서만 `stage`를 보이며 `stage=0`은 “0단”이 아니라 단수 표시 없음이다. `stage`의 최솟값은 0으로, wheel down 등으로 0 미만으로 내릴 수 없다. stage는 SkillBlock만의 속성이며 AutoAction에는 없다.
+
+### 9.2 새 InputBlock의 삽입 위치
+
+새 InputBlock을 전역 시간축의 끝에 무조건 추가하지 않는다. **현재 active line의 마지막 편집 가능 위치**에 삽입한다.
+
+1. 그 라인의 마지막 편집 가능 행동 뒤에 넣는다.
+2. 그 라인의 끝에 다른 라인으로 나가는 Transition이 있으면 그 Transition 직전에 넣는다.
+3. 협주 교체의 퇴장 라인 끝에 반주 AutoAction이 있으면 그 반주 직전에 넣는다.
+4. 삽입 뒤의 기존 열은 오른쪽으로 밀고 기존 Transition과 자동 행동의 의미·연결을 보존한다.
+
+예: 2번 라인의 마지막이 반주이고 사용자가 2번 라인 아이콘을 클릭한 뒤 `E`를 입력하면 `E` 열은 반주 앞에 생긴다. 개막의 active line 변경은 반복의 active line에 영향을 주지 않는다.
+
+## 10. Transition과 AutoAction
+
+### 10.1 교체 생성과 표시
+
+빈 영역 hover 상태에서 숫자키 tap은 일반 교체, 400ms 이상 hold는 협주 교체를 생성한다. 숫자키는 목적 파티 슬롯을 나타낸다. 교체의 출발은 해당 Cycle의 현재 라인, 도착은 누른 숫자키의 파티 슬롯이다. 교체 후 편집 대상 라인은 도착 라인으로 이어져야 한다.
+
+Transition 자체는 시간축 열을 차지하지 않는다. 기본 Editor 및 전체 정보 Export는 별도 숫자키 카드 없이 라인 이동으로 교체를 표현한다. 조작 중심 Export는 실제 누른 숫자키를 `[1]`, `[2]`, `[3]`처럼 입력 블록으로 펼친다. 협주 교체도 `[2 Hold]`가 아닌 `[2]`로 표시한다. Export에서 펼친 블록은 출력 표현일 뿐 저장 데이터의 열이 아니다.
+
+### 10.2 자동 행동
+
+일반 교체 시 등장 공명자의 `normalSwitchAttack` AutoAction을 등장 라인에 만든다. 협주 교체 시 퇴장 공명자의 `outro`를 퇴장 라인에, 등장 공명자의 `intro`를 등장 라인에 만든다. 각 AutoAction은 독립된 전역 열을 차지한다. `normalSwitchAttack`, `intro`, `outro`는 공명자 JSON에서 각각 독립적으로 사람이 검수해 지정한다.
+
+AutoAction은 입력 정보가 없으며 읽기 전용이다. 사용자는 삭제할 수 있지만 스킬 연결·stage 변경·내용 수정·드래그 이동은 할 수 없다. 협주의 outro/intro는 같은 `switchId`의 한 쌍이다. 어느 하나를 삭제해도 둘 다 삭제하고 해당 교체에 대한 재생성 suppression을 기억한다. 일반 교체의 자동 일반공격은 독립적으로 삭제하고 suppression을 기억한다. 교체 자체의 Undo/Redo는 자동 행동 생성/삭제 및 suppression을 한 편집 단위로 복원해야 한다.
+
+## 11. Export
+
+Export 결과는 PNG이며 다음 두 모드를 제공한다.
+
+| 요소            | 전체 정보                            | 조작 중심                                 |
+| --------------- | ------------------------------------ | ----------------------------------------- |
+| InputBlock      | 입력 표시                            | 입력키만 표시                             |
+| 연결 SkillBlock | 아이콘·이름·stage 표시               | 숨김                                      |
+| AutoAction      | 표시                                 | 숨김                                      |
+| Transition      | 숫자키 카드 숨김, 라인 이동으로 표현 | 실제 숫자키 `[1]`·`[2]`·`[3]` 카드로 펼침 |
+
+stage 0은 전체 정보에서도 표시하지 않는다. 조작 중심에서 협주도 `[2]`와 같이 출력한다. 빈 개막/반복 사이클은 결과에서 제외한다. 3라인은 항상 한 묶음으로 함께 wrap한다. wrap은 고정된 열 개수가 아니라 **실제 렌더링된 TimelineColumn 폭의 누적값**으로 최대 출력 폭을 판단하며, TimelineColumn 경계에서만 일어난다. 개별 Column 또는 InputBlock의 중간을 자르지 않고, 여러 SkillBlock으로 넓어진 InputBlock도 한 단에 온전히 들어가야 한다. 정확한 최대 폭·margin·wrap 임계값의 px 값은 추후 결정한다. Editor의 DOM을 그대로 캡처하는 방식이 아니라 `Rotation Data → Editor Renderer`와 `Rotation Data → Export Renderer → PNG` 경로를 분리한다. 각 모드는 같은 데이터에서 생성되어 순서와 교체 의미가 일치해야 한다.
+
+## 12. 저장, 백업, Undo/Redo
+
+### 12.1 프로젝트와 자동저장
+
+IndexedDB에 여러 RotationProject를 저장하고 편집 내용을 자동저장한다. MVP에서 프로젝트 생성·이름 변경·복제·삭제를 지원한다. 새 프로젝트 이름은 `새 로테이션 1`, `새 로테이션 2`처럼 자동 부여하며 이후 수정할 수 있다. 각 프로젝트는 `createdAt`과 `updatedAt`을 저장한다. 외부 DB로 확장할 수 있도록 영속 접근은 Repository 계층 뒤에 둔다.
+
+### 12.2 JSON 백업
+
+JSON Export에는 `app: "wuwa-rotation-builder"`, `schemaVersion`, 공명자/스킬/asset ID 참조 및 최소 snapshot(예: `displayName`, asset 식별 정보)을 포함한다. 이미지 바이너리나 Base64 인코딩 이미지는 넣지 않는다. Import는 기존 프로젝트를 덮어쓰지 않고 **새 ID의 프로젝트**로 추가한다. 참조 ID의 장기 호환을 위해 공개된 asset/skill ID는 삭제·rename보다 비활성화를 우선한다.
+
+Skill/Character 참조를 로드할 때는 다음 순서로 복구한다.
+
+1. 참조 ID가 현재 앱 데이터에 있으면 현재 데이터를 사용한다.
+2. 현재 앱 데이터에 해당 ID가 없으면 JSON에 저장된 최소 snapshot을 사용한다.
+3. snapshot으로도 asset 등 필요한 정보를 복구할 수 없으면 missing 상태로 표시한다.
+4. 비슷한 이름이나 다른 Skill을 자동으로 추론해 대체하지 않는다.
+
+이 fallback은 **매번 로드할 때 적용하는 해석 우선순위**다. 이전 로드에서 snapshot 또는 missing을 사용했더라도, 이후 같은 참조 ID가 현재 앱 데이터에 다시 존재하면 현재 앱 데이터를 우선한다. snapshot/missing 판정을 프로젝트의 영구 고정 상태로 저장하지 않는다. 반면 AutoAction 재생성 suppression은 영속되는 RotationProject 편집 상태로, 재렌더·IndexedDB 저장/로드·JSON Export/Import 후에도 유지한다. 지원할 수 없는 `schemaVersion`, 손상된 JSON의 구체적인 오류 메시지·복구 UX와 missing 상태의 정확한 시각 디자인은 추후 결정한다. 잘못된 Import가 기존 프로젝트를 훼손하거나 I1–I5 불변조건을 깨뜨려서는 안 된다.
+
+### 12.3 Undo/Redo 경계
+
+Undo/Redo는 현재 열린 로테이션의 편집 이력에만 적용한다.
+
+| 포함                                              | 제외                    |
+| ------------------------------------------------- | ----------------------- |
+| InputBlock 생성·삭제·재정렬                       | 프로젝트 생성·삭제·복제 |
+| SkillBlock 추가·삭제·재정렬·stage 변경            | JSON Import             |
+| 교체와 연결 AutoAction 생성/삭제, AutoAction 삭제 | 프로젝트 이름 변경      |
+| 파티 순서 변경, 공명자 교체에 따른 라인 초기화    |                         |
+| 개막/반복 내용 변경                               |                         |
+
+자동저장 후에도 사용자가 수행한 현재 편집의 Undo/Redo 의미가 유지되어야 한다. 프로젝트 관리 작업은 편집 이력에 넣지 않는다. 최대 이력 수는 확정하지 않는다.
+
+## 13. 공명자 데이터 파이프라인
+
+공명자별 데이터는 `src/assets/characters/{characterId}/data/{characterId}.json`, WebP 자산은 `src/assets/characters/{characterId}/assets/*.webp`에 둔다. UI용 스킬 `displayName`과 사용 여부는 사람이 검수한다. `autoActions.normalSwitchAttack`, `autoActions.intro`, `autoActions.outro`도 각각 독립적으로 사람이 지정한다. 원본 파일명은 UI에 노출하지 않는다.
+
+Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와 WW_Data의 합집합 후보 수집 및 Encore api-v2 Resource의 WebP 조회를 확인했다. 이 spike는 후보 수집·이미지 조회의 기술 검증이며 **스킬의 의미가 자동으로 검증되었다는 뜻은 아니다**. 출시 전 외부 데이터·이미지의 라이선스 및 게임 IP 재배포 문제를 별도 재확인한다.
+
+첫 배포는 정의된 대상 공명자의 데이터 등록과 사람 검수가 끝난 뒤 진행한다. 대상 목록과 기준 시점은 배포 계획에서 확정해야 한다.
+
+## 14. 개발용 `wuwa-character-sync` 요구사항
+
+이 Skill은 앱 런타임 기능이 아닌 개발용 데이터 동기화 작업 흐름이다. 다음 두 경로를 제공한다: **미등록 공명자 전체 동기화**, **지정 공명자 재동기화**. 기본 동작은 기존 사람 검수 데이터를 덮어쓰지 않는다.
+
+작업 순서는 다음과 같다.
+
+1. 현재 저장소의 등록 캐릭터를 확인하고 Encore의 현재 목록과 비교하여 미등록 대상을 찾는다. 폴더만으로 등록 완료를 판정하지 않는다. 최소한 `src/assets/characters/{id}/data/{id}.json`이 존재하고 유효하며 JSON의 `characterId`가 디렉터리 ID와 일치해야 등록된 것으로 본다.
+2. Encore에서 기본 정보, 한국어 이름, 속성, 초상화 후보를 수집한다.
+3. Encore Character API와 WW_Data의 스킬 아이콘 후보를 합집합으로 모은다.
+4. Encore api-v2 Resource에서 WebP를 다운로드할 때 HTTP 요청 성공, 응답 Content-Type이 기대하는 이미지 형식인지, 저장 파일이 실제 이미지/WebP로 유효하게 열리는지를 확인한다. 다운로드 또는 검증에 실패한 후보는 실패 사실을 기록하며, 조용히 누락하거나 성공·완료 처리하지 않는다.
+5. 후보 ID와 자산 참조를 가진 JSON 초안을 만든다.
+6. **실제 아이콘이 보이는 로컬 검수 UI**에서 사람이 `displayName`, 사용 여부, `normalSwitchAttack`, `intro`, `outro`를 지정한다.
+7. 검수 결과를 최종 공명자 JSON에 반영하고 아래 필수 항목을 검증한다. 하나라도 충족되지 않은 Character는 완료 상태로 취급하지 않는다.
+
+최종 Character의 필수 검증 항목은 다음과 같다.
+
+- `characterId`가 존재하고 디렉터리 ID와 일치한다.
+- 한국어 `displayName`이 존재하고 `attribute`가 융용/인멸/기류/전도/회절/응결 중 하나다.
+- portrait asset이 존재한다.
+- 노출 대상으로 선택된 모든 Skill에 `displayName`과 WebP asset이 존재하며 Skill ID 중복이 없다.
+- `autoActions.normalSwitchAttack`, `autoActions.intro`, `autoActions.outro`가 각각 지정되어 있고, 세 참조가 실제 선택·등록된 Skill ID를 가리킨다.
+
+전체 신규 동기화는 기존 사람 검수 Character를 덮어쓰지 않는다. 특정 공명자 재동기화에서도 기존 `displayName`, 사용 여부, autoAction 매핑 등 사람 검수 결과의 보존을 기본값으로 한다. 새 후보와 기존 검수 데이터를 구분해 검수할 수 있어야 한다. 자동 후보의 의미는 사람이 승인하기 전까지 최종 데이터로 확정하지 않는다.
+
+자동화는 후보를 넓게 수집해 검수 UI에 제공한다. 내부 asset 파일명·path·suffix가 `QTE`, `A1`, `B3`, `Intro`처럼 보이더라도 그것만으로 사용자용 Skill `displayName`, 노출 여부, `autoActions.normalSwitchAttack`/`intro`/`outro`를 확정하지 않는다. 이 의미 정보는 실제 아이콘과 후보 데이터를 사람이 검수한 뒤 확정한다.
+
+## 15. 수용 기준 및 테스트 시나리오
+
+| ID  | 시나리오                                                                                       | 기대 결과                                                                                                                                                             |
+| --- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | 개막의 빈 영역을 hover하고 `E`를 누른다                                                        | 개막 active line의 마지막 편집 가능 위치에 `E` InputBlock이 생기며 스킬은 자동 연결되지 않는다.                                                                       |
+| A2  | 블록 또는 조작 UI 위, 사이클 밖에서 `E`/LMB를 입력한다                                         | 새 InputBlock이 생기지 않는다.                                                                                                                                        |
+| A3  | 입력을 400ms 미만과 이상으로 수행하고 키를 계속 누른다                                         | 최초 press부터 release까지로 tap/hold가 구분된다. 자동 repeat `keydown`은 중복 기록되지 않고 WASD는 기록되지 않는다.                                                  |
+| A3a | 빈 영역과 다른 UI에서 RMB를 누른다                                                             | 빈 영역에서 Rotation 입력으로 캡처할 때만 context menu가 막히고 다른 위치의 일반 RMB 동작은 유지된다.                                                                 |
+| A4  | 2번 라인에 후속 교체가 있는 상태에서 2번 아이콘을 클릭하고 `E`를 누른다                        | `E`가 해당 교체 직전 새 열에 삽입되고 후속 열이 밀린다. 클릭만으로 교체/자동 행동은 생기지 않는다.                                                                    |
+| A5  | 협주 교체의 퇴장 라인 마지막이 반주일 때 새 입력을 만든다                                      | 입력이 반주 바로 앞에 생기고 linked pair와 Transition이 유지된다.                                                                                                     |
+| A6  | 한 열의 InputBlock에 스킬 두 개를 연결해 폭을 늘린다                                           | 같은 열의 다른 두 라인 X 정렬도 함께 늘어나며 한 열에 다른 행동은 없다.                                                                                               |
+| A7  | SkillBlock을 0→1→2→3개로 추가하고 재정렬/삭제한다                                              | 첫 추가, 두 번째 뒤 추가, 세 번째부터 드롭 위치 삽입이 작동하며 중복 skillRef와 순서가 유지된다. 단일 합성 카드 Delete는 전체 삭제다.                                 |
+| A8  | 숫자키 tap으로 일반 교체한다                                                                   | Transition은 열을 차지하지 않고 등장 라인에 자동 일반공격 열이 생긴다.                                                                                                |
+| A9  | 숫자키 hold로 협주 교체한다                                                                    | 퇴장 반주와 등장 변주가 각각 독립 열에 생기고 같은 `switchId`를 가진다.                                                                                               |
+| A10 | 협주 자동 행동 하나를 삭제한 후 재렌더/저장·로드한다                                           | 연결된 두 자동 행동이 모두 사라지고 suppression 때문에 재생성되지 않는다. 일반 교체 자동공격은 단독 삭제된다.                                                         |
+| A11 | 같은 데이터를 두 모드로 Export한다                                                             | 전체 정보에는 스킬/AutoAction이 보이고 교체 숫자키는 숨는다. 조작 중심에는 입력키와 펼친 `[2]`가 보이며 Skill/stage/AutoAction은 숨는다. 빈 사이클은 제외된다.        |
+| A12 | 개막/반복의 active line을 각각 다르게 바꾸고 파티 순서를 드래그한다                            | active line 상태와 시간축 내용은 독립이며 두 사이클의 파티 순서와 해당 라인 내용이 함께 동기화된다.                                                                   |
+| A13 | 공명자를 교체한 뒤 Undo/Redo한다                                                               | 경고가 보이고 해당 공명자의 양쪽 사이클 라인이 초기화된다. Undo는 이전 편집 상태를 복원한다.                                                                          |
+| A14 | JSON을 Export하고 Import한다                                                                   | `app/schemaVersion` 및 최소 snapshot이 보존되고 이미지 바이너리 없이 새 ID의 프로젝트가 추가된다. 기존 프로젝트는 유지된다.                                           |
+| A15 | 프로젝트를 생성·이름 변경·복제·삭제하고 저장된 프로젝트를 다시 연다                            | 자동 이름은 수정 가능하며 복제·삭제와 여러 프로젝트 저장이 작동한다. `createdAt/updatedAt`과 자동저장된 내용이 유지되고 프로젝트 관리 작업은 Undo/Redo 대상이 아니다. |
+| A16 | sync로 새 공명자를 수집하고 특정 공명자를 재동기화한다                                         | 후보 WebP가 로컬 검수 UI에 실제로 보이고 기존 검수 데이터는 기본 보존된다. 필수 필드·asset·참조가 유효할 때만 완료 처리하며 다운로드/검증 실패를 기록한다.            |
+| A17 | 새 프로젝트를 만들고 두 Cycle의 편집 라인을 변경한다                                           | 처음에는 둘 다 파티 첫 슬롯이며 이후 독립적으로 변경된다.                                                                                                             |
+| A18 | 전역 순서 `A1 → B1 → A2 → C1`에서 A1을 A2 뒤로 드래그한 뒤 다른 라인/Cycle로도 드롭을 시도한다 | `B1 → A2 → A1 → C1` 순서로 재배열되며 A1은 A 공명자 라인에 남는다. 다른 공명자 라인과 Cycle로의 직접 이동은 금지된다.                                                 |
+| A19 | SkillBlock hover 상태에서 Wheel Up/Down을 사용한다                                             | Up은 stage를 1 올리고 Down은 1 내린다. 0 아래로 내려가지 않으며 0은 단수 표시 없이 렌더링된다.                                                                        |
+| A20 | 파티 순서를 바꾼다                                                                             | 행동의 전역 시간 순서는 그대로이고 행동·Transition·linked AutoAction의 소유 공명자가 유지된다.                                                                        |
+| A21 | 현재 앱 데이터에 없는 참조 ID가 든 JSON을 로드한다                                             | 저장된 snapshot을 사용하고, 복구 불가 항목은 missing으로 표시하며 다른 Skill로 자동 대체하지 않는다.                                                                  |
+| A22 | 폭이 다른 Column을 여러 개 가진 사이클을 PNG로 출력한다                                        | 렌더링 폭의 누적값으로 Column 경계에서만 wrap하며 3라인 묶음과 넓은 InputBlock이 잘리지 않는다.                                                                       |
+
+## 16. 추후 결정 및 구현 권장사항
+
+### 추후 결정
+
+- 배포 대상 공명자의 정확한 목록과 기준 시점, 첫 배포처.
+- 지원 브라우저와 최소 데스크톱 화면 폭.
+- 색상, 테두리, 정확한 px/여백, hover 효과, Pretendard weight.
+- Undo/Redo 이력 최대 개수와 자동저장 debounce 시간.
+- IndexedDB 래퍼 라이브러리 및 구체적 프론트엔드 스택.
+- PNG의 정확한 최대 폭, 여백 및 줄바꿈 임계값의 px 값.
+- 누락된 공명자 autoAction 데이터의 처리, 손상된 JSON과 지원하지 않는 `schemaVersion`의 구체적인 오류 메시지·복구 UX, JSON missing 상태의 정확한 시각 디자인.
+
+### 구현 권장사항
+
+- 도메인 편집 명령을 순수 함수로 구현하고 명령 전후에 I1–I5 불변조건을 검증한다. Undo/Redo는 관련 변경을 원자적 한 단계로 기록한다.
+- Transition은 양옆 행동 사이에 고정 인덱스만 저장하기보다 안정적인 anchor를 사용하여 중간 열 삽입에도 의미가 보존되게 한다.
+- 파티 순서 변경 시 화면 인덱스와 공명자 ID를 혼동하지 않도록 라인 매핑을 명시적으로 갱신한다.
+- 행동 소유권은 공명자 ID로 직접 저장하거나 파티 재정렬 시 모든 line reference를 원자적으로 remap할 수 있다. 어느 방식이든 행동·Transition·linked AutoAction의 소유 공명자를 유지한다.
+- 공명자 교체로 관련 Transition이 유효하지 않게 되면 참조와 연결 AutoAction을 일관되게 정리하고 그 결과를 경고에 설명한다.
+- 입력 캡처는 hover 대상, 포커스, 드래그 및 모달 상태를 함께 검사해 편집 UI 사용 중 의도치 않은 블록 생성이 없도록 한다.
+- 실제 입력 데이터는 향후 gamepad 확장을 막지 않도록 `device + control + gesture` 또는 이에 준하는 표현을 권장한다. 예: `device: keyboard | mouse | gamepad`, `control: string`, `gesture: tap | hold`. 이는 정확한 TypeScript schema나 MVP gamepad 입력 UI를 요구하지 않는다.
+- JSON Import는 사전 검증 후 원자적으로 새 프로젝트를 생성하고, 실패 시 기존 데이터를 유지한다.
+- 로컬 검수 UI는 원본 후보와 현재 검수 값을 나란히 보여줘 재동기화에서 변경 범위를 확인하기 쉽게 한다.
+
+이 권장사항은 구현 방식의 제안이며 확정 제품 동작이나 특정 라이브러리 선택을 뜻하지 않는다.
