@@ -20,6 +20,8 @@
 - Q/E/R/T/F/Space/LMB/RMB와 숫자키 Tap/Hold 교체에 적용한다.
 - 블록 배치 영역의 교체 후에는 커서 라인을 유지한다. 공명자 항목의 교체 후에는 도착 라인을 활성화한다.
 - 다른 Cycle의 내용·active line과 기존 소유권·상대 순서·suppression을 보존한다.
+- 기존 교체 경계 바로 앞에 출발 공명자의 InputBlock을 드래그하면 그 블록 뒤로 기존 교체 anchor를 잇는다. 앞선 입력을 전부 삭제해 경계가 전역 시작이 된 경우도 동일하게 처리한다. 다른 소유자의 블록이나 경계와 떨어진 이동으로 교체를 자동 연결하지 않는다.
+- SkillBlock 추가로 InputBlock이 넓어져 표시 영역을 벗어나면 해당 블록이 보이도록 그 Cycle만 자동 스크롤한다. 이미 보이는 블록과 실패한 추가는 스크롤을 변경하지 않는다.
 
 ## 비범위 / 이번 작업에서 하지 않는 것
 
@@ -66,6 +68,8 @@ InputBlock 내부 스킬과 공명자 항목도 캡처한다. LMB down은 native
 - 빈 라인의 끝 및 outgoing/반주 앞 삽입, InputBlock·내부 스킬 뒤 입력과 숫자키 일반·협주 삽입.
 - 끊어진 A→C 복구 및 새 B를 거치는 직접 편집, 다른 공명자 행동 보존.
 - Shared Timeline, 소유권, anchor·linked pair·suppression과 기존 열 상대 순서.
+- 교체 앞 입력 전체 삭제 후 뒤쪽 입력을 시작 경계로 드래그해 연결 복원, 일반·협주 교체와 suppression 유지 및 다른 공명자 이동 시 연결하지 않음.
+- 두 Cycle 각각 스킬 추가로 넓어진 블록의 자동 스크롤, 이미 보이는 블록과 거절된 drop에서 위치 보존.
 - Hold 라인 이탈 취소·최초 위치 유지·생성 후 release 잠금, drag·삭제·wheel·선택창 차단.
 - format:check / lint / test / build를 실행하고 branch만 push한다. PR은 생성하지 않는다.
 

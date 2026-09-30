@@ -48,8 +48,102 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
     )
   })
 }
+async function dragDrop(source: Element, target: Element) {
+  await act(async () => {
+    const start = new Event('dragstart', { bubbles: true, cancelable: true })
+    Object.defineProperty(start, 'dataTransfer', {
+      value: { effectAllowed: '' },
+    })
+    source.dispatchEvent(start)
+  })
+  await act(async () => {
+    target.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }))
+  })
+}
 
 describe('App 실제 입력 연결', () => {
+  it('교체 앞 입력 전체 삭제 후 뒤쪽 입력을 첫 셀로 드래그하면 교체 공격과 연결된다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 10)
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => grid().querySelector('.input-card'),
+    })
+    await hover(grid().querySelector('.input-card')!)
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    })
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(0)
+    Reflect.deleteProperty(document, 'elementFromPoint')
+    await hover(grid().querySelector('[data-row-owner="demo-a"]')!)
+    await key('keydown', 'KeyF')
+    await key('keyup', 'KeyF', 10)
+    const card = grid().querySelector('.input-card')!
+    const firstCell = grid().querySelector(
+      '[data-capture-owner="demo-a"][data-column-cell]',
+    )!
+    await dragDrop(card, firstCell)
+    expect(grid().querySelector('[data-column-cell] .input-card')).toBe(card)
+    expect(grid().querySelectorAll('.wire-flow')).toHaveLength(1)
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(1)
+    expect(
+      grid('repeat').querySelectorAll('.input-card,.auto-card'),
+    ).toHaveLength(0)
+  })
+
+  it.each(['opening', 'repeat'])(
+    '%s에서 스킬 추가로 넓어진 입력 블록을 따라 스크롤하되 이미 보이거나 거절된 drop은 유지한다',
+    async (cycleId) => {
+      await hover(emptyLine('demo-a', cycleId))
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+      const card = grid(cycleId).querySelector<HTMLElement>('.input-card')!
+      const scroll = grid(cycleId).closest<HTMLElement>('.timeline-scroll')!
+      const other = grid(
+        cycleId === 'opening' ? 'repeat' : 'opening',
+      ).closest<HTMLElement>('.timeline-scroll')!
+      Object.defineProperty(scroll, 'clientWidth', {
+        configurable: true,
+        value: 500,
+      })
+      scroll.scrollLeft = 30
+      other.scrollLeft = 42
+      let right = 450
+      vi.spyOn(
+        HTMLElement.prototype,
+        'getBoundingClientRect',
+      ).mockImplementation(function (this: HTMLElement) {
+        if (this === scroll) return { left: 100, right: 600 } as DOMRect
+        if (this.classList.contains('line-label'))
+          return { left: 100, right: 260 } as DOMRect
+        return { left: 300, right } as DOMRect
+      })
+      await dragDrop(document.querySelector('.catalog-skill')!, card)
+      expect(card.querySelectorAll('.linked-skill')).toHaveLength(1)
+      expect(scroll.scrollLeft).toBe(30)
+      right = 750
+      await dragDrop(document.querySelector('.catalog-skill')!, card)
+      expect(card.querySelectorAll('.linked-skill')).toHaveLength(2)
+      expect(scroll.scrollLeft).toBe(180)
+      expect(other.scrollLeft).toBe(42)
+      await hover(emptyLine('demo-b', cycleId))
+      right = 900
+      await dragDrop(document.querySelector('.catalog-skill')!, card)
+      expect(card.querySelectorAll('.linked-skill')).toHaveLength(2)
+      expect(scroll.scrollLeft).toBe(180)
+      expect(other.scrollLeft).toBe(42)
+    },
+  )
+
   it('공명자 항목에서 커서 이동 없이 LMB×3 → 2 → E → 3 Hold → R을 이어 쓴다', async () => {
     const label = grid().querySelector<HTMLElement>(
       '[data-row-owner="demo-a"]',

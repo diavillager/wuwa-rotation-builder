@@ -554,13 +554,26 @@ export function reorderInput(
     if (index === targetIndex) return cycle
     const columns = [...cycle.columns]
     const [column] = columns.splice(index, 1)
-    columns.splice(targetIndex, 0, column)
     const previousColumnId = cycle.columns[index - 1]?.id ?? null
-    const transitions = cycle.transitions.map((item) =>
+    const detached = cycle.transitions.map((item) =>
       item.afterColumnId === columnId
         ? { ...item, afterColumnId: previousColumnId }
         : item,
     )
+    // 원래 교체 경계에 같은 소유자의 입력을 넣으면 생성 시와 같이
+    // 그 입력 뒤로 기존 경계를 잇는다. 다른 위치의 교체는 추론하지 않는다.
+    const transitions = detached.map((item) => {
+      const boundary =
+        item.afterColumnId === null
+          ? 0
+          : columns.findIndex(
+              (candidate) => candidate.id === item.afterColumnId,
+            ) + 1
+      return item.fromId === column.ownerId && boundary === targetIndex
+        ? { ...item, afterColumnId: columnId }
+        : item
+    })
+    columns.splice(targetIndex, 0, column)
     return { ...cycle, columns, transitions }
   })
 }

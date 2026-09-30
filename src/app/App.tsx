@@ -293,15 +293,17 @@ export function App() {
         return
       }
       const ref = drag.ref
-      run((state) =>
-        addSkill(
+      run((state) => {
+        const next = addSkill(
           state,
           cycleId,
           actionId,
           { id: crypto.randomUUID(), skillRef: ref, stage: 0 },
           targetIndex,
-        ),
-      )
+        )
+        revealColumnRef.current = { cycleId, columnId: target.id }
+        return next
+      })
     } else if (
       drag?.kind === 'linkedSkill' &&
       drag.cycleId === cycleId &&

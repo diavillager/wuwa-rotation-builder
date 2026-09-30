@@ -4,6 +4,7 @@ import {
   changeSkillStage,
   createRotation,
   createSwitch,
+  deleteInput,
   deleteAutoAction,
   hasCharacterCycleContent,
   insertInput,
@@ -378,6 +379,87 @@ describe('Rotation foundation', () => {
     expect(state.opening.columns[2].ownerId).toBe('a')
     assertRotation(state)
   })
+
+  it.each(['normal', 'concerto'] as const)(
+    '%s 교체 앞 입력을 전부 삭제한 뒤 같은 공명자의 입력을 경계로 이동하면 연결을 복원한다',
+    (kind) => {
+      let state = insertInput(
+        createRotation(['a', 'b', 'c']),
+        'opening',
+        'first',
+        input('first-input'),
+      )
+      state = createSwitch(state, 'opening', {
+        switchId: 'switch',
+        kind,
+        toId: 'b',
+        normalSwitchAttack: {
+          columnId: 'attack',
+          actionId: 'attack-action',
+          skillRef: 'b-normal',
+        },
+        outro: {
+          columnId: 'outro',
+          actionId: 'outro-action',
+          skillRef: 'a-outro',
+        },
+        intro: {
+          columnId: 'intro',
+          actionId: 'intro-action',
+          skillRef: 'b-intro',
+        },
+      })
+      state = deleteInput(state, 'opening', 'first-input')
+      expect(state.opening.transitions[0].afterColumnId).toBe(
+        kind === 'normal' ? null : 'outro',
+      )
+      state = setActiveCharacter(state, 'opening', 'a')
+      state = insertInput(
+        state,
+        'opening',
+        'later',
+        input('later-input'),
+        undefined,
+        true,
+      )
+      const before = state.opening.columns.filter(
+        (column) => column.action.type === 'autoAction',
+      )
+      const repeat = state.repeat
+      state = reorderInput(state, 'opening', 'later', 0)
+      expect(state.opening.transitions[0].afterColumnId).toBe(
+        kind === 'normal' ? 'later' : 'outro',
+      )
+      expect(state.opening.columns[0].ownerId).toBe('a')
+      expect(state.opening.columns.slice(1)).toEqual(before)
+      expect(state.repeat).toBe(repeat)
+      assertRotation(state)
+      // 경계에서 다시 멀리 이동하면 원래 경계를 유지하고 자동 복구하지 않는다.
+      state = reorderInput(
+        state,
+        'opening',
+        'later',
+        state.opening.columns.length - 1,
+      )
+      expect(state.opening.transitions[0].afterColumnId).toBe(
+        kind === 'normal' ? null : 'outro',
+      )
+      state = setActiveCharacter(state, 'opening', 'c')
+      state = insertInput(
+        state,
+        'opening',
+        'other',
+        input('other-input'),
+        undefined,
+        true,
+      )
+      state = reorderInput(state, 'opening', 'other', 0)
+      expect(state.opening.transitions[0].afterColumnId).toBe(
+        kind === 'normal' ? null : 'outro',
+      )
+      assertRotation(state)
+    },
+  )
 
   it('rejects automatic actions placed on the wrong side of a switch boundary', () => {
     let state = insertInput(
