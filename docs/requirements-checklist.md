@@ -29,6 +29,7 @@
 - [x] 입력 캡처는 사이클 필드의 빈 영역 hover에서만 활성화된다. 빈 영역은 사이클 내부이며 블록 또는 조작 UI를 가리키지 않는 위치다. LMB/RMB도 실제 입력으로 생성한다.
 - [x] RMB를 빈 사이클 영역에서 Rotation 입력으로 캡처할 때만 브라우저 context menu를 막는다. 사이클 밖과 다른 UI의 일반 RMB 동작은 불필요하게 막지 않는다.
 - [x] 숫자키 tap은 일반 교체, hold는 협주 교체 편집 명령이다.
+- [x] 현재 active 공명자의 파티 번호를 누르면 tap/hold 모두 안내 없이 무시하고 행동·교체를 생성하지 않는다.
 - [x] 스킬 진열에는 해당 사이클의 active line 공명자 스킬만 표시한다. MVP에는 카테고리 그룹/필터가 없다. 파일명을 노출하지 않고 displayName을 사람이 검수한다.
 - [x] 진열 SkillBlock과 다중 InputBlock 내부 SkillBlock은 같은 카드 디자인을 사용한다.
 - [x] InputBlock은 실제 조작 컨테이너이고 SkillBlock을 0개 이상 순서대로 연결한다. 같은 skillRef 중복이 가능하다.

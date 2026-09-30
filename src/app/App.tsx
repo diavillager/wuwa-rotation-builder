@@ -122,6 +122,7 @@ export function App() {
               input,
               () => crypto.randomUUID(),
             )
+            if (next === liveRef.current.rotation) continue
             liveRef.current.rotation = next
             setRotation(next)
             setFocusedCycle(input.target.cycleId)

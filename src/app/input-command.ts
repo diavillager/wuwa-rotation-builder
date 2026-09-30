@@ -10,6 +10,10 @@ export function applyCapturedInput(
 ): Rotation {
   const cycleId = input.target.cycleId
   const cycle = rotation[cycleId]
+  const isSwitch =
+    input.control === '1' || input.control === '2' || input.control === '3'
+  const toId = isSwitch ? rotation.party[Number(input.control) - 1] : undefined
+  if (toId === cycle.activeCharacterId) return rotation
   const source = catalog.characters.find(
     (item) => item.id === cycle.activeCharacterId,
   )
@@ -23,8 +27,7 @@ export function applyCapturedInput(
       skills: [],
     })
   }
-  const toId = rotation.party[Number(input.control) - 1]
-  if (toId === cycle.activeCharacterId) return rotation
+  if (!toId) throw new Error('교체 대상 슬롯이 없습니다.')
   const destination = catalog.characters.find((item) => item.id === toId)
   if (!destination)
     throw new Error('교체할 슬롯의 공명자를 먼저 선택해 주세요.')

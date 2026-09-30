@@ -17,6 +17,21 @@ const input = (control: CaptureControl, gesture: 'tap' | 'hold' = 'tap') => ({
 })
 
 describe('캡처 결과의 도메인 연결', () => {
+  it('같은 번호는 tap/hold 모두 카탈로그 조회나 ID 생성 없이 무시한다', () => {
+    const original = createRotation(['demo-a', 'demo-b', 'demo-c'])
+    for (const gesture of ['tap', 'hold'] as const) {
+      expect(
+        applyCapturedInput(
+          original,
+          { characters: [] },
+          input('1', gesture),
+          () => {
+            throw new Error('ID를 만들면 안 됩니다.')
+          },
+        ),
+      ).toBe(original)
+    }
+  })
   it('일반 입력에는 스킬을 자동 연결하지 않고 다른 Cycle을 보존한다', () => {
     const original = createRotation(['demo-a', 'demo-b', 'demo-c'])
     const result = applyCapturedInput(original, demoCatalog, input('E'), nextId)

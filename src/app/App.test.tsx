@@ -44,6 +44,18 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('같은 번호의 tap/hold는 안내와 블록 없이 무시한다', async () => {
+    await hover(grid())
+    for (const duration of [10, 400]) {
+      await key('keydown', 'Digit1')
+      await key('keyup', 'Digit1', duration)
+    }
+    expect(grid().querySelectorAll('.input-card, .auto-card')).toHaveLength(0)
+    expect(document.querySelector('[role="status"]')).toBeNull()
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-a')
+  })
   it('동시 입력은 Q 하나만 렌더링하고 숫자키 교체 후 도착 라인에 기록한다', async () => {
     await hover(grid())
     await key('keydown', 'KeyQ')
