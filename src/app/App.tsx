@@ -278,7 +278,7 @@ export function App() {
     const cycle = rotation[cycleId]
     const view = projectCycle(rotation, cycle)
     const title = cycleId === 'opening' ? '개막 사이클' : '반복 사이클'
-    const tracks = `148px ${view.columns.map((item) => `${item.width}px`).join(' ')} 150px`
+    const tracks = `148px ${view.columns.map((item) => `minmax(${item.width}px, max-content)`).join(' ')} 150px`
     const transitionMark = (transition: Transition, sequence: number) => {
       const fromY = 36 + rotation.party.indexOf(transition.fromId) * 72
       const toY = 36 + rotation.party.indexOf(transition.toId) * 72
