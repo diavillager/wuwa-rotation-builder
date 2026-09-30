@@ -5,6 +5,7 @@ import {
   createRotation,
   createSwitch,
   deleteAutoAction,
+  hasCharacterCycleContent,
   insertInput,
   reorderInput,
   reorderParty,
@@ -22,6 +23,34 @@ const input = (id: string): InputBlock => ({
 })
 
 describe('Rotation foundation', () => {
+  it('warns for owned content in either cycle and for switches without actions', () => {
+    const empty = createRotation(['a', 'b', 'c'])
+    expect(hasCharacterCycleContent(empty, 'a')).toBe(false)
+
+    const opening = insertInput(empty, 'opening', 'opening-a', input('a1'))
+    expect(hasCharacterCycleContent(opening, 'a')).toBe(true)
+    expect(hasCharacterCycleContent(opening, 'b')).toBe(false)
+
+    const repeat = insertInput(empty, 'repeat', 'repeat-a', input('a2'))
+    expect(hasCharacterCycleContent(repeat, 'a')).toBe(true)
+
+    const switched = createSwitch(empty, 'opening', {
+      switchId: 'switch',
+      kind: 'normal',
+      toId: 'b',
+      normalSwitchAttack: {
+        columnId: 'auto-column',
+        actionId: 'auto',
+        skillRef: 'reviewed',
+      },
+    })
+    const suppressed = deleteAutoAction(switched, 'opening', 'auto')
+    expect(suppressed.opening.columns).toEqual([])
+    expect(hasCharacterCycleContent(suppressed, 'a')).toBe(true)
+    expect(hasCharacterCycleContent(suppressed, 'b')).toBe(true)
+    expect(hasCharacterCycleContent(suppressed, 'c')).toBe(false)
+  })
+
   it('keeps exactly one global column sequence and independent cycles', () => {
     const start = createRotation(['a', 'b', 'c'])
     const a = insertInput(start, 'opening', 'ca1', input('a1'))

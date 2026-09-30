@@ -321,6 +321,23 @@ function reanchorTransitions(
   })
 }
 
+/** 두 Cycle 중 공명자에게 소유 행동이나 연결 교체가 있는지 확인한다. */
+export function hasCharacterCycleContent(
+  rotation: Rotation,
+  characterId: CharacterId,
+): boolean {
+  return (['opening', 'repeat'] as const).some((cycleId) => {
+    const cycle = rotation[cycleId]
+    return (
+      cycle.columns.some((column) => column.ownerId === characterId) ||
+      cycle.transitions.some(
+        (transition) =>
+          transition.fromId === characterId || transition.toId === characterId,
+      )
+    )
+  })
+}
+
 /** 파티 슬롯 교체는 두 Cycle의 관련 참조를 한 번에 정리한다. */
 export function replacePartyCharacter(
   rotation: Rotation,

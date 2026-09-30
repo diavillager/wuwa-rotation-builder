@@ -6,6 +6,7 @@ import {
   deleteAutoAction,
   deleteInput,
   deleteSkill,
+  hasCharacterCycleContent,
   reorderInput,
   reorderParty,
   reorderSkill,
@@ -37,6 +38,11 @@ type HoverTarget =
   | { kind: 'input'; cycleId: CycleId; actionId: string }
   | { kind: 'auto'; cycleId: CycleId; actionId: string }
   | { kind: 'skill'; cycleId: CycleId; actionId: string; skillId: string }
+type PendingReplacement = {
+  slotIndex: 0 | 1 | 2
+  formerId: string
+  replacementId: string
+}
 
 function demoEnabled() {
   return (
@@ -74,11 +80,32 @@ export function App() {
   )
   const [focusedCycle, setFocusedCycle] = useState<CycleId>('opening')
   const [selectingSlot, setSelectingSlot] = useState<number | null>(null)
+  const [pendingReplacement, setPendingReplacement] =
+    useState<PendingReplacement | null>(null)
   const [selectedElement, setSelectedElement] = useState<Element>(ELEMENTS[0])
   const [notice, setNotice] = useState('')
   const [drag, setDrag] = useState<DragItem | null>(null)
   const [hover, setHover] = useState<HoverTarget | null>(null)
   const visibleCharacters = charactersByElement(catalog, selectedElement)
+
+  const applyReplacement = (slotIndex: 0 | 1 | 2, replacementId: string) => {
+    try {
+      const hadContent = hasCharacterCycleContent(
+        rotation,
+        rotation.party[slotIndex],
+      )
+      const next = replacePartyCharacter(rotation, slotIndex, replacementId)
+      setRotation(next)
+      setNotice(
+        next === rotation || !hadContent
+          ? ''
+          : replacementNotice(rotation, next),
+      )
+      setSelectingSlot(null)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '교체 오류')
+    }
+  }
 
   const run = (command: (current: Rotation) => Rotation) => {
     try {
@@ -91,6 +118,10 @@ export function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (pendingReplacement) {
+        if (event.key === 'Escape') setPendingReplacement(null)
+        return
+      }
       if (
         event.key !== 'Delete' ||
         !hover ||
@@ -525,24 +556,18 @@ export function App() {
                       rotation.party[selectingSlot] !== item.id
                     }
                     onClick={() => {
-                      try {
-                        const next = replacePartyCharacter(
-                          rotation,
-                          selectingSlot as 0 | 1 | 2,
-                          item.id,
-                        )
-                        setRotation(next)
-                        setNotice(
-                          next === rotation
-                            ? ''
-                            : replacementNotice(rotation, next),
-                        )
-                        setSelectingSlot(null)
-                      } catch (error) {
-                        setNotice(
-                          error instanceof Error ? error.message : '교체 오류',
-                        )
-                      }
+                      const slotIndex = selectingSlot as 0 | 1 | 2
+                      const formerId = rotation.party[slotIndex]
+                      if (
+                        item.id !== formerId &&
+                        hasCharacterCycleContent(rotation, formerId)
+                      ) {
+                        setPendingReplacement({
+                          slotIndex,
+                          formerId,
+                          replacementId: item.id,
+                        })
+                      } else applyReplacement(slotIndex, item.id)
                     }}
                   >
                     {item.displayName}
@@ -597,6 +622,61 @@ export function App() {
         </div>
       </div>
       <footer>입력 캡처와 프로젝트 저장은 후속 단계에서 연결됩니다.</footer>
+      {pendingReplacement && (
+        <div className="confirm-backdrop">
+          <div
+            className="confirm-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="replacement-confirm-title"
+            aria-describedby="replacement-confirm-description"
+            onKeyDown={(event) => {
+              if (event.key !== 'Tab') return
+              const buttons = event.currentTarget.querySelectorAll('button')
+              if (event.shiftKey && document.activeElement === buttons[0]) {
+                event.preventDefault()
+                buttons[buttons.length - 1].focus()
+              } else if (
+                !event.shiftKey &&
+                document.activeElement === buttons[buttons.length - 1]
+              ) {
+                event.preventDefault()
+                buttons[0].focus()
+              }
+            }}
+          >
+            <h2 id="replacement-confirm-title">
+              공명자를 변경하면 사이클이 초기화됩니다.
+            </h2>
+            <p id="replacement-confirm-description">
+              기존 공명자와 연결된 행동·교체가 개막 및 반복 사이클에서
+              정리됩니다.
+            </p>
+            <div className="confirm-actions">
+              <button autoFocus onClick={() => setPendingReplacement(null)}>
+                취소
+              </button>
+              <button
+                className="confirm-submit"
+                onClick={() => {
+                  if (
+                    rotation.party[pendingReplacement.slotIndex] ===
+                    pendingReplacement.formerId
+                  ) {
+                    applyReplacement(
+                      pendingReplacement.slotIndex,
+                      pendingReplacement.replacementId,
+                    )
+                  }
+                  setPendingReplacement(null)
+                }}
+              >
+                공명자 변경
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
