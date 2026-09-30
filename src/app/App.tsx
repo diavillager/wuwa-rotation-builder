@@ -32,7 +32,11 @@ import {
   demoCatalog,
 } from './demo'
 import { projectCycle } from './editor-projection'
-import { canDropInput, stageChangeFromWheel } from './editor-interaction'
+import {
+  canDropInput,
+  deletionTargetAt,
+  stageChangeFromWheel,
+} from './editor-interaction'
 import { TimelineWires } from './TimelineWires'
 import { attachCaptureEvents } from './input-events'
 import { applyCapturedInput } from './input-command'
@@ -42,10 +46,6 @@ type DragItem =
   | { kind: 'input'; cycleId: CycleId; columnId: string }
   | { kind: 'catalogSkill'; ref: string }
   | { kind: 'linkedSkill'; cycleId: CycleId; actionId: string; skillId: string }
-type HoverTarget =
-  | { kind: 'input'; cycleId: CycleId; actionId: string }
-  | { kind: 'auto'; cycleId: CycleId; actionId: string }
-  | { kind: 'skill'; cycleId: CycleId; actionId: string; skillId: string }
 type PendingReplacement = {
   slotIndex: 0 | 1 | 2
   formerId: string
@@ -97,7 +97,7 @@ export function App() {
   const [selectedElement, setSelectedElement] = useState<Element>(ELEMENTS[0])
   const [notice, setNotice] = useState('')
   const [drag, setDrag] = useState<DragItem | null>(null)
-  const [hover, setHover] = useState<HoverTarget | null>(null)
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const visibleCharacters = charactersByElement(catalog, selectedElement)
   const captureRef = useRef<ReturnType<typeof attachCaptureEvents> | null>(null)
   const liveRef = useRef({ rotation, blocked: false })
@@ -109,6 +109,23 @@ export function App() {
     }
     if (liveRef.current.blocked) captureRef.current?.cancel()
   }, [rotation, selectingSlot, pendingReplacement, drag])
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      pointerRef.current = { x: event.clientX, y: event.clientY }
+    }
+    const onOut = (event: MouseEvent) => {
+      if (!event.relatedTarget) pointerRef.current = null
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseover', onMove)
+    document.addEventListener('mouseout', onOut)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseover', onMove)
+      document.removeEventListener('mouseout', onOut)
+    }
+  }, [])
 
   useEffect(() => {
     const adapter = attachCaptureEvents(document, {
@@ -176,14 +193,18 @@ export function App() {
         return
       }
       if (
-        event.key !== 'Delete' ||
-        !hover ||
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
+        event.key !== 'Backspace' ||
+        selectingSlot !== null ||
+        drag !== null ||
+        (event.target instanceof Element &&
+          event.target.closest(
+            'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
+          ))
       )
         return
+      const target = deletionTargetAt(document, pointerRef.current)
+      if (!target) return
       event.preventDefault()
-      const target = hover
       if (target.kind === 'input')
         run((state) => deleteInput(state, target.cycleId, target.actionId))
       else if (target.kind === 'auto')
@@ -192,7 +213,6 @@ export function App() {
         run((state) =>
           deleteSkill(state, target.cycleId, target.actionId, target.skillId),
         )
-      setHover(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -266,6 +286,8 @@ export function App() {
     <div
       className="input-card"
       data-action-column={columnId}
+      data-action-id={action.id}
+      data-skill-count={action.skills.length}
       draggable
       aria-label={`${action.input} 입력, 연결 스킬 ${action.skills.length}개`}
       onDragStart={(event) => {
@@ -273,10 +295,6 @@ export function App() {
         setDrag({ kind: 'input', cycleId, columnId })
       }}
       onDragEnd={() => setDrag(null)}
-      onMouseEnter={() =>
-        setHover({ kind: 'input', cycleId, actionId: action.id })
-      }
-      onMouseLeave={() => setHover(null)}
       onDragOver={(event) => {
         if (drag?.kind === 'catalogSkill' || drag?.kind === 'linkedSkill')
           event.preventDefault()
@@ -300,6 +318,7 @@ export function App() {
         <span
           key={skill.id}
           className="linked-skill"
+          data-skill-id={skill.id}
           draggable={action.skills.length > 1}
           onDragStart={(event) => {
             if (action.skills.length < 2) return
@@ -326,22 +345,6 @@ export function App() {
               dropSkill(cycleId, action.id, index)
             }
           }}
-          onMouseEnter={(event) => {
-            event.stopPropagation()
-            setHover(
-              action.skills.length === 1
-                ? { kind: 'input', cycleId, actionId: action.id }
-                : {
-                    kind: 'skill',
-                    cycleId,
-                    actionId: action.id,
-                    skillId: skill.id,
-                  },
-            )
-          }}
-          onMouseLeave={() =>
-            setHover({ kind: 'input', cycleId, actionId: action.id })
-          }
           onWheel={(event) => {
             const change = stageChangeFromWheel(event.deltaY)
             if (change === 0) return
@@ -351,7 +354,7 @@ export function App() {
               changeSkillStage(state, cycleId, action.id, skill.id, change),
             )
           }}
-          title="휠로 단수 변경 · Delete로 삭제"
+          title="휠로 단수 변경 · Backspace로 삭제"
         >
           {skillName(catalog, skill.skillRef)}
           {skill.stage > 0 && <small>{skill.stage}단</small>}
@@ -452,15 +455,8 @@ export function App() {
                         <div
                           className="auto-card"
                           data-action-column={column.id}
-                          onMouseEnter={() =>
-                            setHover({
-                              kind: 'auto',
-                              cycleId,
-                              actionId: column.action.id,
-                            })
-                          }
-                          onMouseLeave={() => setHover(null)}
-                          title="읽기 전용 · Delete로 삭제"
+                          data-action-id={column.action.id}
+                          title="읽기 전용 · Backspace로 삭제"
                         >
                           <small>
                             {column.action.kind === 'outro'

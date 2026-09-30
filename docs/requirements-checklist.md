@@ -34,10 +34,10 @@
 - [x] 진열 SkillBlock과 다중 InputBlock 내부 SkillBlock은 같은 카드 디자인을 사용한다.
 - [x] InputBlock은 실제 조작 컨테이너이고 SkillBlock을 0개 이상 순서대로 연결한다. 같은 skillRef 중복이 가능하다.
 - [x] SkillBlock은 `skillRef`와 `stage`를 가진다. SkillBlock hover+Wheel Up은 stage +1, Wheel Down은 stage -1이다. 최솟값은 0으로 그 아래로 내려가지 않는다. `stage=0`은 “0단”이 아니라 단수 표시 없음이다. 단수는 스킬 표시가 켜졌을 때만 보이고 AutoAction에는 stage가 없다.
-- [x] SkillBlock이 1개면 InputBlock과 하나의 카드로 합쳐 보이고 hover+Delete는 전체 삭제한다. 2개 이상이면 각 스킬이 좌→우 별도 카드다. 0→1 첫 추가, 1→2 항상 뒤, 2개 이상일 때 드롭 위치에 따라 앞/사이/뒤 삽입한다.
-- [x] 단일/다중 InputBlock의 외곽 높이는 같고 폭만 늘어난다. 스킬 카드 드래그 재정렬, hover+wheel stage 변경, hover+Delete 스킬 삭제가 가능하다. InputBlock hover+Delete는 전체 삭제다.
+- [x] SkillBlock이 1개면 InputBlock과 하나의 카드로 합쳐 보이고 hover+Backspace는 전체 삭제한다. 2개 이상이면 각 스킬이 좌→우 별도 카드다. 0→1 첫 추가, 1→2 항상 뒤, 2개 이상일 때 드롭 위치에 따라 앞/사이/뒤 삽입한다.
+- [x] 단일/다중 InputBlock의 외곽 높이는 같고 폭만 늘어난다. 스킬 카드 드래그 재정렬, hover+wheel stage 변경, hover+Backspace 스킬 삭제가 가능하다. InputBlock hover+Backspace는 전체 삭제다.
 - [x] InputBlock 드래그는 같은 Cycle의 전역 Timeline 순서를 재배열하므로 다른 공명자의 블록 사이에도 배치할 수 있다. 드래그한 블록의 소유 공명자는 유지되고 자기 공명자 라인에 렌더링된다. 다른 공명자 라인으로의 수직 이동이나 개막↔반복 사이의 직접 이동은 금지한다.
-- [x] 기본 조작: hover=대상 지정, wheel=값 변경, Delete=삭제, drag=이동/삽입, 키보드/마우스=실제 입력 생성. 지속 선택 상태는 최소화한다.
+- [x] 기본 조작: hover=대상 지정, wheel=값 변경, Backspace=삭제, drag=이동/삽입, 키보드/마우스=실제 입력 생성. 지속 선택 상태는 최소화한다.
 
 ## 4. 시간축, 교체, 자동 행동
 
@@ -77,7 +77,7 @@
 1. “같은 열에 한 행동”과 협주 linked pair는 양립한다. 반주와 변주는 각각 별도의 AutoAction 열이고 `switchId`로 묶인다.
 2. “교체는 열 없음”과 조작 중심 Export의 `[2]`도 양립한다. Export renderer가 Transition을 출력용 블록으로 펼칠 뿐 Editor 데이터에 열을 추가하지 않는다.
 3. “현재 라인 끝 삽입”은 전역 끝 삽입이 아니다. 퇴장 라인의 교체 묶음 앞에 끼워 넣고 후속 열을 밀어낸다.
-4. “스킬 카드 hover+Delete”와 “InputBlock hover+Delete”는 대상 영역으로 구분한다. 단일 스킬 합성 카드는 전체 InputBlock 삭제다.
+4. “스킬 카드 hover+Backspace”와 “InputBlock hover+Backspace”는 대상 영역으로 구분한다. 단일 스킬 합성 카드는 전체 InputBlock 삭제다.
 5. “개막/반복 독립”은 active line과 내용/시간축을 뜻한다. 파티 구성과 순서는 공유한다.
 
 **구현 전에 또는 출시 전에 정할 사항:**

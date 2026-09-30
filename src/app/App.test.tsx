@@ -24,6 +24,7 @@ beforeEach(async () => {
 })
 afterEach(async () => {
   await act(async () => root.unmount())
+  Reflect.deleteProperty(document, 'elementFromPoint')
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
@@ -44,6 +45,71 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('커서를 옮기지 않고 Backspace를 반복해 다음 블록을 삭제한다', async () => {
+    await hover(grid())
+    for (let index = 0; index < 3; index++) {
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+    }
+    // 삭제 후 같은 화면 좌표로 당겨져 온 첫 블록을 브라우저 hit test가 반환한다.
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => grid().querySelector('.input-card'),
+    })
+    await hover(grid().querySelector('.input-card')!)
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Delete',
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    })
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(3)
+    for (const remaining of [2, 1, 0]) {
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Backspace',
+            bubbles: true,
+            cancelable: true,
+          }),
+        )
+      })
+      expect(grid().querySelectorAll('.input-card')).toHaveLength(remaining)
+    }
+    Reflect.deleteProperty(document, 'elementFromPoint')
+  })
+
+  it('협주 자동 행동 삭제 시 linked pair와 블록 없는 독립 교체선을 제거한다', async () => {
+    await hover(grid())
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 400)
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
+    expect(grid().querySelectorAll('.wire-transition')).toHaveLength(1)
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => grid().querySelector('.auto-card'),
+    })
+    await hover(grid().querySelector('.auto-card')!)
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    })
+    expect(
+      grid().querySelectorAll('.auto-card, .wire-transition, .wire-flow'),
+    ).toHaveLength(0)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+    Reflect.deleteProperty(document, 'elementFromPoint')
+  })
   it('같은 번호의 tap/hold는 안내와 블록 없이 무시한다', async () => {
     await hover(grid())
     for (const duration of [10, 400]) {

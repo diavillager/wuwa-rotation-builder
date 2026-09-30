@@ -151,11 +151,11 @@ RMB를 사이클 필드의 빈 영역에서 Rotation 입력으로 캡처할 때�
 ### 9.1 블록 표시와 직접 조작
 
 - InputBlock은 실제 조작을 나타내는 컨테이너다. 연결 스킬 0개도 허용한다.
-- SkillBlock이 하나면 InputBlock과 시각·조작상 하나의 카드로 합친다. 이 합성 카드 hover+Delete는 InputBlock 전체를 삭제한다.
+- SkillBlock이 하나면 InputBlock과 시각·조작상 하나의 카드로 합친다. 이 합성 카드 hover+Backspace는 InputBlock 전체를 삭제한다.
 - 스킬이 2개 이상이면 외곽 안에 각각 별도의 SkillBlock 카드를 좌→우로 둔다. 단일/다중 외곽의 높이는 같고, 내용에 따라 폭만 늘어난다.
-- 여러 SkillBlock은 드래그로 순서를 변경한다. SkillBlock hover+Wheel Up은 해당 `stage`를 1 증가시키고 Wheel Down은 1 감소시킨다. SkillBlock hover+Delete는 해당 스킬만 삭제한다. InputBlock hover+Delete는 입력과 연결 스킬 전체를 삭제한다.
+- 여러 SkillBlock은 드래그로 순서를 변경한다. SkillBlock hover+Wheel Up은 해당 `stage`를 1 증가시키고 Wheel Down은 1 감소시킨다. SkillBlock hover+Backspace는 해당 스킬만 삭제한다. InputBlock hover+Backspace는 입력과 연결 스킬 전체를 삭제한다.
 - InputBlock 드래그는 같은 Cycle의 **전역 Timeline 순서**를 재배열한다. 다른 공명자의 블록 사이를 지나 배치할 수 있지만, 드래그한 블록의 소유 공명자는 바뀌지 않고 화면에서도 그 공명자 라인에 계속 렌더링된다. 다른 공명자 라인으로의 수직 이동과 개막↔반복 Cycle 사이의 직접 드래그 이동은 MVP에서 금지한다.
-- hover는 대상 지정, wheel은 값 변경, Delete는 삭제, drag는 이동/삽입, 키보드와 마우스는 실제 입력 생성에 쓴다. 지속적인 선택 상태는 최소화한다.
+- hover는 대상 지정, wheel은 값 변경, Backspace는 삭제, drag는 이동/삽입, 키보드와 마우스는 실제 입력 생성에 쓴다. 지속적인 선택 상태는 최소화한다.
 
 Skill 표시가 켜진 곳에서만 `stage`를 보이며 `stage=0`은 “0단”이 아니라 단수 표시 없음이다. `stage`의 최솟값은 0으로, wheel down 등으로 0 미만으로 내릴 수 없다. stage는 SkillBlock만의 속성이며 AutoAction에는 없다.
 
@@ -277,7 +277,7 @@ Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와
 | A4   | 2번 라인에 후속 교체가 있는 상태에서 2번 아이콘을 클릭하고 `E`를 누른다                        | `E`가 해당 교체 직전 새 열에 삽입되고 후속 열이 밀린다. 클릭만으로 교체/자동 행동은 생기지 않는다.                                                                    |
 | A5   | 협주 교체의 퇴장 라인 마지막이 반주일 때 새 입력을 만든다                                      | 입력이 반주 바로 앞에 생기고 linked pair와 Transition이 유지된다.                                                                                                     |
 | A6   | 한 열의 InputBlock에 스킬 두 개를 연결해 폭을 늘린다                                           | 같은 열의 다른 두 라인 X 정렬도 함께 늘어나며 한 열에 다른 행동은 없다.                                                                                               |
-| A7   | SkillBlock을 0→1→2→3개로 추가하고 재정렬/삭제한다                                              | 첫 추가, 두 번째 뒤 추가, 세 번째부터 드롭 위치 삽입이 작동하며 중복 skillRef와 순서가 유지된다. 단일 합성 카드 Delete는 전체 삭제다.                                 |
+| A7   | SkillBlock을 0→1→2→3개로 추가하고 재정렬/삭제한다                                              | 첫 추가, 두 번째 뒤 추가, 세 번째부터 드롭 위치 삽입이 작동하며 중복 skillRef와 순서가 유지된다. 단일 합성 카드 Backspace는 전체 삭제다.                              |
 | A8   | 숫자키 tap으로 일반 교체한다                                                                   | Transition은 열을 차지하지 않고 등장 라인에 자동 일반공격 열이 생긴다.                                                                                                |
 | A9   | 숫자키 hold로 협주 교체한다                                                                    | 퇴장 반주와 등장 변주가 각각 독립 열에 생기고 같은 `switchId`를 가진다.                                                                                               |
 | A10  | 협주 자동 행동 하나를 삭제한 후 재렌더/저장·로드한다                                           | 연결된 두 자동 행동이 모두 사라지고 suppression 때문에 재생성되지 않는다. 일반 교체 자동공격은 단독 삭제된다.                                                         |
