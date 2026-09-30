@@ -309,13 +309,14 @@ button {
 }
 .line-label {
   border: 0;
+  border-right: 1px solid #34414b;
+  border-bottom: 1px solid #34414b;
   text-align: left;
   min-height: 72px;
 }
 .line-label.active-line {
   color: #f2fbf7;
   background: #315047;
-  border-radius: 8px;
 }
 .line-label:hover {
   background: #35544d;
@@ -383,7 +384,7 @@ button {
 .auto-card {
   position: relative;
   z-index: 2;
-  width: 100%;
+  width: max-content;
   padding: 7px;
   border: 1px solid #866f9c;
   border-radius: 8px;

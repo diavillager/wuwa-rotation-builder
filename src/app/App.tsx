@@ -279,7 +279,7 @@ export function App() {
     const cycle = rotation[cycleId]
     const view = projectCycle(rotation, cycle)
     const title = cycleId === 'opening' ? '개막 사이클' : '반복 사이클'
-    const tracks = `148px ${view.columns.map((item) => `minmax(${item.width}px, max-content)`).join(' ')} 150px`
+    const tracks = `148px ${view.columns.map(() => 'max-content').join(' ')} 150px`
     return (
       <section
         className={`cycle-panel ${focusedCycle === cycleId ? 'focused-cycle' : ''}`}

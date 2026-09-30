@@ -9,7 +9,6 @@ export interface EditorColumn {
   id: string
   ownerId: string
   action: TimelineColumn['action']
-  width: number
 }
 
 export interface EditorBoundary {
@@ -30,10 +29,6 @@ export function projectCycle(rotation: Rotation, cycle: Cycle): EditorCycle {
     id: column.id,
     ownerId: column.ownerId,
     action: column.action,
-    width:
-      column.action.type === 'input'
-        ? Math.max(150, 115 + column.action.skills.length * 88)
-        : 164,
   }))
   const boundaries = Array.from({ length: columns.length + 1 }, (_, index) => ({
     index,

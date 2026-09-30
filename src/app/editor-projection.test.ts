@@ -25,7 +25,6 @@ describe('Editor projection', () => {
       'demo-b',
       'demo-b',
     ])
-    expect(after.columns[0].width).toBeGreaterThan(after.columns[1].width)
     expect(after.boundaries.flatMap((item) => item.transitions)).toHaveLength(1)
   })
 
