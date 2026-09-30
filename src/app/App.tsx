@@ -494,20 +494,20 @@ export function App() {
           <div className="character-selector" aria-label="공명자 선택">
             <div className="selector-heading">
               <strong>슬롯 {selectingSlot + 1} 공명자 선택</strong>
+              <div className="element-tabs" role="group" aria-label="속성 선택">
+                {ELEMENTS.map((element) => (
+                  <button
+                    key={element}
+                    type="button"
+                    className={selectedElement === element ? 'selected' : ''}
+                    aria-pressed={selectedElement === element}
+                    onClick={() => setSelectedElement(element)}
+                  >
+                    {element}
+                  </button>
+                ))}
+              </div>
               <button onClick={() => setSelectingSlot(null)}>닫기</button>
-            </div>
-            <div className="element-tabs" role="group" aria-label="속성 선택">
-              {ELEMENTS.map((element) => (
-                <button
-                  key={element}
-                  type="button"
-                  className={selectedElement === element ? 'selected' : ''}
-                  aria-pressed={selectedElement === element}
-                  onClick={() => setSelectedElement(element)}
-                >
-                  {element}
-                </button>
-              ))}
             </div>
             <div className="character-options" aria-live="polite">
               {visibleCharacters.length === 0 ? (

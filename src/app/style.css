@@ -217,8 +217,12 @@ button {
 }
 .selector-heading {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 16px;
+}
+.selector-heading > strong,
+.selector-heading > button {
+  flex-shrink: 0;
 }
 .selector-heading button,
 .element-tabs button,
@@ -232,8 +236,13 @@ button {
 .element-tabs {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-left: auto;
+}
+.element-tabs button {
+  min-width: 88px;
+  padding-inline: 16px;
 }
 .element-tabs button.selected {
   border-color: #8fc9b8;
