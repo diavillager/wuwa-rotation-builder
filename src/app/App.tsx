@@ -25,7 +25,11 @@ import {
   type CharacterCatalog,
   type Element,
 } from './catalog'
-import { createDemoRotation, demoCatalog } from './demo'
+import {
+  createContinuityDemoRotation,
+  createDemoRotation,
+  demoCatalog,
+} from './demo'
 import { projectCycle } from './editor-projection'
 import { canDropInput, stageChangeFromWheel } from './editor-interaction'
 import { TimelineWires } from './TimelineWires'
@@ -76,7 +80,9 @@ export function App() {
   const catalog: CharacterCatalog = demo ? demoCatalog : emptyCatalog
   const [rotation, setRotation] = useState<Rotation>(() =>
     demo
-      ? createDemoRotation()
+      ? new URLSearchParams(window.location.search).get('demo') === 'continuity'
+        ? createContinuityDemoRotation()
+        : createDemoRotation()
       : createRotation(['slot-one', 'slot-two', 'slot-three']),
   )
   const [focusedCycle, setFocusedCycle] = useState<CycleId>('opening')

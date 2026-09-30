@@ -98,3 +98,43 @@ export function createDemoRotation() {
     skills: [],
   })
 }
+
+/** 중간 공명자 교체 후 연결선 단절 검증용 가상 로테이션. */
+export function createContinuityDemoRotation() {
+  let rotation = createRotation(['demo-a', 'demo-b', 'demo-c'])
+  for (const cycleId of ['opening', 'repeat'] as const) {
+    const addInput = (id: string, control: 'LMB' | 'E' | 'R') => {
+      rotation = insertInput(rotation, cycleId, `${cycleId}-${id}-col`, {
+        type: 'input',
+        id: `${cycleId}-${id}`,
+        input: control,
+        gesture: 'tap',
+        skills: [],
+      })
+    }
+    for (let index = 1; index <= 3; index++) addInput(`a${index}`, 'LMB')
+    rotation = createSwitch(rotation, cycleId, {
+      switchId: `${cycleId}-a-to-b`,
+      kind: 'normal',
+      toId: 'demo-b',
+      normalSwitchAttack: {
+        columnId: `${cycleId}-b-auto-col`,
+        actionId: `${cycleId}-b-auto`,
+        skillRef: 'demo-skill-b',
+      },
+    })
+    addInput('b', 'E')
+    rotation = createSwitch(rotation, cycleId, {
+      switchId: `${cycleId}-b-to-c`,
+      kind: 'normal',
+      toId: 'demo-c',
+      normalSwitchAttack: {
+        columnId: `${cycleId}-c-auto-col`,
+        actionId: `${cycleId}-c-auto`,
+        skillRef: 'demo-skill-c',
+      },
+    })
+    addInput('c', 'R')
+  }
+  return rotation
+}

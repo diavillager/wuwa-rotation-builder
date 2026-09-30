@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { TimelineColumn, Transition } from '../domain/rotation'
 import { orthogonalPath } from './timeline-path'
+import { hasFlowConnection } from './timeline-continuity'
 
 interface Wire {
   id: string
@@ -55,6 +56,8 @@ export function TimelineWires({
       const wires: Wire[] = []
 
       for (let index = 0; index < columns.length - 1; index++) {
+        if (!hasFlowConnection(columns[index], columns[index + 1], transitions))
+          continue
         const from = actionElements
           .get(columns[index].id)
           ?.getBoundingClientRect()
