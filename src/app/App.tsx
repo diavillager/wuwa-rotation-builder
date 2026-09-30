@@ -100,6 +100,10 @@ export function App() {
   const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const visibleCharacters = charactersByElement(catalog, selectedElement)
   const captureRef = useRef<ReturnType<typeof attachCaptureEvents> | null>(null)
+  const timelineRefs = useRef<Partial<Record<CycleId, HTMLDivElement>>>({})
+  const revealColumnRef = useRef<{ cycleId: CycleId; columnId: string } | null>(
+    null,
+  )
   const liveRef = useRef({ rotation, blocked: false })
   useLayoutEffect(() => {
     liveRef.current = {
@@ -109,6 +113,24 @@ export function App() {
     }
     if (liveRef.current.blocked) captureRef.current?.cancel()
   }, [rotation, selectingSlot, pendingReplacement, drag])
+
+  useLayoutEffect(() => {
+    const target = revealColumnRef.current
+    revealColumnRef.current = null
+    if (!target) return
+    const scroll = timelineRefs.current[target.cycleId]
+    const card = scroll?.querySelector<HTMLElement>(
+      `[data-action-column="${target.columnId}"]`,
+    )
+    if (!scroll || !card) return
+    const viewport = scroll.getBoundingClientRect()
+    const block = card.getBoundingClientRect()
+    const label = scroll.querySelector('.line-label')?.getBoundingClientRect()
+    const left = label?.right ?? viewport.left
+    const right = viewport.left + scroll.clientWidth
+    if (block.right > right) scroll.scrollLeft += block.right - right
+    else if (block.left < left) scroll.scrollLeft -= left - block.left
+  }, [rotation])
 
   useEffect(() => {
     const onMove = (event: MouseEvent) => {
@@ -140,6 +162,16 @@ export function App() {
               () => crypto.randomUUID(),
             )
             if (next === liveRef.current.rotation) continue
+            const cycleId = input.target.cycleId
+            const previousColumns = new Set(
+              liveRef.current.rotation[cycleId].columns.map(
+                (column) => column.id,
+              ),
+            )
+            const added = next[cycleId].columns
+              .filter((column) => !previousColumns.has(column.id))
+              .at(-1)
+            if (added) revealColumnRef.current = { cycleId, columnId: added.id }
             liveRef.current.rotation = next
             setRotation(next)
             setFocusedCycle(input.target.cycleId)
@@ -386,7 +418,14 @@ export function App() {
             {focusedCycle === cycleId ? '편집 중' : 'Cycle'}
           </span>
         </div>
-        <div className="timeline-scroll" aria-label={`${title} 전역 타임라인`}>
+        <div
+          className="timeline-scroll"
+          ref={(element) => {
+            if (element) timelineRefs.current[cycleId] = element
+            else delete timelineRefs.current[cycleId]
+          }}
+          aria-label={`${title} 전역 타임라인`}
+        >
           <div
             className="timeline-grid"
             data-capture-cycle={cycleId}

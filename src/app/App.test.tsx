@@ -46,6 +46,59 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it.each(['opening', 'repeat'])(
+    '%s의 새 블록만 따라 스크롤하고 보이는 블록과 생성 없는 명령은 위치를 보존한다',
+    async (cycleId) => {
+      const scroll = grid(cycleId).closest<HTMLElement>('.timeline-scroll')!
+      const other = grid(
+        cycleId === 'opening' ? 'repeat' : 'opening',
+      ).closest<HTMLElement>('.timeline-scroll')!
+      Object.defineProperty(scroll, 'clientWidth', {
+        configurable: true,
+        value: 500,
+      })
+      scroll.scrollLeft = 30
+      other.scrollLeft = 42
+      let bounds = { left: 300, right: 450 }
+      vi.spyOn(
+        HTMLElement.prototype,
+        'getBoundingClientRect',
+      ).mockImplementation(function (this: HTMLElement) {
+        if (this === scroll) return { left: 100, right: 600 } as DOMRect
+        if (this.classList.contains('line-label'))
+          return { left: 100, right: 260 } as DOMRect
+        return bounds as DOMRect
+      })
+      await hover(grid(cycleId))
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+      expect(scroll.scrollLeft).toBe(30)
+      bounds = { left: 570, right: 750 }
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+      expect(scroll.scrollLeft).toBe(180)
+      expect(other.scrollLeft).toBe(42)
+      await key('keydown', 'Digit1')
+      await key('keyup', 'Digit1', 10)
+      expect(scroll.scrollLeft).toBe(180)
+      bounds = { left: 620, right: 800 }
+      await key('keydown', 'Digit2')
+      await key('keyup', 'Digit2', 200)
+      expect(scroll.scrollLeft).toBe(380)
+      expect(grid(cycleId).querySelectorAll('.auto-card')).toHaveLength(2)
+      vi.useFakeTimers()
+      bounds = { left: 200, right: 380 }
+      await key('keydown', 'KeyF')
+      time += 200
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+      expect(scroll.scrollLeft).toBe(320)
+      expect(other.scrollLeft).toBe(42)
+      await key('keyup', 'KeyF')
+      expect(scroll.scrollLeft).toBe(320)
+    },
+  )
   it('200ms에 생성된 RMB Hold 위의 메뉴를 막고 release는 중복 생성하지 않는다', async () => {
     vi.useFakeTimers()
     await act(async () => {
