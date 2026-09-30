@@ -419,6 +419,15 @@ button {
 .line-label:hover {
   background: #35544d;
 }
+.line-label:focus {
+  outline: none;
+}
+.line-label:focus-visible {
+  box-shadow: inset 0 0 0 2px #83bfb4;
+}
+.workspace-grid[hidden] {
+  display: none;
+}
 .timeline-cell {
   min-height: 72px;
   padding: 7px;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   addSkill,
   changeSkillStage,
@@ -28,21 +28,24 @@ import {
 import {
   createContinuityDemoRotation,
   createDemoRotation,
+  createInputDemoRotation,
   demoCatalog,
 } from './demo'
 import { projectCycle } from './editor-projection'
-import { canDropInput, stageChangeFromWheel } from './editor-interaction'
+import {
+  canDropInput,
+  deletionTargetAt,
+  stageChangeFromWheel,
+} from './editor-interaction'
 import { TimelineWires } from './TimelineWires'
+import { attachCaptureEvents } from './input-events'
+import { applyCapturedInput } from './input-command'
 
 type DragItem =
   | { kind: 'party'; id: string }
   | { kind: 'input'; cycleId: CycleId; columnId: string }
   | { kind: 'catalogSkill'; ref: string }
   | { kind: 'linkedSkill'; cycleId: CycleId; actionId: string; skillId: string }
-type HoverTarget =
-  | { kind: 'input'; cycleId: CycleId; actionId: string }
-  | { kind: 'auto'; cycleId: CycleId; actionId: string }
-  | { kind: 'skill'; cycleId: CycleId; actionId: string; skillId: string }
 type PendingReplacement = {
   slotIndex: 0 | 1 | 2
   formerId: string
@@ -82,7 +85,9 @@ export function App() {
     demo
       ? new URLSearchParams(window.location.search).get('demo') === 'continuity'
         ? createContinuityDemoRotation()
-        : createDemoRotation()
+        : new URLSearchParams(window.location.search).get('demo') === 'input'
+          ? createInputDemoRotation()
+          : createDemoRotation()
       : createRotation(['slot-one', 'slot-two', 'slot-three']),
   )
   const [focusedCycle, setFocusedCycle] = useState<CycleId>('opening')
@@ -92,8 +97,97 @@ export function App() {
   const [selectedElement, setSelectedElement] = useState<Element>(ELEMENTS[0])
   const [notice, setNotice] = useState('')
   const [drag, setDrag] = useState<DragItem | null>(null)
-  const [hover, setHover] = useState<HoverTarget | null>(null)
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const visibleCharacters = charactersByElement(catalog, selectedElement)
+  const captureRef = useRef<ReturnType<typeof attachCaptureEvents> | null>(null)
+  const timelineRefs = useRef<Partial<Record<CycleId, HTMLDivElement>>>({})
+  const revealColumnRef = useRef<{ cycleId: CycleId; columnId: string } | null>(
+    null,
+  )
+  const liveRef = useRef({ rotation, blocked: false })
+  useLayoutEffect(() => {
+    liveRef.current = {
+      rotation,
+      blocked:
+        selectingSlot !== null || pendingReplacement !== null || drag !== null,
+    }
+    if (liveRef.current.blocked) captureRef.current?.cancel()
+  }, [rotation, selectingSlot, pendingReplacement, drag])
+
+  useLayoutEffect(() => {
+    const target = revealColumnRef.current
+    revealColumnRef.current = null
+    if (!target) return
+    const scroll = timelineRefs.current[target.cycleId]
+    const card = scroll?.querySelector<HTMLElement>(
+      `[data-action-column="${target.columnId}"]`,
+    )
+    if (!scroll || !card) return
+    const viewport = scroll.getBoundingClientRect()
+    const block = card.getBoundingClientRect()
+    const label = scroll.querySelector('.line-label')?.getBoundingClientRect()
+    const left = label?.right ?? viewport.left
+    const right = viewport.left + scroll.clientWidth
+    if (block.right > right) scroll.scrollLeft += block.right - right
+    else if (block.left < left) scroll.scrollLeft -= left - block.left
+  }, [rotation])
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      pointerRef.current = { x: event.clientX, y: event.clientY }
+    }
+    const onOut = (event: MouseEvent) => {
+      if (!event.relatedTarget) pointerRef.current = null
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseover', onMove)
+    document.addEventListener('mouseout', onOut)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseover', onMove)
+      document.removeEventListener('mouseout', onOut)
+    }
+  }, [])
+
+  useEffect(() => {
+    const adapter = attachCaptureEvents(document, {
+      blocked: () => liveRef.current.blocked,
+      commit: (inputs) => {
+        for (const input of inputs) {
+          try {
+            const next = applyCapturedInput(
+              liveRef.current.rotation,
+              catalog,
+              input,
+              () => crypto.randomUUID(),
+            )
+            if (next === liveRef.current.rotation) continue
+            const cycleId = input.target.cycleId
+            const previousColumns = new Set(
+              liveRef.current.rotation[cycleId].columns.map(
+                (column) => column.id,
+              ),
+            )
+            const added = next[cycleId].columns
+              .filter((column) => !previousColumns.has(column.id))
+              .at(-1)
+            if (added) revealColumnRef.current = { cycleId, columnId: added.id }
+            liveRef.current.rotation = next
+            setRotation(next)
+            setFocusedCycle(input.target.cycleId)
+            setNotice('')
+          } catch (error) {
+            setNotice(error instanceof Error ? error.message : '입력 오류')
+          }
+        }
+      },
+    })
+    captureRef.current = adapter
+    return () => {
+      adapter.dispose()
+      captureRef.current = null
+    }
+  }, [catalog])
 
   const applyReplacement = (slotIndex: 0 | 1 | 2, replacementId: string) => {
     try {
@@ -115,6 +209,7 @@ export function App() {
   }
 
   const run = (command: (current: Rotation) => Rotation) => {
+    captureRef.current?.cancel()
     try {
       setRotation(command(rotation))
       setNotice('')
@@ -130,14 +225,18 @@ export function App() {
         return
       }
       if (
-        event.key !== 'Delete' ||
-        !hover ||
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
+        event.key !== 'Backspace' ||
+        selectingSlot !== null ||
+        drag !== null ||
+        (event.target instanceof Element &&
+          event.target.closest(
+            'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
+          ))
       )
         return
+      const target = deletionTargetAt(document, pointerRef.current)
+      if (!target) return
       event.preventDefault()
-      const target = hover
       if (target.kind === 'input')
         run((state) => deleteInput(state, target.cycleId, target.actionId))
       else if (target.kind === 'auto')
@@ -146,7 +245,6 @@ export function App() {
         run((state) =>
           deleteSkill(state, target.cycleId, target.actionId, target.skillId),
         )
-      setHover(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -220,6 +318,9 @@ export function App() {
     <div
       className="input-card"
       data-action-column={columnId}
+      data-action-id={action.id}
+      data-skill-count={action.skills.length}
+      onContextMenu={(event) => event.preventDefault()}
       draggable
       aria-label={`${action.input} 입력, 연결 스킬 ${action.skills.length}개`}
       onDragStart={(event) => {
@@ -227,10 +328,6 @@ export function App() {
         setDrag({ kind: 'input', cycleId, columnId })
       }}
       onDragEnd={() => setDrag(null)}
-      onMouseEnter={() =>
-        setHover({ kind: 'input', cycleId, actionId: action.id })
-      }
-      onMouseLeave={() => setHover(null)}
       onDragOver={(event) => {
         if (drag?.kind === 'catalogSkill' || drag?.kind === 'linkedSkill')
           event.preventDefault()
@@ -254,6 +351,7 @@ export function App() {
         <span
           key={skill.id}
           className="linked-skill"
+          data-skill-id={skill.id}
           draggable={action.skills.length > 1}
           onDragStart={(event) => {
             if (action.skills.length < 2) return
@@ -280,22 +378,6 @@ export function App() {
               dropSkill(cycleId, action.id, index)
             }
           }}
-          onMouseEnter={(event) => {
-            event.stopPropagation()
-            setHover(
-              action.skills.length === 1
-                ? { kind: 'input', cycleId, actionId: action.id }
-                : {
-                    kind: 'skill',
-                    cycleId,
-                    actionId: action.id,
-                    skillId: skill.id,
-                  },
-            )
-          }}
-          onMouseLeave={() =>
-            setHover({ kind: 'input', cycleId, actionId: action.id })
-          }
           onWheel={(event) => {
             const change = stageChangeFromWheel(event.deltaY)
             if (change === 0) return
@@ -305,7 +387,7 @@ export function App() {
               changeSkillStage(state, cycleId, action.id, skill.id, change),
             )
           }}
-          title="휠로 단수 변경 · Delete로 삭제"
+          title="휠로 단수 변경 · Backspace로 삭제"
         >
           {skillName(catalog, skill.skillRef)}
           {skill.stage > 0 && <small>{skill.stage}단</small>}
@@ -336,9 +418,17 @@ export function App() {
             {focusedCycle === cycleId ? '편집 중' : 'Cycle'}
           </span>
         </div>
-        <div className="timeline-scroll" aria-label={`${title} 전역 타임라인`}>
+        <div
+          className="timeline-scroll"
+          ref={(element) => {
+            if (element) timelineRefs.current[cycleId] = element
+            else delete timelineRefs.current[cycleId]
+          }}
+          aria-label={`${title} 전역 타임라인`}
+        >
           <div
             className="timeline-grid"
+            data-capture-cycle={cycleId}
             style={{ gridTemplateColumns: tracks }}
           >
             {view.party.map((id, lineIndex) => (
@@ -405,15 +495,8 @@ export function App() {
                         <div
                           className="auto-card"
                           data-action-column={column.id}
-                          onMouseEnter={() =>
-                            setHover({
-                              kind: 'auto',
-                              cycleId,
-                              actionId: column.action.id,
-                            })
-                          }
-                          onMouseLeave={() => setHover(null)}
-                          title="읽기 전용 · Delete로 삭제"
+                          data-action-id={column.action.id}
+                          title="읽기 전용 · Backspace로 삭제"
                         >
                           <small>
                             {column.action.kind === 'outro'
@@ -599,7 +682,7 @@ export function App() {
           </div>
         )}
       </section>
-      <div className="workspace-grid">
+      <div className="workspace-grid" hidden={selectingSlot !== null}>
         <aside className="skills-panel" aria-label="공명자 스킬">
           <div className="section-heading">
             <div>
@@ -642,7 +725,9 @@ export function App() {
           {renderCycle('repeat')}
         </div>
       </div>
-      <footer>입력 캡처와 프로젝트 저장은 후속 단계에서 연결됩니다.</footer>
+      <footer hidden={selectingSlot !== null}>
+        빈 사이클 영역에서 입력 · 200ms 후 Hold 생성 · 숫자키로 교체
+      </footer>
       {pendingReplacement && (
         <div className="confirm-backdrop">
           <div

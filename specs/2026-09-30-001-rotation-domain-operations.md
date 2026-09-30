@@ -21,7 +21,7 @@
 
 ## 비범위
 
-- Editor의 실제 드래그, hover, wheel, Delete 이벤트와 선택창·경고 UI.
+- Editor의 실제 드래그, hover, wheel, Backspace 이벤트와 선택창·경고 UI.
 - Transition 직접 선택·삭제 UI 및 서로 다른 InputBlock 사이의 SkillBlock 직접 이동 UX.
 - Undo/Redo 이력 저장과 UI, IndexedDB, JSON Import/Export 제품 기능, PNG Export.
 - 공명자 데이터 수집과 누락된 autoAction 데이터의 사용자-facing 처리 방식.

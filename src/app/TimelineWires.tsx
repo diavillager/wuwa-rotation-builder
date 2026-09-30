@@ -78,6 +78,16 @@ export function TimelineWires({
       }
 
       for (const transition of transitions) {
+        // 삭제된 자동 행동을 향하는 독립 교체선은 그리지 않는다.
+        // 남은 실제 행동 사이의 유효한 교체는 위 흐름선에서 표현한다.
+        if (
+          !columns.some(
+            (column) =>
+              column.action.type === 'autoAction' &&
+              column.action.switchId === transition.switchId,
+          )
+        )
+          continue
         const from = rowElements.get(transition.fromId)?.getBoundingClientRect()
         const to = rowElements.get(transition.toId)?.getBoundingClientRect()
         const anchor = transition.afterColumnId
