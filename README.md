@@ -6,6 +6,8 @@ Wuthering Waves 3인 파티의 개막·반복 로테이션을 실제 입력 순�
 
 Rotation 도메인 모델, 파티·타임라인 Editor와 실제 입력 캡처를 연결한 단계입니다. 파티 재정렬, Cycle별 active line, 입력 생성·교체와 기존 블록 편집을 시험할 수 있습니다. 프로젝트 저장, Export, 검수된 실제 공명자 데이터는 아직 제공하지 않습니다.
 
+전역 끝·InputBlock 뒤 수동 삽입 UX는 확정하여 명세에 반영했으며 아직 구현 전입니다. 현재 앱은 빈 영역 캡처와 활성 라인 끝 삽입을 사용합니다.
+
 ## 개발 환경
 
 Node.js 20.19 이상과 npm이 필요합니다.
@@ -42,6 +44,7 @@ npm run build
 - [로테이션 도메인 연산 spec](specs/2026-09-30-001-rotation-domain-operations.md): 도메인 편집 연산의 범위와 테스트 계획
 - [파티·타임라인 Editor 연결 spec](specs/2026-09-30-002-party-timeline-editor.md): 앱 Shell과 도메인 연산 연결 계획
 - [실제 입력 캡처 spec](specs/2026-09-30-003-input-capture.md): 입력 판정·교체·오캡처 방지와 테스트 계획
+- [수동 입력·교체 삽입 spec](specs/2026-09-30-004-manual-transition-editing.md): 전역 끝·InputBlock 뒤 삽입의 확정 규칙과 미확정 사항
 - [AGENTS.md](AGENTS.md): 저장소 작업 지침
 
 `specs/`는 기능별 구현 계획을 담으며 체크리스트나 PRD를 대체하지 않습니다.
