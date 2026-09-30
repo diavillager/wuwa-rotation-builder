@@ -277,6 +277,26 @@ button {
   margin-top: 20px;
   border: 1px solid #34414b;
   border-radius: 10px;
+  scrollbar-color: #648b82 #202c34;
+  scrollbar-width: thin;
+}
+.timeline-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.timeline-scroll::-webkit-scrollbar-track {
+  background: #202c34;
+}
+.timeline-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid #202c34;
+  border-radius: 10px;
+  background: #648b82;
+}
+.timeline-scroll::-webkit-scrollbar-thumb:hover {
+  background: #8ab6a9;
+}
+.timeline-scroll::-webkit-scrollbar-corner {
+  background: #202c34;
 }
 .timeline-grid {
   display: grid;
@@ -311,6 +331,10 @@ button {
   border: 0;
   border-right: 1px solid #34414b;
   border-bottom: 1px solid #34414b;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #202932;
   text-align: left;
   min-height: 72px;
 }
