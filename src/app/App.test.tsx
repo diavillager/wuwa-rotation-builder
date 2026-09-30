@@ -31,7 +31,11 @@ afterEach(async () => {
 })
 const grid = (cycleId = 'opening') =>
   document.querySelector(`[data-capture-cycle="${cycleId}"]`)!
+const emptyLine = (ownerId = 'demo-a', cycleId = 'opening') =>
+  grid(cycleId).querySelector(`[data-capture-owner="${ownerId}"].end-cell`)!
 async function hover(element: Element) {
+  if (element.hasAttribute('data-capture-cycle'))
+    element = element.querySelector('.end-cell')!
   await act(async () => {
     element.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
   })
@@ -46,6 +50,142 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('커서 라인을 즉시 강조하고 진열하며 클릭은 활성 라인을 바꾸지 않는다', async () => {
+    await hover(emptyLine('demo-b'))
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+    expect(document.querySelector('.skills-context')?.textContent).toContain(
+      '데모 공명자 B',
+    )
+    await act(async () =>
+      grid()
+        .querySelector<HTMLButtonElement>('[data-row-owner="demo-a"]')!
+        .click(),
+    )
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+    await hover(document.querySelector('.skills-panel')!)
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(0)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+    await hover(emptyLine('demo-c', 'repeat'))
+    expect(
+      grid('repeat')
+        .querySelector('.active-line')
+        ?.getAttribute('data-row-owner'),
+    ).toBe('demo-c')
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+  })
+  it('다른 라인으로 이동하면 미확정 Hold를 취소하고 새 입력은 커서 소유자로 만든다', async () => {
+    vi.useFakeTimers()
+    await hover(emptyLine())
+    await key('keydown', 'KeyQ')
+    await hover(emptyLine('demo-b'))
+    time += 200
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    await key('keyup', 'KeyQ')
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(0)
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    expect(
+      grid()
+        .querySelector('.input-card')
+        ?.closest('[data-capture-owner]')
+        ?.getAttribute('data-capture-owner'),
+    ).toBe('demo-b')
+  })
+  it('빈 셀은 라인 끝에, InputBlock은 그 뒤에 넣으며 첫 press 위치를 유지한다', async () => {
+    await hover(emptyLine())
+    for (const code of ['KeyQ', 'KeyR']) {
+      await key('keydown', code)
+      await key('keyup', code, 10)
+    }
+    const first = grid().querySelector('.input-card')!
+    await hover(first)
+    await key('keydown', 'KeyE')
+    await hover(emptyLine())
+    await key('keyup', 'KeyE', 10)
+    expect(
+      Array.from(grid().querySelectorAll('.input-key')).map(
+        (node) => node.textContent,
+      ),
+    ).toEqual(['QTap', 'ETap', 'RTap'])
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 200)
+    await key('keydown', 'KeyF')
+    await key('keyup', 'KeyF', 10)
+    const actions = Array.from(
+      grid().querySelectorAll('[data-action-column]'),
+    ).map((node) => node.textContent)
+    expect(actions[3]).toContain('FTap')
+    expect(actions[4]).toContain('반주')
+  })
+  it('공명자 변경으로 끊어진 A→C 구간을 새 공명자를 거쳐 직접 복구한다', async () => {
+    await hover(emptyLine())
+    for (let index = 0; index < 3; index++) {
+      await key('keydown', 'KeyQ')
+      await key('keyup', 'KeyQ', 10)
+    }
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 10)
+    await hover(emptyLine('demo-b'))
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await key('keydown', 'Digit3')
+    await key('keyup', 'Digit3', 10)
+    await hover(emptyLine('demo-c'))
+    await key('keydown', 'KeyR')
+    await key('keyup', 'KeyR', 10)
+    await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('.party-slot')[1].click(),
+    )
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('.character-options button')!
+        .click(),
+    )
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.confirm-submit')!.click(),
+    )
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(4)
+    expect(grid().querySelectorAll('.wire-flow')).toHaveLength(2)
+    const aCards = grid().querySelectorAll(
+      '[data-capture-owner="demo-a"] .input-card',
+    )
+    await hover(aCards[2])
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 10)
+    await hover(emptyLine('demo-e'))
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await hover(
+      grid().querySelector('[data-capture-owner="demo-e"] .input-card')!,
+    )
+    await key('keydown', 'Digit3')
+    await key('keyup', 'Digit3', 200)
+    const cards = Array.from(
+      grid().querySelectorAll('[data-action-column]'),
+    ).map((node) => node.textContent)
+    expect(cards).toHaveLength(8)
+    expect(cards.slice(0, 3).every((value) => value?.includes('QTap'))).toBe(
+      true,
+    )
+    expect(cards.at(-1)).toContain('RTap')
+    expect(grid().querySelectorAll('.wire-flow')).toHaveLength(7)
+    expect(
+      grid('repeat').querySelectorAll('[data-action-column]'),
+    ).toHaveLength(0)
+    expect(document.querySelector('[role="status"]')).toBeNull()
+  })
   it('파티 슬롯 공명자를 변경한 뒤 숫자키로 새 공명자에게 교체한다', async () => {
     await act(async () => {
       document.querySelectorAll<HTMLButtonElement>('.party-slot')[1].click()
@@ -63,15 +203,16 @@ describe('App 실제 입력 연결', () => {
     await key('keyup', 'Digit2', 10)
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
-    ).toBe('demo-e')
+    ).toBe('demo-a')
     expect(grid().querySelector('.auto-card')?.textContent).toContain(
       '데모 E 교체 공격',
     )
+    await hover(emptyLine('demo-e'))
     await key('keydown', 'Digit3')
     await key('keyup', 'Digit3', 200)
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
-    ).toBe('demo-c')
+    ).toBe('demo-e')
     expect(grid().textContent).toContain('데모 E 반주')
     expect(document.querySelector('[role="status"]')).toBeNull()
   })
@@ -131,7 +272,7 @@ describe('App 실제 입력 연결', () => {
   it('200ms에 생성된 RMB Hold 위의 메뉴를 막고 release는 중복 생성하지 않는다', async () => {
     vi.useFakeTimers()
     await act(async () => {
-      grid().dispatchEvent(
+      emptyLine().dispatchEvent(
         new MouseEvent('mousedown', { button: 2, bubbles: true }),
       )
     })
@@ -199,7 +340,7 @@ describe('App 실제 입력 연결', () => {
     expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
-    ).toBe('demo-b')
+    ).toBe('demo-a')
     await key('keyup', 'Digit2', 1000)
     expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
   })
@@ -283,7 +424,7 @@ describe('App 실제 입력 연결', () => {
     ).toHaveLength(0)
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
-    ).toBe('demo-b')
+    ).toBe('demo-a')
     Reflect.deleteProperty(document, 'elementFromPoint')
   })
   it('같은 번호의 tap/hold는 안내와 블록 없이 무시한다', async () => {
@@ -298,7 +439,7 @@ describe('App 실제 입력 연결', () => {
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
     ).toBe('demo-a')
   })
-  it('동시 입력은 Q 하나만 렌더링하고 숫자키 교체 후 도착 라인에 기록한다', async () => {
+  it('동시 입력은 Q 하나만 기록하고 교체 뒤 커서를 옮겨 도착 라인에 입력한다', async () => {
     await hover(grid())
     await key('keydown', 'KeyQ')
     await key('keydown', 'KeyE', 10)
@@ -311,7 +452,8 @@ describe('App 실제 입력 연결', () => {
     expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
-    ).toBe('demo-b')
+    ).toBe('demo-a')
+    await hover(emptyLine('demo-b'))
     await key('keydown', 'KeyE')
     await key('keyup', 'KeyE', 10)
     expect(grid().querySelectorAll('.input-card')).toHaveLength(2)
@@ -323,20 +465,20 @@ describe('App 실제 입력 연결', () => {
     )
   })
 
-  it('React 재렌더 뒤에도 block hover 및 공명자 선택창은 캡처하지 않는다', async () => {
+  it('InputBlock 뒤 입력을 캡처하고 공명자 선택창에서는 차단한다', async () => {
     await hover(grid())
     await key('keydown', 'KeyE')
     await key('keyup', 'KeyE', 10)
     await hover(grid().querySelector('.input-card')!)
     await key('keydown', 'KeyE')
     await key('keyup', 'KeyE', 10)
-    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(2)
     await act(async () =>
       document.querySelector<HTMLButtonElement>('.party-slot')!.click(),
     )
     await hover(grid())
     await key('keydown', 'KeyE')
     await key('keyup', 'KeyE', 10)
-    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(2)
   })
 })

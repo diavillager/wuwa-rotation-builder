@@ -5,16 +5,18 @@ import {
   keyboardControl,
   mouseControl,
   type CapturedInput,
+  type CaptureTarget,
 } from './input-capture'
 
 export interface CaptureEventsOptions {
   blocked: () => boolean
   commit: (inputs: CapturedInput[]) => void
   now?: () => number
+  activate?: (cycleId: CycleId, ownerId: string) => void
 }
 
 const UI_SELECTOR =
-  '.input-card, .auto-card, .line-label, button, input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="dialog"], [role="alertdialog"]'
+  '.auto-card, .line-label, button, input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="dialog"], [role="alertdialog"]'
 
 /** 브라우저 이벤트와 순수 입력 판정 사이의 어댑터. */
 export function attachCaptureEvents(
@@ -24,7 +26,7 @@ export function attachCaptureEvents(
   const win = doc.defaultView!
   const capture = new InputCapture()
   const now = options.now ?? (() => win.performance.now())
-  let cycleId: CycleId | null = null
+  let captureTarget: CaptureTarget | null = null
   let point: { x: number; y: number } | null = null
   let rmbContext = false
   let holdTimer: number | undefined
@@ -38,9 +40,9 @@ export function attachCaptureEvents(
   }
   const start = (
     control: Parameters<InputCapture['press']>[0],
-    id: CycleId,
+    target: CaptureTarget,
   ) => {
-    const accepted = capture.press(control, { cycleId: id }, now())
+    const accepted = capture.press(control, target, now())
     if (accepted)
       holdTimer = win.setTimeout(() => {
         holdTimer = undefined
@@ -62,7 +64,7 @@ export function attachCaptureEvents(
     target: EventTarget | null,
     x: number,
     y: number,
-  ): CycleId | null => {
+  ): CaptureTarget | null => {
     if (!(target instanceof win.Element) || target.closest(UI_SELECTOR))
       return null
     const grid = target.closest<HTMLElement>('[data-capture-cycle]')
@@ -78,16 +80,39 @@ export function attachCaptureEvents(
         return null
     }
     const id = grid.dataset.captureCycle
-    return id === 'opening' || id === 'repeat' ? id : null
+    if (id !== 'opening' && id !== 'repeat') return null
+    const ownerId = target.closest<HTMLElement>('[data-capture-owner]')?.dataset
+      .captureOwner
+    if (!ownerId) return null
+    const afterColumnId =
+      target.closest<HTMLElement>('.input-card')?.dataset.actionColumn
+    return {
+      cycleId: id,
+      ...(ownerId ? { ownerId } : {}),
+      ...(afterColumnId ? { afterColumnId } : {}),
+    }
   }
   const update = (target: EventTarget | null, x: number, y: number) => {
     const next = targetCycle(target, x, y)
-    if (next !== cycleId || options.blocked() || typing()) {
+    if (
+      next?.cycleId !== captureTarget?.cycleId ||
+      next?.ownerId !== captureTarget?.ownerId ||
+      !next ||
+      options.blocked() ||
+      typing()
+    ) {
       cancelPending()
       rmbContext = false
     }
-    cycleId = next
+    captureTarget = next
     point = { x, y }
+    if (!options.blocked() && !typing() && target instanceof win.Element) {
+      const row = target.closest<HTMLElement>('[data-capture-owner]')
+      const id = row?.closest<HTMLElement>('[data-capture-cycle]')?.dataset
+        .captureCycle
+      if (row?.dataset.captureOwner && (id === 'opening' || id === 'repeat'))
+        options.activate?.(id, row.dataset.captureOwner)
+    }
   }
   const refresh = () => {
     if (point && doc.elementFromPoint)
@@ -97,7 +122,7 @@ export function attachCaptureEvents(
       rmbContext = false
       return null
     }
-    return cycleId
+    return captureTarget
   }
   const onMove = (event: MouseEvent) =>
     update(event.target, event.clientX, event.clientY)
@@ -138,7 +163,12 @@ export function attachCaptureEvents(
     const id = refresh()
     if (!control || !id || event.ctrlKey || event.altKey || event.metaKey)
       return
-    event.preventDefault()
+    if (!(
+      event.target instanceof win.Element &&
+      event.target.closest('.input-card') &&
+      control === 'LMB'
+    ))
+      event.preventDefault()
     const accepted = start(control, id)
     if (control === 'RMB') rmbContext = accepted
   }
@@ -163,7 +193,7 @@ export function attachCaptureEvents(
   }
   function reset() {
     cancelPending()
-    cycleId = null
+    captureTarget = null
     point = null
     rmbContext = false
   }

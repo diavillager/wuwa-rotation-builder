@@ -152,6 +152,18 @@ export function App() {
   useEffect(() => {
     const adapter = attachCaptureEvents(document, {
       blocked: () => liveRef.current.blocked,
+      activate: (cycleId, ownerId) => {
+        if (liveRef.current.rotation[cycleId].activeCharacterId !== ownerId) {
+          const next = setActiveCharacter(
+            liveRef.current.rotation,
+            cycleId,
+            ownerId,
+          )
+          liveRef.current.rotation = next
+          setRotation(next)
+        }
+        setFocusedCycle(cycleId)
+      },
       commit: (inputs) => {
         for (const input of inputs) {
           try {
@@ -436,10 +448,7 @@ export function App() {
                 <button
                   className={`line-label ${cycle.activeCharacterId === id ? 'active-line' : ''}`}
                   data-row-owner={id}
-                  onClick={() => {
-                    setFocusedCycle(cycleId)
-                    run((state) => setActiveCharacter(state, cycleId, id))
-                  }}
+                  data-capture-owner={id}
                   draggable
                   onDragStart={(event) => {
                     event.dataTransfer.effectAllowed = 'move'
@@ -464,6 +473,7 @@ export function App() {
                     className="timeline-cell"
                     key={column.id}
                     data-column-cell={column.id}
+                    data-capture-owner={id}
                     onDragOver={(event) => {
                       if (
                         canDropInput(
@@ -512,6 +522,7 @@ export function App() {
                 ))}
                 <div
                   className="timeline-cell end-cell"
+                  data-capture-owner={id}
                   onDragOver={(event) => {
                     if (
                       canDropInput(
@@ -726,7 +737,8 @@ export function App() {
         </div>
       </div>
       <footer hidden={selectingSlot !== null}>
-        빈 사이클 영역에서 입력 · 200ms 후 Hold 생성 · 숫자키로 교체
+        커서가 있는 라인에 입력 · 블록 위에서는 바로 뒤에 삽입 · 200ms Hold ·
+        숫자키로 교체
       </footer>
       {pendingReplacement && (
         <div className="confirm-backdrop">
