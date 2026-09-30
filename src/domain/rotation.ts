@@ -4,6 +4,17 @@ export type InputControl = 'Q' | 'E' | 'R' | 'T' | 'Space' | 'LMB' | 'RMB'
 export type Gesture = 'tap' | 'hold'
 export type AutoActionKind = 'normalSwitchAttack' | 'intro' | 'outro'
 
+const INPUT_CONTROLS: readonly InputControl[] = [
+  'Q',
+  'E',
+  'R',
+  'T',
+  'Space',
+  'LMB',
+  'RMB',
+]
+const GESTURES: readonly Gesture[] = ['tap', 'hold']
+
 export interface SkillBlock {
   id: string
   skillRef: string
@@ -60,7 +71,11 @@ export interface Rotation {
 }
 
 export function createRotation(party: Rotation['party']): Rotation {
-  if (new Set(party).size !== 3 || party.some((id) => !id))
+  if (
+    party.length !== 3 ||
+    new Set(party).size !== 3 ||
+    party.some((id) => !id)
+  )
     throw new Error('파티는 서로 다른 공명자 3명이어야 합니다.')
   return {
     party: [...party],
@@ -104,6 +119,12 @@ export function assertRotation(rotation: Rotation): void {
         throw new Error('행동 ID가 유효하지 않습니다.')
       actionIds.add(column.action.id)
       if (column.action.type === 'input') {
+        if (
+          !INPUT_CONTROLS.includes(column.action.input) ||
+          !GESTURES.includes(column.action.gesture) ||
+          !Array.isArray(column.action.skills)
+        )
+          throw new Error('InputBlock의 입력 정보가 유효하지 않습니다.')
         const skillIds = new Set<string>()
         for (const skill of column.action.skills) {
           if (
@@ -117,8 +138,20 @@ export function assertRotation(rotation: Rotation): void {
           }
           skillIds.add(skill.id)
         }
-      } else if (!column.action.skillRef) {
-        throw new Error('AutoAction의 Skill 참조가 없습니다.')
+      } else if (column.action.type === 'autoAction') {
+        if (
+          !['normalSwitchAttack', 'intro', 'outro'].includes(
+            column.action.kind,
+          ) ||
+          !column.action.skillRef ||
+          'input' in column.action ||
+          'gesture' in column.action ||
+          'skills' in column.action ||
+          'stage' in column.action
+        )
+          throw new Error('AutoAction의 데이터가 유효하지 않습니다.')
+      } else {
+        throw new Error('행동 종류가 유효하지 않습니다.')
       }
     }
     const switchIds = new Set<string>()
@@ -129,6 +162,7 @@ export function assertRotation(rotation: Rotation): void {
         !rotation.party.includes(transition.fromId) ||
         !rotation.party.includes(transition.toId) ||
         transition.fromId === transition.toId ||
+        !['normal', 'concerto'].includes(transition.kind) ||
         (transition.afterColumnId !== null &&
           !ids.has(transition.afterColumnId))
       ) {
@@ -215,6 +249,7 @@ function changeCycle(
   cycleId: CycleId,
   change: (cycle: Cycle) => Cycle,
 ): Rotation {
+  assertRotation(rotation)
   const next = { ...rotation, [cycleId]: change(rotation[cycleId]) }
   assertRotation(next)
   return next
@@ -249,12 +284,90 @@ export function reorderParty(
   rotation: Rotation,
   party: Rotation['party'],
 ): Rotation {
+  assertRotation(rotation)
   if (
     new Set(party).size !== 3 ||
     party.some((id) => !rotation.party.includes(id))
   )
     throw new Error('동일한 공명자 3명만 재정렬할 수 있습니다.')
   const next = { ...rotation, party: [...party] as Rotation['party'] }
+  assertRotation(next)
+  return next
+}
+
+/** 제거된 열을 가리키던 교체 경계를 직전의 남은 열에 유지한다. */
+function reanchorTransitions(
+  before: TimelineColumn[],
+  after: TimelineColumn[],
+  transitions: Transition[],
+): Transition[] {
+  const retainedIds = new Set(after.map((column) => column.id))
+  return transitions.map((transition) => {
+    const anchor = transition.afterColumnId
+    if (anchor === null || retainedIds.has(anchor)) return transition
+    const index = before.findIndex((column) => column.id === anchor)
+    const previous = before
+      .slice(0, index)
+      .reverse()
+      .find((column) => retainedIds.has(column.id))
+    return { ...transition, afterColumnId: previous?.id ?? null }
+  })
+}
+
+/** 파티 슬롯 교체는 두 Cycle의 관련 참조를 한 번에 정리한다. */
+export function replacePartyCharacter(
+  rotation: Rotation,
+  slotIndex: 0 | 1 | 2,
+  replacementId: CharacterId,
+): Rotation {
+  assertRotation(rotation)
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex > 2)
+    throw new Error('파티 슬롯이 유효하지 않습니다.')
+  const formerId = rotation.party[slotIndex]
+  if (replacementId === formerId) return rotation
+  if (!replacementId || rotation.party.includes(replacementId))
+    throw new Error('교체 공명자는 파티의 다른 슬롯에 없어야 합니다.')
+
+  const replaceInCycle = (cycle: Cycle): Cycle => {
+    const removedSwitchIds = new Set(
+      cycle.transitions
+        .filter(
+          (transition) =>
+            transition.fromId === formerId || transition.toId === formerId,
+        )
+        .map((transition) => transition.switchId),
+    )
+    const columns = cycle.columns.filter(
+      (column) =>
+        column.ownerId !== formerId &&
+        !(
+          column.action.type === 'autoAction' &&
+          removedSwitchIds.has(column.action.switchId)
+        ),
+    )
+    const transitions = cycle.transitions.filter(
+      (transition) => !removedSwitchIds.has(transition.switchId),
+    )
+    return {
+      ...cycle,
+      activeCharacterId:
+        cycle.activeCharacterId === formerId
+          ? replacementId
+          : cycle.activeCharacterId,
+      columns,
+      transitions: reanchorTransitions(cycle.columns, columns, transitions),
+      suppression: cycle.suppression.filter(
+        (item) => !removedSwitchIds.has(item.switchId),
+      ),
+    }
+  }
+  const party = [...rotation.party] as Rotation['party']
+  party[slotIndex] = replacementId
+  const next: Rotation = {
+    party,
+    opening: replaceInCycle(rotation.opening),
+    repeat: replaceInCycle(rotation.repeat),
+  }
   assertRotation(next)
   return next
 }
@@ -379,6 +492,28 @@ export function reorderInput(
   })
 }
 
+export function deleteInput(
+  rotation: Rotation,
+  cycleId: CycleId,
+  actionId: string,
+): Rotation {
+  return changeCycle(rotation, cycleId, (cycle) => {
+    const found = cycle.columns.find((column) => column.action.id === actionId)
+    if (!found || found.action.type !== 'input')
+      throw new Error('삭제할 InputBlock이 없습니다.')
+    const columns = cycle.columns.filter((column) => column !== found)
+    return {
+      ...cycle,
+      columns,
+      transitions: reanchorTransitions(
+        cycle.columns,
+        columns,
+        cycle.transitions,
+      ),
+    }
+  })
+}
+
 export interface SwitchCommand {
   switchId: string
   kind: 'normal' | 'concerto'
@@ -488,24 +623,14 @@ export function deleteAutoAction(
         (transition.kind === 'concerto' || column.action.id === actionId),
     )
     const columns = cycle.columns.filter((column) => !removed.includes(column))
-    const removedIds = new Set(removed.map((column) => column.id))
-    const remapAnchor = (anchor: string | null): string | null => {
-      if (anchor === null || !removedIds.has(anchor)) return anchor
-      const index = cycle.columns.findIndex((column) => column.id === anchor)
-      return (
-        cycle.columns
-          .slice(0, index)
-          .reverse()
-          .find((column) => !removedIds.has(column.id))?.id ?? null
-      )
-    }
     return {
       ...cycle,
       columns,
-      transitions: cycle.transitions.map((item) => ({
-        ...item,
-        afterColumnId: remapAnchor(item.afterColumnId),
-      })),
+      transitions: reanchorTransitions(
+        cycle.columns,
+        columns,
+        cycle.transitions,
+      ),
       suppression: cycle.suppression.some((item) => item.switchId === switchId)
         ? cycle.suppression
         : [
@@ -522,6 +647,89 @@ export function deleteAutoAction(
   })
 }
 
+function updateInput(
+  rotation: Rotation,
+  cycleId: CycleId,
+  actionId: string,
+  update: (input: InputBlock) => InputBlock,
+): Rotation {
+  return changeCycle(rotation, cycleId, (cycle) => {
+    const found = cycle.columns.find((column) => column.action.id === actionId)
+    if (!found || found.action.type !== 'input')
+      throw new Error('편집할 InputBlock이 없습니다.')
+    return {
+      ...cycle,
+      columns: cycle.columns.map((column) =>
+        column === found
+          ? { ...column, action: update(found.action as InputBlock) }
+          : column,
+      ),
+    }
+  })
+}
+
+export function addSkill(
+  rotation: Rotation,
+  cycleId: CycleId,
+  actionId: string,
+  skill: SkillBlock,
+  targetIndex?: number,
+): Rotation {
+  return updateInput(rotation, cycleId, actionId, (input) => {
+    const count = input.skills.length
+    if (
+      targetIndex !== undefined &&
+      (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex > count)
+    )
+      throw new Error('SkillBlock 삽입 위치가 유효하지 않습니다.')
+    if (input.skills.some((item) => item.id === skill.id))
+      throw new Error('SkillBlock ID가 중복되었습니다.')
+    const index = count < 2 ? count : (targetIndex ?? count)
+    const skills = [...input.skills]
+    skills.splice(index, 0, { ...skill })
+    return { ...input, skills }
+  })
+}
+
+export function deleteSkill(
+  rotation: Rotation,
+  cycleId: CycleId,
+  actionId: string,
+  skillId: string,
+): Rotation {
+  return updateInput(rotation, cycleId, actionId, (input) => {
+    if (!input.skills.some((skill) => skill.id === skillId))
+      throw new Error('삭제할 SkillBlock이 없습니다.')
+    return {
+      ...input,
+      skills: input.skills.filter((skill) => skill.id !== skillId),
+    }
+  })
+}
+
+export function reorderSkill(
+  rotation: Rotation,
+  cycleId: CycleId,
+  actionId: string,
+  skillId: string,
+  targetIndex: number,
+): Rotation {
+  return updateInput(rotation, cycleId, actionId, (input) => {
+    const currentIndex = input.skills.findIndex((skill) => skill.id === skillId)
+    if (currentIndex < 0) throw new Error('이동할 SkillBlock이 없습니다.')
+    if (
+      !Number.isInteger(targetIndex) ||
+      targetIndex < 0 ||
+      targetIndex >= input.skills.length
+    )
+      throw new Error('SkillBlock 이동 위치가 유효하지 않습니다.')
+    const skills = [...input.skills]
+    const [skill] = skills.splice(currentIndex, 1)
+    skills.splice(targetIndex, 0, skill)
+    return { ...input, skills }
+  })
+}
+
 export function changeSkillStage(
   rotation: Rotation,
   cycleId: CycleId,
@@ -531,22 +739,16 @@ export function changeSkillStage(
 ): Rotation {
   if (!Number.isInteger(delta))
     throw new Error('stage 변경량은 정수여야 합니다.')
-  return changeCycle(rotation, cycleId, (cycle) => ({
-    ...cycle,
-    columns: cycle.columns.map((column) =>
-      column.action.type === 'input' && column.action.id === actionId
-        ? {
-            ...column,
-            action: {
-              ...column.action,
-              skills: column.action.skills.map((skill) =>
-                skill.id === skillId
-                  ? { ...skill, stage: Math.max(0, skill.stage + delta) }
-                  : skill,
-              ),
-            },
-          }
-        : column,
-    ),
-  }))
+  return updateInput(rotation, cycleId, actionId, (input) => {
+    if (!input.skills.some((skill) => skill.id === skillId))
+      throw new Error('stage를 변경할 SkillBlock이 없습니다.')
+    return {
+      ...input,
+      skills: input.skills.map((skill) =>
+        skill.id === skillId
+          ? { ...skill, stage: Math.max(0, skill.stage + delta) }
+          : skill,
+      ),
+    }
+  })
 }
