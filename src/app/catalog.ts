@@ -21,6 +21,10 @@ export interface CatalogCharacter {
   displayName: string
   element: Element
   skills: readonly CatalogSkill[]
+  /** 사람이 명시적으로 지정한 자동 행동 Skill ID. 일반 입력과 자동 연결하지 않는다. */
+  autoActions?: Partial<
+    Record<'normalSwitchAttack' | 'intro' | 'outro', string>
+  >
 }
 
 /** 화면 표시용 검수 데이터. Rotation의 내용이나 자동 행동을 생성하지 않는다. */
