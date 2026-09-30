@@ -122,6 +122,8 @@ type Transition = {
 
 Tap/Hold는 최초 press(`keydown`/`mousedown` 등)부터 해당 release까지의 지속 시간으로 판정한다. **400ms 미만은 tap, 400ms 이상은 hold**다. 키보드의 자동 repeat `keydown`은 여러 입력으로 기록하지 않는다.
 
+한 번에 하나의 입력만 캡처한다. 먼저 누른 입력이 진행 중이면 추가 키·마우스 press는 무시한다. 예를 들어 Q를 누른 채 E를 짧게 누르고 뗀 후 Q를 떼면 Q Hold만 기록한다. 무시된 입력은 release 시에도 생성하지 않으며, 이후 새 press부터 다시 캡처한다. 캡처 중 빈 영역을 벗어나거나 다른 Cycle로 이동하면 진행 중 입력을 취소한다.
+
 사이클 필드 내부의 **빈 영역을 hover**할 때만 실제 입력을 캡처한다. 빈 영역은 InputBlock, SkillBlock 및 조작 UI 위가 아닌 곳이다. LMB/RMB도 별도 생성 버튼이 아니라 실제 클릭/누름으로 생성한다. 다른 UI를 조작하거나 빈 영역 밖에 있을 때 키 입력으로 블록을 만들지 않는다.
 
 RMB를 사이클 필드의 빈 영역에서 Rotation 입력으로 캡처할 때만 브라우저 context menu를 막는다. 사이클 밖이나 다른 UI의 일반 RMB 동작은 불필요하게 막지 않는다.

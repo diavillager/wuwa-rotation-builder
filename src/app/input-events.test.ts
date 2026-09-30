@@ -18,7 +18,6 @@ function fixture() {
   let sequence = 0
   let blocked = false
   const adapter = attachCaptureEvents(document, {
-    order: 'press',
     now: () => time,
     blocked: () => blocked,
     commit: (inputs) => {
@@ -67,6 +66,34 @@ function fixture() {
 }
 
 describe('브라우저 이벤트와 Rotation 통합', () => {
+  it('키 hold 중 추가 키와 마우스는 기록하지 않고 다음 새 press부터 받는다', () => {
+    const f = fixture()
+    f.move('#empty')
+    f.key('keydown', 'KeyQ', 0)
+    f.key('keydown', 'KeyE', 10)
+    f.key('keyup', 'KeyE', 50)
+    document
+      .querySelector('#empty')!
+      .dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true }))
+    document
+      .querySelector('#empty')!
+      .dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true }))
+    f.key('keyup', 'KeyQ', 500)
+    f.key('keydown', 'KeyE', 600, true)
+    f.key('keyup', 'KeyE', 700)
+    expect(f.state().opening.columns.map((item) => item.action)).toMatchObject([
+      { input: 'Q', gesture: 'hold' },
+    ])
+    f.key('keydown', 'KeyE', 800)
+    f.key('keyup', 'KeyE', 900)
+    expect(
+      f
+        .state()
+        .opening.columns.map(
+          (item) => item.action.type === 'input' && item.action.input,
+        ),
+    ).toEqual(['Q', 'E'])
+  })
   it('빈 영역의 입력과 숫자키 교체를 기록하고 두 Cycle을 분리한다', () => {
     const f = fixture()
     f.move('#empty')
@@ -159,6 +186,27 @@ describe('브라우저 이벤트와 Rotation 통합', () => {
     })
     document.querySelector('#outside')!.dispatchEvent(outsideMenu)
     expect(outsideMenu.defaultPrevented).toBe(false)
+  })
+
+  it('진행 중 키 때문에 무시된 RMB의 메뉴는 막지 않는다', () => {
+    const f = fixture()
+    f.move('#empty')
+    f.key('keydown', 'KeyQ', 0)
+    const empty = document.querySelector('#empty')!
+    empty.dispatchEvent(
+      new MouseEvent('mousedown', {
+        button: 2,
+        bubbles: true,
+        cancelable: true,
+      }),
+    )
+    const menu = new MouseEvent('contextmenu', {
+      button: 2,
+      bubbles: true,
+      cancelable: true,
+    })
+    empty.dispatchEvent(menu)
+    expect(menu.defaultPrevented).toBe(false)
   })
 
   it('리스너 해제 후 이벤트는 기록하지 않는다', () => {

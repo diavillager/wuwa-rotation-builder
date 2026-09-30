@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   addSkill,
   changeSkillStage,
@@ -34,6 +34,8 @@ import {
 import { projectCycle } from './editor-projection'
 import { canDropInput, stageChangeFromWheel } from './editor-interaction'
 import { TimelineWires } from './TimelineWires'
+import { attachCaptureEvents } from './input-events'
+import { applyCapturedInput } from './input-command'
 
 type DragItem =
   | { kind: 'party'; id: string }
@@ -97,6 +99,45 @@ export function App() {
   const [drag, setDrag] = useState<DragItem | null>(null)
   const [hover, setHover] = useState<HoverTarget | null>(null)
   const visibleCharacters = charactersByElement(catalog, selectedElement)
+  const captureRef = useRef<ReturnType<typeof attachCaptureEvents> | null>(null)
+  const liveRef = useRef({ rotation, blocked: false })
+  useLayoutEffect(() => {
+    liveRef.current = {
+      rotation,
+      blocked:
+        selectingSlot !== null || pendingReplacement !== null || drag !== null,
+    }
+    if (liveRef.current.blocked) captureRef.current?.cancel()
+  }, [rotation, selectingSlot, pendingReplacement, drag])
+
+  useEffect(() => {
+    const adapter = attachCaptureEvents(document, {
+      blocked: () => liveRef.current.blocked,
+      commit: (inputs) => {
+        for (const input of inputs) {
+          try {
+            const next = applyCapturedInput(
+              liveRef.current.rotation,
+              catalog,
+              input,
+              () => crypto.randomUUID(),
+            )
+            liveRef.current.rotation = next
+            setRotation(next)
+            setFocusedCycle(input.target.cycleId)
+            setNotice('')
+          } catch (error) {
+            setNotice(error instanceof Error ? error.message : '입력 오류')
+          }
+        }
+      },
+    })
+    captureRef.current = adapter
+    return () => {
+      adapter.dispose()
+      captureRef.current = null
+    }
+  }, [catalog])
 
   const applyReplacement = (slotIndex: 0 | 1 | 2, replacementId: string) => {
     try {
@@ -118,6 +159,7 @@ export function App() {
   }
 
   const run = (command: (current: Rotation) => Rotation) => {
+    captureRef.current?.cancel()
     try {
       setRotation(command(rotation))
       setNotice('')
@@ -342,6 +384,7 @@ export function App() {
         <div className="timeline-scroll" aria-label={`${title} 전역 타임라인`}>
           <div
             className="timeline-grid"
+            data-capture-cycle={cycleId}
             style={{ gridTemplateColumns: tracks }}
           >
             {view.party.map((id, lineIndex) => (
@@ -645,7 +688,7 @@ export function App() {
           {renderCycle('repeat')}
         </div>
       </div>
-      <footer>입력 캡처와 프로젝트 저장은 후속 단계에서 연결됩니다.</footer>
+      <footer>빈 사이클 영역에서 입력 · 400ms 이상 Hold · 숫자키로 교체</footer>
       {pendingReplacement && (
         <div className="confirm-backdrop">
           <div

@@ -20,7 +20,7 @@ describe('실제 입력 판정', () => {
   })
 
   it('399ms tap과 400ms hold를 구분하며 repeat와 대응 press 없는 release를 무시한다', () => {
-    const capture = new InputCapture('press')
+    const capture = new InputCapture()
     expect(capture.release('E', 0)).toEqual([])
     expect(capture.press('E', { cycleId: 'opening' }, 0)).toBe(true)
     expect(capture.press('E', { cycleId: 'opening' }, 100)).toBe(false)
@@ -34,37 +34,35 @@ describe('실제 입력 판정', () => {
     expect(capture.release('RMB', 901)).toEqual([])
   })
 
-  it('press 순서는 먼저 누른 입력이 release될 때까지 기다린다', () => {
-    const capture = new InputCapture('press')
+  it('Q hold 도중 E tap은 무시하고 Q만 기록한다', () => {
+    const capture = new InputCapture()
     capture.press('Q', { cycleId: 'opening' }, 0)
-    capture.press('E', { cycleId: 'opening' }, 1)
+    expect(capture.press('E', { cycleId: 'opening' }, 1)).toBe(false)
     expect(capture.release('E', 100)).toEqual([])
     expect(
       capture.release('Q', 500).map((item) => [item.control, item.gesture]),
-    ).toEqual([
-      ['Q', 'hold'],
-      ['E', 'tap'],
-    ])
+    ).toEqual([['Q', 'hold']])
   })
 
   it('취소한 입력은 나중 release에서도 기록하지 않는다', () => {
-    const capture = new InputCapture('press')
+    const capture = new InputCapture()
     capture.press('LMB', { cycleId: 'opening' }, 0)
     capture.cancel()
     expect(capture.release('LMB', 1000)).toEqual([])
   })
 
-  it('먼저 누른 hold를 기다리는 동안 다른 키의 여러 tap을 보존한다', () => {
-    const capture = new InputCapture('press')
+  it('무시한 입력의 release는 현재 입력을 끝내지 않으며 이후 새 press만 받는다', () => {
+    const capture = new InputCapture()
     capture.press('Q', { cycleId: 'opening' }, 0)
     capture.press('E', { cycleId: 'opening' }, 10)
     capture.release('E', 20)
-    expect(capture.press('E', { cycleId: 'opening' }, 30)).toBe(true)
+    expect(capture.press('E', { cycleId: 'opening' }, 30)).toBe(false)
     capture.release('E', 40)
-    expect(capture.release('Q', 500).map((item) => item.control)).toEqual([
-      'Q',
-      'E',
-      'E',
-    ])
+    expect(capture.release('Q', 500).map((item) => item.control)).toEqual(['Q'])
+    expect(capture.release('E', 600)).toEqual([])
+    expect(capture.press('LMB', { cycleId: 'opening' }, 700)).toBe(true)
+    expect(capture.press('RMB', { cycleId: 'opening' }, 710)).toBe(false)
+    expect(capture.release('LMB', 800)[0].control).toBe('LMB')
+    expect(capture.release('RMB', 900)).toEqual([])
   })
 })

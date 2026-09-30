@@ -35,38 +35,28 @@ export class InputCapture {
     control: CaptureControl
     target: CaptureTarget
     startedAt: number
-    result?: CapturedInput
-  }[] = []
-
-  constructor(private readonly order: 'press' | 'release') {}
+  } | null = null
 
   press(control: CaptureControl, target: CaptureTarget, now: number): boolean {
-    if (this.pending.some((item) => item.control === control && !item.result))
-      return false
-    this.pending.push({ control, target: { ...target }, startedAt: now })
+    if (this.pending) return false
+    this.pending = { control, target: { ...target }, startedAt: now }
     return true
   }
 
   release(control: CaptureControl, now: number): CapturedInput[] {
-    const item = this.pending.find(
-      (candidate) => candidate.control === control && !candidate.result,
-    )
-    if (!item || item.result) return []
-    item.result = {
-      control,
-      target: item.target,
-      gesture: now - item.startedAt < 400 ? 'tap' : 'hold',
-    }
-    if (this.order === 'release') {
-      this.pending = this.pending.filter((candidate) => candidate !== item)
-      return [item.result]
-    }
-    const results: CapturedInput[] = []
-    while (this.pending[0]?.result) results.push(this.pending.shift()!.result!)
-    return results
+    const item = this.pending
+    if (!item || item.control !== control) return []
+    this.pending = null
+    return [
+      {
+        control,
+        target: item.target,
+        gesture: now - item.startedAt < 400 ? 'tap' : 'hold',
+      },
+    ]
   }
 
   cancel() {
-    this.pending = []
+    this.pending = null
   }
 }

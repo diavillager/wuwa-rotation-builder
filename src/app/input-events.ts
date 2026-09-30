@@ -7,7 +7,6 @@ import {
 } from './input-capture'
 
 export interface CaptureEventsOptions {
-  order: 'press' | 'release'
   blocked: () => boolean
   commit: (inputs: CapturedInput[]) => void
   now?: () => number
@@ -22,10 +21,11 @@ export function attachCaptureEvents(
   options: CaptureEventsOptions,
 ) {
   const win = doc.defaultView!
-  const capture = new InputCapture(options.order)
+  const capture = new InputCapture()
   const now = options.now ?? (() => win.performance.now())
   let cycleId: CycleId | null = null
   let point: { x: number; y: number } | null = null
+  let rmbContext = false
   const typing = () =>
     doc.activeElement instanceof win.Element &&
     !!doc.activeElement.closest(
@@ -55,7 +55,10 @@ export function attachCaptureEvents(
   }
   const update = (target: EventTarget | null, x: number, y: number) => {
     const next = targetCycle(target, x, y)
-    if (next !== cycleId || options.blocked() || typing()) capture.cancel()
+    if (next !== cycleId || options.blocked() || typing()) {
+      capture.cancel()
+      rmbContext = false
+    }
     cycleId = next
     point = { x, y }
   }
@@ -64,6 +67,7 @@ export function attachCaptureEvents(
       update(doc.elementFromPoint(point.x, point.y), point.x, point.y)
     if (options.blocked() || typing()) {
       capture.cancel()
+      rmbContext = false
       return null
     }
     return cycleId
@@ -106,7 +110,8 @@ export function attachCaptureEvents(
     if (!control || !id || event.ctrlKey || event.altKey || event.metaKey)
       return
     event.preventDefault()
-    capture.press(control, { cycleId: id }, now())
+    const accepted = capture.press(control, { cycleId: id }, now())
+    if (control === 'RMB') rmbContext = accepted
   }
   const onUp = (event: MouseEvent) => {
     update(event.target, event.clientX, event.clientY)
@@ -116,14 +121,18 @@ export function attachCaptureEvents(
     if (inputs.length) options.commit(inputs)
   }
   const onContext = (event: MouseEvent) => {
+    const captured =
+      rmbContext && event.button === 2 && !options.blocked() && !typing()
+    rmbContext = false
     update(event.target, event.clientX, event.clientY)
-    if (refresh() && !event.ctrlKey && !event.altKey && !event.metaKey)
+    if (captured && !event.ctrlKey && !event.altKey && !event.metaKey)
       event.preventDefault()
   }
   function reset() {
     capture.cancel()
     cycleId = null
     point = null
+    rmbContext = false
   }
   const onVisibility = () => {
     if (doc.hidden) reset()
