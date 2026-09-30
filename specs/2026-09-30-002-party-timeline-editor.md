@@ -67,6 +67,7 @@
 - 공통 열 grid의 X 정렬, 소유 라인 표시, 빈 Cycle, 가로 스크롤을 컴포넌트 테스트와 수동 브라우저 확인으로 검증한다.
 - 파티 순서 변경과 공명자 교체 뒤 두 Cycle의 표시·active line·원본 소유권 및 경고 내용을 확인한다.
 - InputBlock과 SkillBlock의 삭제·이동·stage 변경, AutoAction 읽기 전용 및 linked pair 삭제를 UI 이벤트와 도메인 상태 양쪽에서 확인한다.
+- 다른 라인/Cycle 드롭 거부, 수평 휠의 단수 유지, 삭제 후 hover 초기화, 블록 삭제 시 스크롤 영역 축소를 확인한다.
 - 협주 outro/intro의 별도 열, Transition 무열 표시, suppression 유지, opening/repeat 독립성을 fixture로 확인한다.
 - 작업 완료 전 저장소의 `lint`, `test`, `build`를 실제로 실행한다. 구현 중 도메인 결함을 발견하면 해당 동작의 단위 테스트를 먼저 보강한다.
 

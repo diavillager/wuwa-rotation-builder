@@ -27,6 +27,7 @@ import {
 } from './catalog'
 import { createDemoRotation, demoCatalog } from './demo'
 import { projectCycle } from './editor-projection'
+import { canDropInput, stageChangeFromWheel } from './editor-interaction'
 import { TimelineWires } from './TimelineWires'
 
 type DragItem =
@@ -139,6 +140,7 @@ export function App() {
         run((state) =>
           deleteSkill(state, target.cycleId, target.actionId, target.skillId),
         )
+      setHover(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -289,16 +291,12 @@ export function App() {
             setHover({ kind: 'input', cycleId, actionId: action.id })
           }
           onWheel={(event) => {
+            const change = stageChangeFromWheel(event.deltaY)
+            if (change === 0) return
             event.preventDefault()
             event.stopPropagation()
             run((state) =>
-              changeSkillStage(
-                state,
-                cycleId,
-                action.id,
-                skill.id,
-                event.deltaY < 0 ? 1 : -1,
-              ),
+              changeSkillStage(state, cycleId, action.id, skill.id, change),
             )
           }}
           title="휠로 단수 변경 · Delete로 삭제"
@@ -371,11 +369,21 @@ export function App() {
                     key={column.id}
                     data-column-cell={column.id}
                     onDragOver={(event) => {
-                      if (drag?.kind === 'input' && drag.cycleId === cycleId)
+                      if (
+                        canDropInput(
+                          rotation,
+                          drag?.kind === 'input' ? drag : null,
+                          cycleId,
+                          id,
+                        )
+                      )
                         event.preventDefault()
                     }}
                     onDrop={(event) => {
-                      if (drag?.kind === 'input' && drag.cycleId === cycleId) {
+                      if (
+                        drag?.kind === 'input' &&
+                        canDropInput(rotation, drag, cycleId, id)
+                      ) {
                         event.preventDefault()
                         run((state) =>
                           reorderInput(state, cycleId, drag.columnId, index),
@@ -416,13 +424,20 @@ export function App() {
                 <div
                   className="timeline-cell end-cell"
                   onDragOver={(event) => {
-                    if (drag?.kind === 'input' && drag.cycleId === cycleId)
+                    if (
+                      canDropInput(
+                        rotation,
+                        drag?.kind === 'input' ? drag : null,
+                        cycleId,
+                        id,
+                      )
+                    )
                       event.preventDefault()
                   }}
                   onDrop={(event) => {
                     if (
                       drag?.kind === 'input' &&
-                      drag.cycleId === cycleId &&
+                      canDropInput(rotation, drag, cycleId, id) &&
                       view.columns.length > 0
                     ) {
                       event.preventDefault()

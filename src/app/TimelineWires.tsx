@@ -80,7 +80,7 @@ export function TimelineWires({
         const anchor = transition.afterColumnId
           ? cellElements.get(transition.afterColumnId)?.getBoundingClientRect()
               .right
-          : rowElements.get(party[0])?.getBoundingClientRect().right
+          : rect.left + (rowElements.get(party[0])?.offsetWidth ?? 0)
         if (!from || !to || anchor === undefined) continue
         const boundaryX = anchor - rect.left
         const fromY = from.top + from.height / 2 - rect.top
@@ -91,7 +91,7 @@ export function TimelineWires({
           path: `M ${boundaryX - 13} ${fromY} H ${boundaryX} V ${toY} H ${boundaryX + 13}`,
         })
       }
-      setGeometry({ width: grid.scrollWidth, height: grid.scrollHeight, wires })
+      setGeometry({ width: rect.width, height: rect.height, wires })
     }
     measure()
     const observer = new ResizeObserver(measure)
