@@ -50,6 +50,168 @@ async function key(type: 'keydown' | 'keyup', code: string, duration = 0) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('공명자 항목에서 커서 이동 없이 LMB×3 → 2 → E → 3 Hold → R을 이어 쓴다', async () => {
+    const label = grid().querySelector<HTMLElement>(
+      '[data-row-owner="demo-a"]',
+    )!
+    await hover(label)
+    for (let index = 0; index < 3; index++) {
+      await act(async () => {
+        label.dispatchEvent(
+          new MouseEvent('mousedown', {
+            button: 0,
+            bubbles: true,
+            cancelable: true,
+          }),
+        )
+        label.focus()
+      })
+      time += 10
+      await act(async () =>
+        label.dispatchEvent(
+          new MouseEvent('mouseup', { button: 0, bubbles: true }),
+        ),
+      )
+    }
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 10)
+    // 항목 내부 이동·mouseover·매 keydown hit test가 A를 재선택하면 안 된다.
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => label,
+    })
+    await act(async () =>
+      label
+        .querySelector('span')!
+        .dispatchEvent(new MouseEvent('mousemove', { bubbles: true })),
+    )
+    await hover(label)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 10)
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    vi.useFakeTimers()
+    await key('keydown', 'Digit3')
+    time += 200
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-c')
+    await key('keyup', 'Digit3')
+    await key('keydown', 'KeyR')
+    await key('keyup', 'KeyR', 10)
+    const actions = Array.from(
+      grid().querySelectorAll('[data-action-column]'),
+    ).map((node) => ({
+      owner: node
+        .closest('[data-capture-owner]')
+        ?.getAttribute('data-capture-owner'),
+      text: node.textContent,
+    }))
+    expect(actions.map((item) => item.owner)).toEqual([
+      'demo-a',
+      'demo-a',
+      'demo-a',
+      'demo-b',
+      'demo-b',
+      'demo-b',
+      'demo-c',
+      'demo-c',
+    ])
+    expect(
+      actions.slice(0, 3).every((item) => item.text?.includes('LMBTap')),
+    ).toBe(true)
+    expect(actions[4].text).toContain('ETap')
+    expect(actions.at(-1)?.text).toContain('RTap')
+    expect(grid().querySelectorAll('.wire-flow')).toHaveLength(7)
+    expect(
+      grid('repeat').querySelectorAll('[data-action-column]'),
+    ).toHaveLength(0)
+    Reflect.deleteProperty(document, 'elementFromPoint')
+    // 배치 영역으로 이동하면 커서 라인을 따르고, 항목 재진입은 전역 끝을 사용한다.
+    await hover(emptyLine())
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-a')
+    await hover(label)
+    await key('keydown', 'KeyF')
+    await key('keyup', 'KeyF', 10)
+    const aCells = grid().querySelectorAll(
+      '[data-capture-owner="demo-a"][data-column-cell]',
+    )
+    expect(aCells[aCells.length - 1].textContent).toContain('FTap')
+  })
+  it('공명자 항목을 벗어나 재진입하거나 다른 항목에 들어가면 다시 활성화한다', async () => {
+    const label = grid().querySelector('[data-row-owner="demo-a"]')!
+    await hover(label)
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 10)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+    await hover(document.querySelector('header')!)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+    await hover(label)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-a')
+    await hover(grid().querySelector('[data-row-owner="demo-c"]')!)
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-c')
+  })
+  it('항목의 RMB Hold는 교체한 도착 공명자에 한 번 생성하고 메뉴를 차단한다', async () => {
+    const label = grid().querySelector('[data-row-owner="demo-a"]')!
+    await hover(label)
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 10)
+    vi.useFakeTimers()
+    await act(async () =>
+      label.dispatchEvent(
+        new MouseEvent('mousedown', {
+          button: 2,
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    )
+    time += 200
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+    })
+    const menu = new MouseEvent('contextmenu', {
+      button: 2,
+      bubbles: true,
+      cancelable: true,
+    })
+    await act(async () => {
+      label.dispatchEvent(menu)
+      label.dispatchEvent(
+        new MouseEvent('mouseup', { button: 2, bubbles: true }),
+      )
+    })
+    expect(menu.defaultPrevented).toBe(true)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+    expect(grid().querySelector('.input-card')?.textContent).toContain(
+      'RMBHold',
+    )
+    expect(
+      grid()
+        .querySelector('.input-card')
+        ?.closest('[data-capture-owner]')
+        ?.getAttribute('data-capture-owner'),
+    ).toBe('demo-b')
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-b')
+  })
   it('커서 라인을 즉시 강조하고 진열하며 클릭은 활성 라인을 바꾸지 않는다', async () => {
     await hover(emptyLine('demo-b'))
     expect(

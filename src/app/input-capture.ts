@@ -6,6 +6,7 @@ export interface CaptureTarget {
   cycleId: CycleId
   ownerId?: string
   afterColumnId?: string
+  atTimelineEnd?: boolean
 }
 export interface CapturedInput {
   control: CaptureControl

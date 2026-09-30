@@ -490,6 +490,7 @@ export function insertInput(
   columnId: string,
   action: InputBlock,
   afterColumnId?: string,
+  atTimelineEnd = false,
 ): Rotation {
   return changeCycle(rotation, cycleId, (cycle) => {
     requireUniqueColumn(cycle, columnId, action.id)
@@ -499,7 +500,9 @@ export function insertInput(
     )
       throw new Error('유효한 직접 입력만 삽입할 수 있습니다.')
     const ownerId = cycle.activeCharacterId
-    const index = inputInsertionIndex(cycle, ownerId, afterColumnId)
+    const index = atTimelineEnd
+      ? cycle.columns.length
+      : inputInsertionIndex(cycle, ownerId, afterColumnId)
     const latest = latestLineTransition(cycle, ownerId)
     const outgoing = latest?.fromId === ownerId ? latest : undefined
     const column: TimelineColumn = {
@@ -508,6 +511,7 @@ export function insertInput(
       action: { ...action, skills: [...action.skills] },
     }
     const transitions = cycle.transitions.map((item) =>
+      !atTimelineEnd &&
       item === outgoing &&
       outgoing &&
       index ===

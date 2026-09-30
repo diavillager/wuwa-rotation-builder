@@ -13,6 +13,7 @@ export interface CaptureEventsOptions {
   commit: (inputs: CapturedInput[]) => void
   now?: () => number
   activate?: (cycleId: CycleId, ownerId: string) => void
+  activeOwner?: (cycleId: CycleId) => string
 }
 
 const UI_SELECTOR =
@@ -30,6 +31,7 @@ export function attachCaptureEvents(
   let point: { x: number; y: number } | null = null
   let rmbContext = false
   let holdTimer: number | undefined
+  let pointerLabelKey: string | null = null
   const clearHoldTimer = () => {
     if (holdTimer !== undefined) win.clearTimeout(holdTimer)
     holdTimer = undefined
@@ -65,8 +67,9 @@ export function attachCaptureEvents(
     x: number,
     y: number,
   ): CaptureTarget | null => {
-    if (!(target instanceof win.Element) || target.closest(UI_SELECTOR))
-      return null
+    if (!(target instanceof win.Element)) return null
+    const label = target.closest('.line-label')
+    if (!label && target.closest(UI_SELECTOR)) return null
     const grid = target.closest<HTMLElement>('[data-capture-cycle]')
     if (!grid) return null
     const scroll = grid.closest<HTMLElement>('.timeline-scroll')
@@ -81,18 +84,43 @@ export function attachCaptureEvents(
     }
     const id = grid.dataset.captureCycle
     if (id !== 'opening' && id !== 'repeat') return null
-    const ownerId = target.closest<HTMLElement>('[data-capture-owner]')?.dataset
-      .captureOwner
-    if (!ownerId) return null
+    const rowOwner = target.closest<HTMLElement>('[data-capture-owner]')
+      ?.dataset.captureOwner
+    if (!rowOwner) return null
+    const ownerId = label ? (options.activeOwner?.(id) ?? rowOwner) : rowOwner
     const afterColumnId =
       target.closest<HTMLElement>('.input-card')?.dataset.actionColumn
     return {
       cycleId: id,
       ...(ownerId ? { ownerId } : {}),
       ...(afterColumnId ? { afterColumnId } : {}),
+      ...(label ? { atTimelineEnd: true } : {}),
     }
   }
   const update = (target: EventTarget | null, x: number, y: number) => {
+    const row =
+      target instanceof win.Element
+        ? target.closest<HTMLElement>('[data-capture-owner]')
+        : null
+    const id = row?.closest<HTMLElement>('[data-capture-cycle]')?.dataset
+      .captureCycle
+    const labelKey =
+      target instanceof win.Element &&
+      target.closest('.line-label') &&
+      row?.dataset.captureOwner &&
+      (id === 'opening' || id === 'repeat')
+        ? `${id}:${row.dataset.captureOwner}`
+        : null
+    if (
+      !options.blocked() &&
+      !typing() &&
+      row?.dataset.captureOwner &&
+      (id === 'opening' || id === 'repeat')
+    ) {
+      if (!labelKey || pointerLabelKey !== labelKey)
+        options.activate?.(id, row.dataset.captureOwner)
+    }
+    pointerLabelKey = options.blocked() || typing() ? null : labelKey
     const next = targetCycle(target, x, y)
     if (
       next?.cycleId !== captureTarget?.cycleId ||
@@ -106,13 +134,6 @@ export function attachCaptureEvents(
     }
     captureTarget = next
     point = { x, y }
-    if (!options.blocked() && !typing() && target instanceof win.Element) {
-      const row = target.closest<HTMLElement>('[data-capture-owner]')
-      const id = row?.closest<HTMLElement>('[data-capture-cycle]')?.dataset
-        .captureCycle
-      if (row?.dataset.captureOwner && (id === 'opening' || id === 'repeat'))
-        options.activate?.(id, row.dataset.captureOwner)
-    }
   }
   const refresh = () => {
     if (point && doc.elementFromPoint)
@@ -165,7 +186,7 @@ export function attachCaptureEvents(
       return
     if (!(
       event.target instanceof win.Element &&
-      event.target.closest('.input-card') &&
+      event.target.closest('.input-card, .line-label') &&
       control === 'LMB'
     ))
       event.preventDefault()
@@ -196,6 +217,15 @@ export function attachCaptureEvents(
     captureTarget = null
     point = null
     rmbContext = false
+    pointerLabelKey = null
+  }
+  const onFocusIn = (event: FocusEvent) => {
+    if (
+      event.target instanceof win.Element &&
+      event.target.closest('.line-label, .input-card')
+    )
+      return
+    reset()
   }
   const onVisibility = () => {
     if (doc.hidden) hardReset()
@@ -214,7 +244,7 @@ export function attachCaptureEvents(
     ['keydown', onKeyDown],
     ['keyup', onKeyUp],
     ['dragstart', reset],
-    ['focusin', reset],
+    ['focusin', onFocusIn],
     ['visibilitychange', onVisibility],
   ] as const
   for (const [name, listener] of listeners)

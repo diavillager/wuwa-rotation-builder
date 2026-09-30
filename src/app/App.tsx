@@ -152,6 +152,8 @@ export function App() {
   useEffect(() => {
     const adapter = attachCaptureEvents(document, {
       blocked: () => liveRef.current.blocked,
+      activeOwner: (cycleId) =>
+        liveRef.current.rotation[cycleId].activeCharacterId,
       activate: (cycleId, ownerId) => {
         if (liveRef.current.rotation[cycleId].activeCharacterId !== ownerId) {
           const next = setActiveCharacter(
@@ -412,7 +414,7 @@ export function App() {
     const cycle = rotation[cycleId]
     const view = projectCycle(rotation, cycle)
     const title = cycleId === 'opening' ? '개막 사이클' : '반복 사이클'
-    const tracks = `148px ${view.columns.map(() => 'max-content').join(' ')} 150px`
+    const tracks = `148px ${view.columns.map(() => 'max-content').join(' ')} minmax(150px, 1fr)`
     return (
       <section
         className={`cycle-panel ${focusedCycle === cycleId ? 'focused-cycle' : ''}`}
@@ -737,7 +739,7 @@ export function App() {
         </div>
       </div>
       <footer hidden={selectingSlot !== null}>
-        커서가 있는 라인에 입력 · 블록 위에서는 바로 뒤에 삽입 · 200ms Hold ·
+        공명자 항목: 연속 입력 · 배치 영역: 커서 라인 편집 · 200ms Hold ·
         숫자키로 교체
       </footer>
       {pendingReplacement && (

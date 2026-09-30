@@ -42,6 +42,7 @@ export function applyCapturedInput(
         skills: [],
       },
       input.target.afterColumnId,
+      input.target.atTimelineEnd,
     )
   }
   if (!toId) throw new Error('교체 대상 슬롯이 없습니다.')
@@ -63,7 +64,9 @@ export function applyCapturedInput(
           toId,
           afterColumnId:
             input.target.afterColumnId ??
-            (input.target.ownerId ? inputInsertionBoundary(cycle) : undefined),
+            (input.target.ownerId && !input.target.atTimelineEnd
+              ? inputInsertionBoundary(cycle)
+              : undefined),
           normalSwitchAttack: auto(
             destination,
             destination.autoActions?.normalSwitchAttack,
@@ -75,12 +78,14 @@ export function applyCapturedInput(
           toId,
           afterColumnId:
             input.target.afterColumnId ??
-            (input.target.ownerId ? inputInsertionBoundary(cycle) : undefined),
+            (input.target.ownerId && !input.target.atTimelineEnd
+              ? inputInsertionBoundary(cycle)
+              : undefined),
           outro: auto(source, source.autoActions?.outro),
           intro: auto(destination, destination.autoActions?.intro),
         },
   )
-  return input.target.ownerId
+  return input.target.ownerId && !input.target.atTimelineEnd
     ? setActiveCharacter(result, cycleId, input.target.ownerId)
     : result
 }
