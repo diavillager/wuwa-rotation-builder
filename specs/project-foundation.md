@@ -31,10 +31,13 @@
 - 자기 자신으로의 교체와 잘못된 대상은 거부한다.
 - 협주 outro/intro 중 하나를 삭제하면 연결 쌍을 제거하고 suppression을 남긴다.
 - 입력 재정렬은 같은 Cycle의 InputBlock에만 허용하고 소유권을 보존한다.
+- 같은 공명자가 다시 진입한 경우 새 입력은 과거 퇴장 교체 앞이 아니라 최근 진입 뒤의 마지막 편집 가능 위치에 둔다.
+- 교체 경계의 anchor였던 InputBlock을 옮겨도 교체 경계는 원래 위치에 남아 연결 AutoAction의 앞뒤 관계를 보존한다.
 
 ## 테스트 계획
 
 전역 순서 및 한 열 한 행동, line 소유권, cycle 독립성, 교체/자동 행동의 열 구조, 삽입 위치, suppression과 직렬화, 파티 재정렬, stage 경계를 Vitest로 확인한다. `lint`, `test`, `build`를 실행한다.
+재등장 공명자의 입력 삽입, AutoAction suppression 뒤 삽입, anchor 입력 재정렬, 교체 경계 양옆의 AutoAction 검증도 포함한다.
 
 ## 남은 미확정 사항
 

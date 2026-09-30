@@ -191,6 +191,21 @@ export function assertRotation(rotation: Rotation): void {
         ).size !== 2
       )
         throw new Error('협주 자동 행동 쌍이 유효하지 않습니다.')
+      const boundary =
+        transition.afterColumnId === null
+          ? 0
+          : cycle.columns.findIndex(
+              (column) => column.id === transition.afterColumnId,
+            ) + 1
+      for (const action of actions) {
+        const actionIndex = cycle.columns.indexOf(action)
+        if (
+          (action.action as AutoActionBlock).kind === 'outro'
+            ? actionIndex >= boundary
+            : actionIndex < boundary
+        )
+          throw new Error('AutoAction이 교체 경계의 잘못된 쪽에 있습니다.')
+      }
     }
   }
 }
@@ -267,9 +282,11 @@ export function insertInput(
     )
       throw new Error('유효한 직접 입력만 삽입할 수 있습니다.')
     const ownerId = cycle.activeCharacterId
-    const outgoing = [...cycle.transitions]
+    const latestTransition = [...cycle.transitions]
       .reverse()
-      .find((item) => item.fromId === ownerId)
+      .find((item) => item.fromId === ownerId || item.toId === ownerId)
+    const outgoing =
+      latestTransition?.fromId === ownerId ? latestTransition : undefined
     let index: number
     if (outgoing) {
       const outroIndex = cycle.columns.findIndex(
@@ -290,7 +307,18 @@ export function insertInput(
       const lastOwned = cycle.columns
         .map((column) => column.ownerId)
         .lastIndexOf(ownerId)
-      index = lastOwned < 0 ? cycle.columns.length : lastOwned + 1
+      const arrivalBoundary =
+        latestTransition?.toId === ownerId
+          ? latestTransition.afterColumnId === null
+            ? 0
+            : cycle.columns.findIndex(
+                (column) => column.id === latestTransition.afterColumnId,
+              ) + 1
+          : 0
+      index =
+        lastOwned < 0 && !latestTransition
+          ? cycle.columns.length
+          : Math.max(arrivalBoundary, lastOwned + 1)
     }
     const column: TimelineColumn = {
       id: columnId,
@@ -337,10 +365,17 @@ export function reorderInput(
       targetIndex >= cycle.columns.length
     )
       throw new Error('이동 위치가 유효하지 않습니다.')
+    if (index === targetIndex) return cycle
     const columns = [...cycle.columns]
     const [column] = columns.splice(index, 1)
     columns.splice(targetIndex, 0, column)
-    return { ...cycle, columns }
+    const previousColumnId = cycle.columns[index - 1]?.id ?? null
+    const transitions = cycle.transitions.map((item) =>
+      item.afterColumnId === columnId
+        ? { ...item, afterColumnId: previousColumnId }
+        : item,
+    )
+    return { ...cycle, columns, transitions }
   })
 }
 

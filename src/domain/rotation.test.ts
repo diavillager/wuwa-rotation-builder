@@ -246,4 +246,134 @@ describe('Rotation foundation', () => {
     ])
     assertRotation(state)
   })
+
+  it('inserts after the latest arrival when the same character returns', () => {
+    let state = createSwitch(createRotation(['a', 'b', 'c']), 'opening', {
+      switchId: 's1',
+      kind: 'normal',
+      toId: 'b',
+      normalSwitchAttack: {
+        columnId: 'auto-b',
+        actionId: 'ab',
+        skillRef: 'b-normal',
+      },
+    })
+    state = createSwitch(state, 'opening', {
+      switchId: 's2',
+      kind: 'normal',
+      toId: 'a',
+      normalSwitchAttack: {
+        columnId: 'auto-a',
+        actionId: 'aa',
+        skillRef: 'a-normal',
+      },
+    })
+    state = insertInput(
+      state,
+      'opening',
+      'a-return',
+      input('pressed-after-return'),
+    )
+    expect(state.opening.columns.map((column) => column.action.id)).toEqual([
+      'ab',
+      'aa',
+      'pressed-after-return',
+    ])
+    expect(state.opening.transitions.map((item) => item.afterColumnId)).toEqual(
+      [null, 'auto-b'],
+    )
+  })
+
+  it('inserts at the arrival boundary when its automatic action was suppressed', () => {
+    let state = createSwitch(createRotation(['a', 'b', 'c']), 'opening', {
+      switchId: 's1',
+      kind: 'normal',
+      toId: 'b',
+      normalSwitchAttack: {
+        columnId: 'auto-b',
+        actionId: 'ab',
+        skillRef: 'b-normal',
+      },
+    })
+    state = createSwitch(state, 'opening', {
+      switchId: 's2',
+      kind: 'normal',
+      toId: 'a',
+      normalSwitchAttack: {
+        columnId: 'auto-a',
+        actionId: 'aa',
+        skillRef: 'a-normal',
+      },
+    })
+    state = deleteAutoAction(state, 'opening', 'aa')
+    state = insertInput(
+      state,
+      'opening',
+      'a-return',
+      input('pressed-after-return'),
+    )
+    expect(state.opening.columns.map((column) => column.action.id)).toEqual([
+      'ab',
+      'pressed-after-return',
+    ])
+    expect(state.opening.suppression).toEqual([
+      { switchId: 's2', kind: 'normalSwitchAttack' },
+    ])
+  })
+
+  it('keeps the switch boundary before automatic actions when its anchor input moves', () => {
+    let state = insertInput(
+      createRotation(['a', 'b', 'c']),
+      'opening',
+      'a-first',
+      input('a1'),
+    )
+    state = createSwitch(state, 'opening', {
+      switchId: 's1',
+      kind: 'normal',
+      toId: 'b',
+      normalSwitchAttack: {
+        columnId: 'auto-b',
+        actionId: 'ab',
+        skillRef: 'b-normal',
+      },
+    })
+    state = insertInput(state, 'opening', 'b-first', input('b1'))
+    state = reorderInput(state, 'opening', 'a-first', 2)
+    expect(state.opening.columns.map((column) => column.action.id)).toEqual([
+      'ab',
+      'b1',
+      'a1',
+    ])
+    expect(state.opening.transitions[0].afterColumnId).toBeNull()
+    expect(state.opening.columns[2].ownerId).toBe('a')
+    assertRotation(state)
+  })
+
+  it('rejects automatic actions placed on the wrong side of a switch boundary', () => {
+    let state = insertInput(
+      createRotation(['a', 'b', 'c']),
+      'opening',
+      'a-first',
+      input('a1'),
+    )
+    state = createSwitch(state, 'opening', {
+      switchId: 's1',
+      kind: 'normal',
+      toId: 'b',
+      normalSwitchAttack: {
+        columnId: 'auto-b',
+        actionId: 'ab',
+        skillRef: 'b-normal',
+      },
+    })
+    const corrupt = {
+      ...state,
+      opening: {
+        ...state.opening,
+        columns: [state.opening.columns[1], state.opening.columns[0]],
+      },
+    }
+    expect(() => assertRotation(corrupt)).toThrow('교체 경계')
+  })
 })
