@@ -1,12 +1,12 @@
 import type { CharacterId } from '../domain/rotation'
 
 export const ELEMENTS = [
-  '융용',
-  '인멸',
-  '기류',
-  '전도',
-  '회절',
   '응결',
+  '용융',
+  '전도',
+  '기류',
+  '회절',
+  '인멸',
 ] as const
 
 export type Element = (typeof ELEMENTS)[number]
@@ -29,6 +29,13 @@ export interface CharacterCatalog {
 }
 
 export const emptyCatalog: CharacterCatalog = { characters: [] }
+
+export function charactersByElement(
+  catalog: CharacterCatalog,
+  element: Element,
+): readonly CatalogCharacter[] {
+  return catalog.characters.filter((character) => character.element === element)
+}
 
 export function characterName(
   catalog: CharacterCatalog,

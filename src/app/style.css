@@ -221,6 +221,7 @@ button {
   align-items: center;
 }
 .selector-heading button,
+.element-tabs button,
 .character-options button {
   border: 1px solid #52626a;
   border-radius: 8px;
@@ -228,19 +229,27 @@ button {
   background: #293941;
   color: #e4eeee;
 }
-.element-group {
+.element-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 16px;
 }
-.element-group h3 {
-  font-size: 13px;
-  color: #9dc9bf;
-  margin: 0 0 8px;
+.element-tabs button.selected {
+  border-color: #8fc9b8;
+  background: #315047;
+  color: #f2fbf7;
+}
+.element-tabs button:hover,
+.element-tabs button:focus-visible {
+  border-color: #8fc9b8;
 }
 .character-options {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   min-height: 28px;
+  margin-top: 16px;
 }
 .character-options button:disabled {
   opacity: 0.45;

@@ -18,9 +18,11 @@ import {
 import {
   ELEMENTS,
   characterName,
+  charactersByElement,
   emptyCatalog,
   skillName,
   type CharacterCatalog,
+  type Element,
 } from './catalog'
 import { createDemoRotation, demoCatalog } from './demo'
 import { projectCycle } from './editor-projection'
@@ -72,9 +74,11 @@ export function App() {
   )
   const [focusedCycle, setFocusedCycle] = useState<CycleId>('opening')
   const [selectingSlot, setSelectingSlot] = useState<number | null>(null)
+  const [selectedElement, setSelectedElement] = useState<Element>(ELEMENTS[0])
   const [notice, setNotice] = useState('')
   const [drag, setDrag] = useState<DragItem | null>(null)
   const [hover, setHover] = useState<HoverTarget | null>(null)
+  const visibleCharacters = charactersByElement(catalog, selectedElement)
 
   const run = (command: (current: Rotation) => Rotation) => {
     try {
@@ -456,9 +460,10 @@ export function App() {
               className="party-slot"
               key={id}
               draggable
-              onClick={() =>
+              onClick={() => {
+                setSelectedElement(ELEMENTS[0])
                 setSelectingSlot(selectingSlot === index ? null : index)
-              }
+              }}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = 'move'
                 setDrag({ kind: 'party', id })
@@ -491,52 +496,60 @@ export function App() {
               <strong>슬롯 {selectingSlot + 1} 공명자 선택</strong>
               <button onClick={() => setSelectingSlot(null)}>닫기</button>
             </div>
-            {catalog.characters.length === 0 ? (
-              <p>검수된 공명자 데이터가 아직 없습니다.</p>
-            ) : (
-              ELEMENTS.map((element) => (
-                <div className="element-group" key={element}>
-                  <h3>{element}</h3>
-                  <div className="character-options">
-                    {catalog.characters
-                      .filter((item) => item.element === element)
-                      .map((item) => (
-                        <button
-                          key={item.id}
-                          disabled={
-                            rotation.party.includes(item.id) &&
-                            rotation.party[selectingSlot] !== item.id
-                          }
-                          onClick={() => {
-                            try {
-                              const next = replacePartyCharacter(
-                                rotation,
-                                selectingSlot as 0 | 1 | 2,
-                                item.id,
-                              )
-                              setRotation(next)
-                              setNotice(
-                                next === rotation
-                                  ? ''
-                                  : replacementNotice(rotation, next),
-                              )
-                              setSelectingSlot(null)
-                            } catch (error) {
-                              setNotice(
-                                error instanceof Error
-                                  ? error.message
-                                  : '교체 오류',
-                              )
-                            }
-                          }}
-                        >
-                          {item.displayName}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              ))
-            )}
+            <div className="element-tabs" role="group" aria-label="속성 선택">
+              {ELEMENTS.map((element) => (
+                <button
+                  key={element}
+                  type="button"
+                  className={selectedElement === element ? 'selected' : ''}
+                  aria-pressed={selectedElement === element}
+                  onClick={() => setSelectedElement(element)}
+                >
+                  {element}
+                </button>
+              ))}
+            </div>
+            <div className="character-options" aria-live="polite">
+              {visibleCharacters.length === 0 ? (
+                <p>
+                  {catalog.characters.length === 0
+                    ? '검수된 공명자 데이터가 아직 없습니다.'
+                    : `${selectedElement} 공명자가 없습니다.`}
+                </p>
+              ) : (
+                visibleCharacters.map((item) => (
+                  <button
+                    key={item.id}
+                    disabled={
+                      rotation.party.includes(item.id) &&
+                      rotation.party[selectingSlot] !== item.id
+                    }
+                    onClick={() => {
+                      try {
+                        const next = replacePartyCharacter(
+                          rotation,
+                          selectingSlot as 0 | 1 | 2,
+                          item.id,
+                        )
+                        setRotation(next)
+                        setNotice(
+                          next === rotation
+                            ? ''
+                            : replacementNotice(rotation, next),
+                        )
+                        setSelectingSlot(null)
+                      } catch (error) {
+                        setNotice(
+                          error instanceof Error ? error.message : '교체 오류',
+                        )
+                      }
+                    }}
+                  >
+                    {item.displayName}
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         )}
       </section>

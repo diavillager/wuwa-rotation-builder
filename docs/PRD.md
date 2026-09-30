@@ -130,7 +130,7 @@ RMB를 사이클 필드의 빈 영역에서 Rotation 입력으로 캡처할 때�
 
 ## 7. 파티 편성
 
-파티는 3슬롯 고정이다. 슬롯 클릭 시 공명자 선택창을 연다. 선택창은 융용, 인멸, 기류, 전도, 회절, 응결의 6속성으로 분류한다. 이미 다른 슬롯에 있는 공명자는 중복 선택할 수 없다.
+파티는 3슬롯 고정이다. 슬롯 클릭 시 공명자 선택창을 연다. 선택창은 응결, 용융, 전도, 기류, 회절, 인멸 순서의 6속성 탭으로 분류한다. 처음 열면 응결이 선택되며 선택한 속성의 공명자만 표시한다. 이미 다른 슬롯에 있는 공명자는 중복 선택할 수 없다.
 
 슬롯 또는 사이클 좌측 공명자 아이콘 드래그로 파티 순서를 바꾼다. 재배열 시 개막·반복의 공명자 라인 **순서와 그 라인에 속한 내용**을 함께 옮기되, Timeline 행동의 시간 순서는 바꾸지 않는다. 두 Cycle의 active line은 각각 독립적으로 유지한다. 재배열 후 active line의 실제 공명자와 화면 표시가 어긋나지 않아야 하며, 기존 행동·Transition·linked AutoAction의 소유 공명자도 유지되어야 한다.
 
@@ -251,7 +251,7 @@ Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와
 최종 Character의 필수 검증 항목은 다음과 같다.
 
 - `characterId`가 존재하고 디렉터리 ID와 일치한다.
-- 한국어 `displayName`이 존재하고 `attribute`가 융용/인멸/기류/전도/회절/응결 중 하나다.
+- 한국어 `displayName`이 존재하고 `attribute`가 응결/용융/전도/기류/회절/인멸 중 하나다.
 - portrait asset이 존재한다.
 - 노출 대상으로 선택된 모든 Skill에 `displayName`과 WebP asset이 존재하며 Skill ID 중복이 없다.
 - `autoActions.normalSwitchAttack`, `autoActions.intro`, `autoActions.outro`가 각각 지정되어 있고, 세 참조가 실제 선택·등록된 Skill ID를 가리킨다.

@@ -12,7 +12,7 @@ export const demoCatalog: CharacterCatalog = {
     {
       id: 'demo-a',
       displayName: '데모 공명자 A',
-      element: '융용',
+      element: '용융',
       skills: [
         { id: 'demo-skill-a', displayName: '데모 스킬 A' },
         { id: 'demo-skill-a2', displayName: '데모 스킬 A2' },
@@ -35,6 +35,18 @@ export const demoCatalog: CharacterCatalog = {
       displayName: '데모 공명자 D',
       element: '회절',
       skills: [{ id: 'demo-skill-d', displayName: '데모 스킬 D' }],
+    },
+    {
+      id: 'demo-e',
+      displayName: '데모 공명자 E',
+      element: '응결',
+      skills: [{ id: 'demo-skill-e', displayName: '데모 스킬 E' }],
+    },
+    {
+      id: 'demo-f',
+      displayName: '데모 공명자 F',
+      element: '인멸',
+      skills: [{ id: 'demo-skill-f', displayName: '데모 스킬 F' }],
     },
   ],
 }
