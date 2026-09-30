@@ -1,0 +1,49 @@
+import type { CharacterId } from '../domain/rotation'
+
+export const ELEMENTS = [
+  '융용',
+  '인멸',
+  '기류',
+  '전도',
+  '회절',
+  '응결',
+] as const
+
+export type Element = (typeof ELEMENTS)[number]
+
+export interface CatalogSkill {
+  id: string
+  displayName: string
+}
+
+export interface CatalogCharacter {
+  id: CharacterId
+  displayName: string
+  element: Element
+  skills: readonly CatalogSkill[]
+}
+
+/** 화면 표시용 검수 데이터. Rotation의 내용이나 자동 행동을 생성하지 않는다. */
+export interface CharacterCatalog {
+  characters: readonly CatalogCharacter[]
+}
+
+export const emptyCatalog: CharacterCatalog = { characters: [] }
+
+export function characterName(
+  catalog: CharacterCatalog,
+  id: CharacterId,
+): string {
+  return (
+    catalog.characters.find((item) => item.id === id)?.displayName ??
+    (id.startsWith('slot-') ? '공명자 미지정' : `알 수 없는 공명자 (${id})`)
+  )
+}
+
+export function skillName(catalog: CharacterCatalog, skillRef: string): string {
+  for (const character of catalog.characters) {
+    const skill = character.skills.find((item) => item.id === skillRef)
+    if (skill) return skill.displayName
+  }
+  return `알 수 없는 스킬 (${skillRef})`
+}
