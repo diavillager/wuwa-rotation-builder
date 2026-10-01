@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type DragEvent,
 } from 'react'
 import {
   createEditorHistory,
@@ -16,7 +17,7 @@ import {
   addSkill,
   changeSkillStage,
   createRotation,
-  deleteAutoAction,
+  deleteSwitchForAutoAction,
   deleteInput,
   deleteSkill,
   hasCharacterCycleContent,
@@ -54,6 +55,8 @@ import { TimelineWires } from './TimelineWires'
 import { attachCaptureEvents } from './input-events'
 import { applyCapturedInput } from './input-command'
 import { attachDragScroll } from './drag-scroll'
+import { showDragPreview } from './drag-preview'
+import { SkillTooltip } from './SkillTooltip'
 import { usePartySelectorScroll } from './use-party-selector-scroll'
 import type { ProjectReferences } from '../domain/project'
 
@@ -140,6 +143,29 @@ export function App({
       ? `${snapshot.displayName} (데이터 누락)`
       : skillName(catalog, id)
   }
+  const skillContent = (id: string, label?: string) => {
+    const skill = catalog.characters
+      .flatMap((character) => character.skills)
+      .find((item) => item.id === id)
+    return (
+      <>
+        {skill?.assetUrl && (
+          <img
+            className="skill-icon"
+            src={skill.assetUrl}
+            alt=""
+            draggable={false}
+          />
+        )}
+        <span>{label ?? skill?.category ?? skillLabel(id)}</span>
+      </>
+    )
+  }
+  const skillTooltipName = (id: string) =>
+    catalog.characters
+      .flatMap((character) => character.skills)
+      .find((skill) => skill.id === id)?.displayName ??
+    references?.skills.find((skill) => skill.id === id)?.displayName
   const [editor, setEditor] = useState(() =>
     createEditorHistory(
       initialRotation ??
@@ -169,6 +195,26 @@ export function App({
   const [selectedElement, setSelectedElement] = useState<Element>(ELEMENTS[0])
   const [notice, setNotice] = useState('')
   const [drag, setDrag] = useState<DragItem | null>(null)
+  const dragPreviewRef = useRef<(() => void) | null>(null)
+  const clearDragPreview = useCallback(() => {
+    dragPreviewRef.current?.()
+    dragPreviewRef.current = null
+  }, [])
+  const beginDragPreview = (event: DragEvent<HTMLElement>) => {
+    clearDragPreview()
+    dragPreviewRef.current = showDragPreview(
+      event.currentTarget,
+      event.dataTransfer,
+      {
+        x: event.clientX,
+        y: event.clientY,
+      },
+    )
+  }
+  useEffect(() => clearDragPreview, [clearDragPreview])
+  useEffect(() => {
+    if (!drag) clearDragPreview()
+  }, [drag, clearDragPreview])
   const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const visibleCharacters = charactersByElement(catalog, selectedElement)
   const captureRef = useRef<ReturnType<typeof attachCaptureEvents> | null>(null)
@@ -384,7 +430,9 @@ export function App({
       if (target.kind === 'input')
         run((state) => deleteInput(state, target.cycleId, target.actionId))
       else if (target.kind === 'auto')
-        run((state) => deleteAutoAction(state, target.cycleId, target.actionId))
+        run((state) =>
+          deleteSwitchForAutoAction(state, target.cycleId, target.actionId),
+        )
       else
         run((state) =>
           deleteSkill(state, target.cycleId, target.actionId, target.skillId),
@@ -471,6 +519,7 @@ export function App({
       aria-label={`${action.input} 입력, 연결 스킬 ${action.skills.length}개`}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'move'
+        beginDragPreview(event)
         setDrag({ kind: 'input', cycleId, columnId })
       }}
       onDragEnd={() => setDrag(null)}
@@ -490,9 +539,6 @@ export function App({
         {action.input}
         <small>{action.gesture === 'hold' ? 'Hold' : 'Tap'}</small>
       </span>
-      {action.skills.length === 0 && (
-        <span className="skill-placeholder">스킬 없음</span>
-      )}
       {action.skills.map((skill, index) => (
         <span
           key={skill.id}
@@ -503,6 +549,7 @@ export function App({
             if (action.skills.length < 2) return
             event.stopPropagation()
             event.dataTransfer.effectAllowed = 'move'
+            beginDragPreview(event)
             setDrag({
               kind: 'linkedSkill',
               cycleId,
@@ -533,9 +580,9 @@ export function App({
               changeSkillStage(state, cycleId, action.id, skill.id, change),
             )
           }}
-          title="휠로 단수 변경 · Backspace로 삭제"
+          data-skill-tooltip={skillTooltipName(skill.skillRef)}
         >
-          {skillLabel(skill.skillRef)}
+          {skillContent(skill.skillRef)}
           {skill.stage > 0 && <small>{skill.stage}단</small>}
         </span>
       ))}
@@ -546,7 +593,7 @@ export function App({
     const cycle = rotation[cycleId]
     const view = projectCycle(rotation, cycle)
     const title = cycleId === 'opening' ? '개막 사이클' : '반복 사이클'
-    const tracks = `148px ${view.columns.map(() => 'max-content').join(' ')} minmax(150px, 1fr)`
+    const tracks = `var(--timeline-line-size) ${view.columns.map(() => 'max-content').join(' ')} minmax(150px, 1fr)`
     return (
       <section
         className={`cycle-panel ${focusedCycle === cycleId ? 'focused-cycle' : ''}`}
@@ -615,6 +662,8 @@ export function App({
                   className={`line-label ${cycle.activeCharacterId === id ? 'active-line' : ''}`}
                   data-row-owner={id}
                   data-capture-owner={id}
+                  aria-label={`슬롯 ${lineIndex + 1} ${characterLabel(id)}`}
+                  title={characterLabel(id)}
                   draggable
                   onDragStart={(event) => {
                     event.dataTransfer.effectAllowed = 'move'
@@ -632,7 +681,25 @@ export function App({
                   }}
                 >
                   <span className="line-number">0{lineIndex + 1}</span>
-                  {characterLabel(id)}
+                  {catalog.characters.find((item) => item.id === id)
+                    ?.assetUrl ? (
+                    <img
+                      className="line-portrait"
+                      src={
+                        catalog.characters.find((item) => item.id === id)!
+                          .assetUrl
+                      }
+                      alt=""
+                      draggable={false}
+                    />
+                  ) : (
+                    <span
+                      className="line-portrait-placeholder"
+                      aria-hidden="true"
+                    >
+                      ◇
+                    </span>
+                  )}
                 </button>
                 {view.columns.map((column, index) => (
                   <div
@@ -672,16 +739,18 @@ export function App({
                           className="auto-card"
                           data-action-column={column.id}
                           data-action-id={column.action.id}
-                          title="읽기 전용 · Backspace로 삭제"
+                          data-skill-tooltip={skillTooltipName(
+                            column.action.skillRef,
+                          )}
                         >
-                          <small>
-                            {column.action.kind === 'outro'
-                              ? '반주'
+                          {skillContent(
+                            column.action.skillRef,
+                            column.action.kind === 'outro'
+                              ? '반주 스킬'
                               : column.action.kind === 'intro'
-                                ? '변주'
-                                : '교체 공격'}
-                          </small>
-                          {skillLabel(column.action.skillRef)}
+                                ? '변주 스킬'
+                                : '교체 공격',
+                          )}
                         </div>
                       ))}
                   </div>
@@ -777,12 +846,12 @@ export function App({
               <span className="eyebrow">PARTY SETUP</span>
               <h2>파티 편성</h2>
             </div>
-            <p>슬롯 클릭으로 공명자 선택 · 드래그로 순서 변경</p>
           </div>
           <div className="party-grid">
             {rotation.party.map((id, index) => (
               <button
                 className="party-slot"
+                aria-expanded={selectingSlot === index}
                 key={id}
                 draggable
                 onClick={() => {
@@ -806,12 +875,29 @@ export function App({
                 }}
               >
                 <span className="slot-index">0{index + 1}</span>
-                <span className="portrait-placeholder" aria-hidden="true">
-                  ◇
-                </span>
-                <span>
+                {catalog.characters.find((item) => item.id === id)?.assetUrl ? (
+                  <img
+                    className="character-portrait"
+                    src={
+                      catalog.characters.find((item) => item.id === id)!
+                        .assetUrl
+                    }
+                    alt=""
+                    draggable={false}
+                  />
+                ) : (
+                  <span className="portrait-placeholder" aria-hidden="true">
+                    ◇
+                  </span>
+                )}
+                <span className="party-character-info">
                   <strong>{characterLabel(id)}</strong>
-                  <small>슬롯 {index + 1}</small>
+                  <small>
+                    {catalog.characters.find((item) => item.id === id)?.element}
+                    {catalog.characters.find((item) => item.id === id)
+                      ?.weaponType &&
+                      ` / ${catalog.characters.find((item) => item.id === id)!.weaponType}`}
+                  </small>
                 </span>
               </button>
             ))}
@@ -869,7 +955,15 @@ export function App({
                         } else applyReplacement(slotIndex, item.id)
                       }}
                     >
-                      {item.displayName}
+                      {item.assetUrl && (
+                        <img
+                          className="selector-portrait"
+                          src={item.assetUrl}
+                          alt=""
+                          draggable={false}
+                        />
+                      )}
+                      <span className="selector-name">{item.displayName}</span>
                     </button>
                   ))
                 )}
@@ -885,27 +979,44 @@ export function App({
                 <h2>공명자 스킬</h2>
               </div>
             </div>
-            <p className="skills-context">
-              {focusedCycle === 'opening' ? '개막' : '반복'} ·{' '}
-              {characterLabel(activeId)}
-            </p>
             {activeCharacter ? (
               <div className="skill-list">
-                {activeCharacter.skills.map((skill) => (
-                  <div
-                    className="catalog-skill"
-                    key={skill.id}
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = 'copy'
-                      setDrag({ kind: 'catalogSkill', ref: skill.id })
-                    }}
-                    onDragEnd={() => setDrag(null)}
-                  >
-                    {skill.displayName}
-                    <small>InputBlock으로 드래그</small>
-                  </div>
-                ))}
+                {activeCharacter.skills
+                  .filter((skill) => skill.visible !== false)
+                  .map((skill) => (
+                    <div
+                      className="catalog-skill"
+                      key={skill.id}
+                      data-skill-tooltip={skill.displayName}
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = 'copy'
+                        event.dataTransfer.setData('text/plain', skill.id)
+                        beginDragPreview(event)
+                        setDrag({ kind: 'catalogSkill', ref: skill.id })
+                      }}
+                      onDragEnd={() => setDrag(null)}
+                    >
+                      {skill.assetUrl && (
+                        <img
+                          className="skill-icon"
+                          src={skill.assetUrl}
+                          alt=""
+                          draggable={false}
+                        />
+                      )}
+                      <span className="catalog-skill-copy">
+                        {skill.category && (
+                          <span className="catalog-skill-category">
+                            {skill.category}
+                          </span>
+                        )}
+                        <span className="catalog-skill-name">
+                          {skill.displayName}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
               </div>
             ) : (
               <div className="skills-empty">
@@ -920,9 +1031,18 @@ export function App({
             {renderCycle('repeat')}
           </div>
         </div>
+        <SkillTooltip
+          disabled={
+            drag !== null ||
+            selectingSlot !== null ||
+            pendingReplacement !== null ||
+            hideEditor ||
+            locked
+          }
+        />
         <footer hidden={selectingSlot !== null}>
-          공명자 항목: 연속 입력 · 배치 영역: 커서 라인 편집 · 200ms Hold ·
-          숫자키로 교체
+          A fan-made website for Wuthering Waves. Wuthering Waves and all
+          related assets are © KURO GAMES.
         </footer>
         {pendingReplacement && (
           <div className="confirm-backdrop">

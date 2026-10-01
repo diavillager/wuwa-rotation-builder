@@ -11,7 +11,7 @@ import {
   changeSkillStage,
   createRotation,
   createSwitch,
-  deleteAutoAction,
+  deleteSwitchForAutoAction,
   deleteInput,
   deleteSkill,
   insertInput,
@@ -123,7 +123,7 @@ describe('사이클별 편집 이력', () => {
   })
 
   it.each(['normal', 'concerto'] as const)(
-    '%s 교체 생성과 자동 행동·suppression 삭제를 한 단계씩 복원한다',
+    '%s 교체 생성과 카드·Transition 함께 삭제를 한 단계씩 복원한다',
     (kind) => {
       let state = initial()
       state = recordRotationEdit(state, insert(state.rotation, 'a1'))
@@ -159,14 +159,15 @@ describe('사이클별 편집 이력', () => {
       expect(state.rotation.opening).toEqual(switched)
       state = recordRotationEdit(
         state,
-        deleteAutoAction(
+        deleteSwitchForAutoAction(
           state.rotation,
           'opening',
           kind === 'normal' ? 'normal-action' : 'intro-action',
         ),
       )
       expect(state.rotation.opening.columns).toHaveLength(1)
-      expect(state.rotation.opening.suppression).toHaveLength(1)
+      expect(state.rotation.opening.suppression).toEqual([])
+      expect(state.rotation.opening.transitions).toEqual([])
       const suppressed = state.rotation.opening
       state = undoCycle(state, 'opening')
       expect(state.rotation.opening).toEqual(switched)

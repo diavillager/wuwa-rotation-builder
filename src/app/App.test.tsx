@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { demoCatalog } from './demo'
 
 let root: Root
 let time = 0
@@ -59,7 +60,7 @@ async function dragDrop(source: Element, target: Element) {
   await act(async () => {
     const start = new Event('dragstart', { bubbles: true, cancelable: true })
     Object.defineProperty(start, 'dataTransfer', {
-      value: { effectAllowed: '' },
+      value: { effectAllowed: '', setData: vi.fn(), setDragImage: vi.fn() },
     })
     source.dispatchEvent(start)
   })
@@ -69,6 +70,206 @@ async function dragDrop(source: Element, target: Element) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it.each([10, 500])(
+    '교체 카드 삭제 후 협주 재입력은 입력→반주 선을 연결한다 (%dms)',
+    async (duration) => {
+      await hover(emptyLine())
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+      await key('keydown', 'Digit2')
+      await key('keyup', 'Digit2', duration)
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: () => grid().querySelector('.auto-card'),
+      })
+      await hover(grid().querySelector('.auto-card')!)
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Backspace',
+            bubbles: true,
+            cancelable: true,
+          }),
+        )
+      })
+      expect(grid().querySelector('.auto-card')).toBeNull()
+      Reflect.deleteProperty(document, 'elementFromPoint')
+      await hover(emptyLine())
+      await key('keydown', 'Digit2')
+      await key('keyup', 'Digit2', 500)
+      expect(
+        [...grid().querySelectorAll('[data-action-column]')].map(
+          (card) => card.textContent,
+        ),
+      ).toEqual(['ETap', '반주 스킬', '변주 스킬'])
+      expect(grid().querySelectorAll('.wire-flow')).toHaveLength(2)
+      expect(grid().querySelectorAll('.wire-transition')).toHaveLength(1)
+    },
+  )
+  it.each([
+    ['opening', 'Digit2', 'demo-b'],
+    ['opening', 'Digit3', 'demo-c'],
+    ['repeat', 'Digit2', 'demo-b'],
+    ['repeat', 'Digit3', 'demo-c'],
+  ])(
+    '%s에서 1번 라인→%s 협주는 입력→반주와 반주→변주 흐름을 모두 연결한다',
+    async (cycleId, code, destination) => {
+      await hover(emptyLine('demo-a', cycleId))
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+      await key('keydown', code)
+      await key('keyup', code, 500)
+      const cycleGrid = grid(cycleId)
+      const cards = [...cycleGrid.querySelectorAll('[data-action-column]')]
+      expect(cards).toHaveLength(3)
+      expect(
+        cards.map(
+          (card) =>
+            card.closest<HTMLElement>('[data-capture-owner]')?.dataset
+              .captureOwner,
+        ),
+      ).toEqual(['demo-a', 'demo-a', destination])
+      expect(cards[0].classList.contains('input-card')).toBe(true)
+      expect(cards[1].textContent).toBe('반주 스킬')
+      expect(cards[2].textContent).toBe('변주 스킬')
+      expect(cycleGrid.querySelectorAll('.wire-flow')).toHaveLength(2)
+      expect(cycleGrid.querySelectorAll('.wire-transition')).toHaveLength(1)
+      expect(
+        grid(cycleId === 'opening' ? 'repeat' : 'opening').querySelector(
+          '[data-action-column]',
+        ),
+      ).toBeNull()
+    },
+  )
+  it.each([10, 500])(
+    '교체 자동 행동도 조작 안내 대신 스킬명 툴팁을 사용한다 (%dms)',
+    async (duration) => {
+      await hover(emptyLine())
+      await key('keydown', 'Digit2')
+      await key('keyup', 'Digit2', duration)
+      const cards = [...grid().querySelectorAll('.auto-card')]
+      expect(cards).toHaveLength(duration === 10 ? 1 : 2)
+      const names = demoCatalog.characters.flatMap((character) =>
+        character.skills.map((skill) => skill.displayName),
+      )
+      vi.useFakeTimers()
+      for (const card of cards) {
+        expect(card.hasAttribute('title')).toBe(false)
+        expect(card.querySelector('[title]')).toBeNull()
+        expect(names).toContain(card.getAttribute('data-skill-tooltip'))
+        await hover(card)
+        expect(document.querySelector('[role="tooltip"]')).toBeNull()
+        await act(async () => vi.advanceTimersByTime(500))
+        expect(document.querySelector('[role="tooltip"]')?.textContent).toBe(
+          card.getAttribute('data-skill-tooltip'),
+        )
+        expect(
+          document.querySelector('[role="tooltip"]')?.getAttribute('data-tone'),
+        ).toBe('auto')
+      }
+      expect(cards.map((card) => card.textContent)).toEqual(
+        duration === 10 ? ['교체 공격'] : ['반주 스킬', '변주 스킬'],
+      )
+    },
+  )
+  it('빈 입력은 키와 Tap/Hold만 표시하고 연결 스킬은 키 뒤에 추가한다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    const input = grid().querySelector('.input-card')!
+    const label = input.querySelector('.input-key')!
+    expect(input.textContent).toBe('ETap')
+    expect(input.querySelector('.skill-placeholder')).toBeNull()
+    await dragDrop(document.querySelector('.catalog-skill')!, input)
+    expect(input.firstElementChild).toBe(label)
+    expect(input.children[1].className).toBe('linked-skill')
+    await dragDrop(document.querySelectorAll('.catalog-skill')[1], input)
+    expect(input.firstElementChild).toBe(label)
+    expect(input.querySelectorAll('.linked-skill')).toHaveLength(2)
+  })
+  it('진열 스킬 전체 카드를 잡은 위치에 드래그 이미지로 연결한다', async () => {
+    const card = document.querySelector<HTMLElement>('.catalog-skill')!
+    vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({
+      left: 10,
+      top: 20,
+      width: 300,
+      height: 80,
+    } as DOMRect)
+    const transfer = {
+      effectAllowed: '',
+      setData: vi.fn(),
+      setDragImage: vi.fn(),
+    }
+    await act(async () => {
+      const event = new MouseEvent('dragstart', {
+        bubbles: true,
+        clientX: 40,
+        clientY: 55,
+      })
+      Object.defineProperty(event, 'dataTransfer', { value: transfer })
+      card.dispatchEvent(event)
+    })
+    expect(transfer.setDragImage.mock.calls[0][0]).toBeInstanceOf(
+      HTMLCanvasElement,
+    )
+    expect(
+      document.querySelector<HTMLElement>('.drag-preview')!.style.transform,
+    ).toBe('translate3d(10px, 20px, 0)')
+    expect(transfer.setData).toHaveBeenCalledWith('text/plain', 'demo-skill-a')
+    expect(transfer.effectAllowed).toBe('copy')
+    await act(async () =>
+      card.dispatchEvent(new Event('dragend', { bubbles: true })),
+    )
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+  })
+  it('파티 선택에는 초상화와 이름, 스킬 진열에는 아이콘과 분류를 표시한다', async () => {
+    const catalog = structuredClone(demoCatalog)
+    const character = catalog.characters[0]
+    character.assetUrl = '/reviewed-portrait.webp'
+    character.element = '응결'
+    const skill = character.skills[0]
+    skill.assetUrl = '/reviewed-skill.webp'
+    skill.category = '기본 공격'
+    await act(async () => root.render(<App catalogOverride={catalog} />))
+    const card = document.querySelector('.catalog-skill')!
+    expect(card.textContent).toContain('기본 공격')
+    expect(card.textContent).toContain(skill.displayName)
+    expect(card.textContent).not.toContain('InputBlock으로 드래그')
+    expect(card.getAttribute('data-skill-tooltip')).toBe(skill.displayName)
+    expect(card.hasAttribute('title')).toBe(false)
+    expect(card.querySelector('img')?.getAttribute('src')).toBe(skill.assetUrl)
+    const line = grid().querySelector('.line-label')!
+    expect(line.querySelector('img')?.getAttribute('src')).toBe(
+      character.assetUrl,
+    )
+    expect(line.getAttribute('aria-label')).toContain(character.displayName)
+    expect(line.getAttribute('title')).toBe(character.displayName)
+    expect(line.textContent).not.toContain(character.displayName)
+    expect(document.querySelector('.skills-context')).toBeNull()
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await dragDrop(card, grid().querySelector('.input-card')!)
+    const linked = grid().querySelector('.linked-skill')!
+    expect(linked.textContent).toContain('기본 공격')
+    expect(linked.querySelector('img')?.getAttribute('src')).toBe(
+      skill.assetUrl,
+    )
+    expect(linked.getAttribute('data-skill-tooltip')).toBe(skill.displayName)
+    expect(linked.querySelector('[title]')).toBeNull()
+    expect(linked.hasAttribute('title')).toBe(false)
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.party-slot')!.click(),
+    )
+    const option = document.querySelector('.character-options button')!
+    expect(option.textContent).toContain(character.displayName)
+    expect(option.querySelector('img')?.getAttribute('src')).toBe(
+      character.assetUrl,
+    )
+  })
   it('Cycle 제목 옆 버튼은 해당 사이클만 복원하고 hover는 Redo를 지우지 않는다', async () => {
     for (const id of ['opening', 'repeat']) {
       expect(historyButton(id, 'undo').disabled).toBe(true)
@@ -203,7 +404,7 @@ describe('App 실제 입력 연결', () => {
     await clickHistory('opening', 'undo')
     await clickHistory('opening', 'redo')
     expect(
-      grid().querySelectorAll('[data-row-owner]')[2].textContent,
+      grid().querySelectorAll('[data-row-owner]')[2].getAttribute('aria-label'),
     ).toContain('데모 공명자 A')
     expect(
       grid().querySelector('.input-card')?.parentElement?.dataset.captureOwner,
@@ -262,6 +463,11 @@ describe('App 실제 입력 연결', () => {
   })
 
   it('파티 선택창을 열 때 페이지 높이와 클릭 당시 스크롤을 보존하고 닫기·선택 완료 때 해제한다', async () => {
+    const expandedSlots = () =>
+      [...document.querySelectorAll('.party-slot')].map((slot) =>
+        slot.getAttribute('aria-expanded'),
+      )
+    expect(expandedSlots()).toEqual(['false', 'false', 'false'])
     const shell = document.querySelector<HTMLElement>('.app-shell')!
     vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
       height: 1400,
@@ -282,6 +488,7 @@ describe('App 실제 입력 연결', () => {
     )
     expect(shell.style.minHeight).toBe('1400px')
     expect(window.scrollY).toBe(180)
+    expect(expandedSlots()).toEqual(['true', 'false', 'false'])
     expect(scrollTo).toHaveBeenCalledWith({
       left: 0,
       top: 180,
@@ -303,12 +510,14 @@ describe('App 실제 입력 연결', () => {
     expect(
       document.querySelector('.selector-heading strong')?.textContent,
     ).toContain('슬롯 2')
+    expect(expandedSlots()).toEqual(['false', 'true', 'false'])
     await act(async () =>
       document
         .querySelector<HTMLButtonElement>('.selector-heading > button')!
         .click(),
     )
     expect(shell.style.minHeight).toBe('')
+    expect(expandedSlots()).toEqual(['false', 'false', 'false'])
     expect(document.querySelector<HTMLElement>('.workspace-grid')!.hidden).toBe(
       false,
     )
@@ -323,6 +532,7 @@ describe('App 실제 입력 연결', () => {
     )
     expect(document.querySelector('.character-selector')).toBeNull()
     expect(shell.style.minHeight).toBe('')
+    expect(expandedSlots()).toEqual(['false', 'false', 'false'])
   })
 
   it.each(['opening', 'repeat'])(
@@ -363,7 +573,7 @@ describe('App 실제 입력 연결', () => {
       await act(async () => {
         const event = new Event('dragstart', { bubbles: true })
         Object.defineProperty(event, 'dataTransfer', {
-          value: { effectAllowed: '' },
+          value: { effectAllowed: '', setDragImage: vi.fn() },
         })
         card.dispatchEvent(event)
       })
@@ -657,8 +867,8 @@ describe('App 실제 입력 연결', () => {
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
     ).toBe('demo-b')
-    expect(document.querySelector('.skills-context')?.textContent).toContain(
-      '데모 공명자 B',
+    expect(document.querySelector('.skill-list')?.textContent).toContain(
+      '데모 스킬 B',
     )
     await act(async () =>
       grid()
@@ -806,16 +1016,18 @@ describe('App 실제 입력 연결', () => {
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
     ).toBe('demo-a')
-    expect(grid().querySelector('.auto-card')?.textContent).toContain(
-      '데모 E 교체 공격',
-    )
+    expect(
+      grid().querySelector('.auto-card')?.getAttribute('data-skill-tooltip'),
+    ).toBe('데모 E 교체 공격')
     await hover(emptyLine('demo-e'))
     await key('keydown', 'Digit3')
     await key('keyup', 'Digit3', 200)
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
     ).toBe('demo-e')
-    expect(grid().textContent).toContain('데모 E 반주')
+    expect(
+      grid().querySelector('[data-skill-tooltip="데모 E 반주"]'),
+    ).not.toBeNull()
     expect(document.querySelector('[role="status"]')).toBeNull()
   })
   it.each(['opening', 'repeat'])(
@@ -964,6 +1176,55 @@ describe('App 실제 입력 연결', () => {
     expect(workspace.hidden).toBe(false)
     expect(grid().querySelector('.input-card')?.textContent).toContain('FTap')
   })
+  it('마지막 스킬도 입력을 남기고 삭제하며 빈 입력 삭제는 별도 Undo 단계다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    const input = grid().querySelector('.input-card')!
+    const inputId = input.getAttribute('data-action-id')
+    for (const card of [...document.querySelectorAll('.catalog-skill')].slice(
+      0,
+      2,
+    ))
+      await dragDrop(card, input)
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () =>
+        grid().querySelector('.linked-skill') ??
+        grid().querySelector('.input-card'),
+    })
+    const backspace = async () => {
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Backspace',
+            bubbles: true,
+            cancelable: true,
+          }),
+        )
+      })
+    }
+    await hover(input.querySelector('.linked-skill')!)
+    for (const count of [1, 0]) {
+      await backspace()
+      expect(grid().querySelectorAll('.linked-skill')).toHaveLength(count)
+      expect(
+        grid().querySelector('.input-card')?.getAttribute('data-action-id'),
+      ).toBe(inputId)
+    }
+    expect(grid().querySelector('.input-card')?.textContent).toBe('ETap')
+    await hover(grid().querySelector('.input-card')!)
+    await backspace()
+    expect(grid().querySelector('.input-card')).toBeNull()
+    for (const count of [0, 1, 2]) {
+      await clickHistory('opening', 'undo')
+      expect(grid().querySelectorAll('.linked-skill')).toHaveLength(count)
+      expect(
+        grid().querySelector('.input-card')?.getAttribute('data-action-id'),
+      ).toBe(inputId)
+    }
+    expect(grid('repeat').querySelector('.input-card')).toBeNull()
+  })
   it('커서를 옮기지 않고 Backspace를 반복해 다음 블록을 삭제한다', async () => {
     await hover(grid())
     for (let index = 0; index < 3; index++) {
@@ -1062,8 +1323,8 @@ describe('App 실제 입력 연결', () => {
     expect(
       grid('repeat').querySelectorAll('.input-card, .auto-card'),
     ).toHaveLength(0)
-    expect(document.querySelector('.skills-context')?.textContent).toContain(
-      '데모 공명자 B',
+    expect(document.querySelector('.skill-list')?.textContent).toContain(
+      '데모 스킬 B',
     )
   })
 

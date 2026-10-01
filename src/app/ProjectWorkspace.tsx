@@ -4,6 +4,7 @@ import { emptyCatalog, type CharacterCatalog } from './catalog'
 import { createInputDemoRotation, demoCatalog } from './demo'
 import { ProjectStore } from './project-store'
 import { createRotation } from '../domain/rotation'
+import type { CharacterDataIssue } from '../data/characters/load'
 import {
   IndexedDbProjectRepository,
   type ProjectRepository,
@@ -12,9 +13,14 @@ import {
 export interface WorkspaceProps {
   repository?: ProjectRepository
   catalog?: CharacterCatalog
+  catalogIssues?: readonly CharacterDataIssue[]
 }
 
-export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
+export function ProjectWorkspace({
+  repository,
+  catalog,
+  catalogIssues = [],
+}: WorkspaceProps = {}) {
   const storageDemo =
     import.meta.env.DEV &&
     new URLSearchParams(window.location.search).get('demo') === 'storage'
@@ -199,6 +205,21 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
   )
   const notices = (
     <>
+      {catalogIssues.length > 0 && (
+        <details className="catalog-issues" role="alert">
+          <summary>
+            공명자 데이터 오류 {catalogIssues.length}건 · 해당 공명자는 선택
+            목록에서 제외됩니다.
+          </summary>
+          <ul>
+            {catalogIssues.map((issue, index) => (
+              <li key={`${issue.path}-${index}`}>
+                {issue.characterId}: {issue.message}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       {!state.current && !state.loading && (
         <p className="project-empty">
           새 프로젝트를 만들거나 목록에서 선택해 주세요.

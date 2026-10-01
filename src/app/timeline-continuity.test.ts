@@ -61,6 +61,9 @@ describe('공명자 변경 후 시간 흐름선', () => {
     const concerto = createDemoRotation()
     const columns = concerto.opening.columns
     expect(
+      hasFlowConnection(columns[0], columns[1], concerto.opening.transitions),
+    ).toBe(true)
+    expect(
       hasFlowConnection(columns[1], columns[2], concerto.opening.transitions),
     ).toBe(true)
     const suppressed = deleteAutoAction(concerto, 'opening', 'demo-out').opening
