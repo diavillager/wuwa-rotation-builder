@@ -503,8 +503,6 @@ export function insertInput(
     const index = atTimelineEnd
       ? cycle.columns.length
       : inputInsertionIndex(cycle, ownerId, afterColumnId)
-    const latest = latestLineTransition(cycle, ownerId)
-    const outgoing = latest?.fromId === ownerId ? latest : undefined
     const column: TimelineColumn = {
       id: columnId,
       ownerId,
@@ -512,13 +510,12 @@ export function insertInput(
     }
     const transitions = cycle.transitions.map((item) =>
       !atTimelineEnd &&
-      item === outgoing &&
-      outgoing &&
+      item.fromId === ownerId &&
       index ===
-        (outgoing.afterColumnId === null
+        (item.afterColumnId === null
           ? 0
           : cycle.columns.findIndex(
-              (candidate) => candidate.id === outgoing.afterColumnId,
+              (candidate) => candidate.id === item.afterColumnId,
             ) + 1)
         ? { ...item, afterColumnId: columnId }
         : item,

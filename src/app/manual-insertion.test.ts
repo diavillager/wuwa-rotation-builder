@@ -20,6 +20,47 @@ const initial = () => createRotation(['demo-a', 'demo-b', 'demo-c'])
 const a = { cycleId: 'opening' as const, ownerId: 'demo-a' }
 
 describe('수동 입력·교체 경계', () => {
+  it('같은 공명자가 돌아온 뒤에도 앞쪽 기존 교체 직전 입력은 해당 교체 경계를 이어 준다', () => {
+    let state = applyCapturedInput(
+      initial(),
+      demoCatalog,
+      command('Q', a),
+      nextId,
+    )
+    const anchor = state.opening.columns[0].id
+    state = applyCapturedInput(state, demoCatalog, command('2', a), nextId)
+    const b = { ...a, ownerId: 'demo-b' }
+    state = applyCapturedInput(state, demoCatalog, command('E', b), nextId)
+    state = applyCapturedInput(state, demoCatalog, command('1', b), nextId)
+    state = applyCapturedInput(state, demoCatalog, command('R', a), nextId)
+    state = applyCapturedInput(state, demoCatalog, command('3', a), nextId)
+    const before = state
+    const next = applyCapturedInput(
+      state,
+      demoCatalog,
+      command('F', { ...a, afterColumnId: anchor }),
+      nextId,
+    )
+    expect(next.opening.columns[1].action).toMatchObject({
+      type: 'input',
+      input: 'F',
+    })
+    expect(next.opening.transitions[0].afterColumnId).toBe(
+      next.opening.columns[1].id,
+    )
+    expect(next.opening.transitions.slice(1)).toEqual(
+      before.opening.transitions.slice(1),
+    )
+    expect(
+      next.opening.columns.filter(
+        (column) => column.id !== next.opening.columns[1].id,
+      ),
+    ).toEqual(before.opening.columns)
+    expect(next.opening.suppression).toEqual(before.opening.suppression)
+    expect(next.repeat).toBe(before.repeat)
+    assertRotation(next)
+  })
+
   it.each(['tap', 'hold'] as const)(
     '끊어진 중간 경계에 %s 교체를 넣고 후속 입력·소유권을 보존한다',
     (gesture) => {
