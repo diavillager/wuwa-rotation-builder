@@ -851,6 +851,7 @@ export function App({
             {rotation.party.map((id, index) => (
               <button
                 className="party-slot"
+                aria-expanded={selectingSlot === index}
                 key={id}
                 draggable
                 onClick={() => {

@@ -227,6 +227,7 @@ button {
   text-align: left;
 }
 .party-slot:hover,
+.party-slot[aria-expanded='true'],
 .party-slot:focus-visible {
   border-color: #83bfb4;
 }

@@ -463,6 +463,11 @@ describe('App 실제 입력 연결', () => {
   })
 
   it('파티 선택창을 열 때 페이지 높이와 클릭 당시 스크롤을 보존하고 닫기·선택 완료 때 해제한다', async () => {
+    const expandedSlots = () =>
+      [...document.querySelectorAll('.party-slot')].map((slot) =>
+        slot.getAttribute('aria-expanded'),
+      )
+    expect(expandedSlots()).toEqual(['false', 'false', 'false'])
     const shell = document.querySelector<HTMLElement>('.app-shell')!
     vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
       height: 1400,
@@ -483,6 +488,7 @@ describe('App 실제 입력 연결', () => {
     )
     expect(shell.style.minHeight).toBe('1400px')
     expect(window.scrollY).toBe(180)
+    expect(expandedSlots()).toEqual(['true', 'false', 'false'])
     expect(scrollTo).toHaveBeenCalledWith({
       left: 0,
       top: 180,
@@ -504,12 +510,14 @@ describe('App 실제 입력 연결', () => {
     expect(
       document.querySelector('.selector-heading strong')?.textContent,
     ).toContain('슬롯 2')
+    expect(expandedSlots()).toEqual(['false', 'true', 'false'])
     await act(async () =>
       document
         .querySelector<HTMLButtonElement>('.selector-heading > button')!
         .click(),
     )
     expect(shell.style.minHeight).toBe('')
+    expect(expandedSlots()).toEqual(['false', 'false', 'false'])
     expect(document.querySelector<HTMLElement>('.workspace-grid')!.hidden).toBe(
       false,
     )
@@ -524,6 +532,7 @@ describe('App 실제 입력 연결', () => {
     )
     expect(document.querySelector('.character-selector')).toBeNull()
     expect(shell.style.minHeight).toBe('')
+    expect(expandedSlots()).toEqual(['false', 'false', 'false'])
   })
 
   it.each(['opening', 'repeat'])(
