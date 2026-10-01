@@ -285,7 +285,10 @@ export class ReviewRepository {
       conflict: source.currentError,
     }
   }
-  private async prepare(value: ReviewState): Promise<Prepared> {
+  private async prepare(
+    value: ReviewState,
+    selectedOnly = false,
+  ): Promise<Prepared> {
     const errors: string[] = [],
       summary: string[] = []
     const assets = new Map<string, Uint8Array>()
@@ -325,7 +328,7 @@ export class ReviewRepository {
         state.existingSkills.map((s) => s.candidateId).filter(Boolean),
       )
       for (const skill of state.existingSkills) {
-        if (skill.decision === 'pending')
+        if (skill.decision === 'pending' && !selectedOnly)
           errors.push(`미검수 스킬: ${skill.displayName || skill.skillId}`)
         const old = source.current!.skills.find(
           (s) => s.skillId === skill.skillId,
@@ -344,7 +347,10 @@ export class ReviewRepository {
           ...(skill.category ? { category: skill.category } : {}),
           ...(skill.hitCount !== undefined ? { hitCount: skill.hitCount } : {}),
           displayName: skill.displayName.trim(),
-          visible: skill.visible,
+          visible:
+            selectedOnly && skill.decision === 'pending'
+              ? false
+              : skill.visible,
           asset,
         })
         if (
@@ -360,6 +366,7 @@ export class ReviewRepository {
       for (const candidate of state.candidates) {
         if (
           candidate.decision === 'pending' &&
+          !selectedOnly &&
           !linked.has(candidate.candidateId)
         )
           errors.push(`미검수 후보: ${candidate.candidateId}`)
@@ -469,6 +476,23 @@ export class ReviewRepository {
   async validate(state: ReviewState): Promise<ReviewValidation> {
     const { errors, summary, token } = await this.prepare(state)
     return { errors, summary, token }
+  }
+  /** 에이전트 반영용: 선택되지 않은 후보의 검수 상태를 바꾸지 않는다. */
+  async prepareSelectedCharacter(state: ReviewState) {
+    const source = await this.source(state)
+    parseReview(state, source)
+    if (!state.portraitCandidateId && !source.current?.portrait) return null
+    const current = (await scanRegistered(this.root)).find(
+      (entry) => entry.characterId === state.characterId,
+    )
+    if ((current?.sha256 ?? null) !== state.baseHash)
+      throw new Error(
+        '현재 DB가 백업 기준과 다릅니다. 변경 내용을 먼저 확인해 주세요.',
+      )
+    const prepared = await this.prepare(state, true)
+    if (prepared.errors.length || !prepared.data)
+      throw new Error(prepared.errors.join('\n') || '검증 실패')
+    return { data: prepared.data, assets: prepared.assets }
   }
   async exportCharacter(state: ReviewState) {
     const prepared = await this.prepare(state)

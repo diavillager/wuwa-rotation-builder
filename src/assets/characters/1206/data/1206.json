@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "reviewStatus": "approved",
+  "characterId": "1206",
+  "displayName": "브렌트",
+  "attribute": "용융",
+  "portrait": "assets/9441af5b5fb83713536ecedeab81c93fc22c9956d8141147db0bddca7b1353d4.webp",
+  "skills": [
+    {
+      "skillId": "1206:skill:5bf50ce050eb7bf3dcf34b4b43b3574361fa6190e210fd1013b4fa416b67e56d",
+      "category": "기본 공격",
+      "displayName": "선장의 랩소디",
+      "visible": true,
+      "asset": "assets/4c0720eddfd4ef2176fc86672daa0f147ff9884c72def662eeaf53e19a3c6f1c.webp"
+    },
+    {
+      "skillId": "1206:skill:27d51f6f80ccc6a92c9d10b9443078d204e184d2019c8d325d70d860c46f08f6",
+      "category": "공명 스킬",
+      "displayName": "닻을 올려라!",
+      "visible": true,
+      "asset": "assets/d08eee5dcd712e86dcc9386ff1ebe715261d57b0378cdd2a79518d851955c48b.webp"
+    },
+    {
+      "skillId": "1206:skill:b40b5ed868f86701478e5072675ba4df7d8905cbf0e5bb8823c5d3cc30566cab",
+      "category": "공명 해방",
+      "displayName": "세상 끝까지",
+      "visible": true,
+      "asset": "assets/1f22d2c31bc14c6ebddce80fffebbe6b59fe0973406da6e3398fab3a69d87130.webp"
+    },
+    {
+      "skillId": "1206:skill:b4a90983c065ec1f3dc34ca2d5f35eace681e64dd0713265abf0cab999aea2e8",
+      "category": "공명 회로",
+      "displayName": "해상 연극",
+      "visible": true,
+      "asset": "assets/0f78a220c9ebc416127d4d544168746135f3f075c0180068f45f7cb790dabc64.webp"
+    },
+    {
+      "skillId": "1206:skill:e6698754cdf9b09b1d317e44e497430b0cc45681a9a832ba4eff29bdfdf7eb39",
+      "category": "변주 스킬",
+      "displayName": "나를 위하여!",
+      "visible": true,
+      "asset": "assets/f8c84d75f23b7e7d85c10d94d5d68501920cc98a4e76472b50deaaa91d68b605.webp"
+    },
+    {
+      "skillId": "1206:skill:a5bee88ba0df293148a87dfe5e47187395ae4b06ad75c5344503534cf2308db4",
+      "category": "반주 스킬",
+      "displayName": "항로 확정!",
+      "visible": true,
+      "asset": "assets/ee4632a981350ba102cdc7e48782ffe722b7bdebed10bbdb318da0d92c09c318.webp"
+    },
+    {
+      "skillId": "1206:skill:4856119349840d755806820895e52b090dd41cfe46079f7614bea9a80437b45b",
+      "category": "조화도 파괴",
+      "displayName": "조화도 파괴 · 직검",
+      "visible": true,
+      "asset": "assets/52ca7c18eccc97f859f503e46dc89f13854735270a22bab35d3c574e138bd7a7.webp"
+    }
+  ],
+  "autoActions": {
+    "normalSwitchAttack": "1206:skill:5bf50ce050eb7bf3dcf34b4b43b3574361fa6190e210fd1013b4fa416b67e56d",
+    "intro": "1206:skill:e6698754cdf9b09b1d317e44e497430b0cc45681a9a832ba4eff29bdfdf7eb39",
+    "outro": "1206:skill:a5bee88ba0df293148a87dfe5e47187395ae4b06ad75c5344503534cf2308db4"
+  }
+}

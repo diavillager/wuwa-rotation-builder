@@ -86,3 +86,9 @@ npm run character-review:build
 검증 및 파일 관리 맨 아래의 **전체 검수 초기화**를 누르고 확인하면 현재 수집 대상 전체를 초기 검수 상태로 복원합니다. 필요한 내용은 먼저 JSON으로 백업하세요. 이미지와 툴팁은 유지하며 앱 프로젝트에는 영향을 주지 않습니다. 준비 실패 시 현재 화면을 유지하고, 성공하면 응결 목록과 미검수 초기값을 브라우저에 자동 저장합니다. JSON Import는 같은 ID의 내용을 갱신하고 새 ID를 추가하며 파일에 없는 대상은 유지합니다.
 
 관련 명세: [검수 초기화·병합 Import](../../specs/2026-10-01-010-review-reset-and-merge-import.md).
+
+## 백업에서 선택 항목만 앱에 반영
+
+사용자가 백업을 보내 앱 반영을 요청하면 `ReviewRepository.prepareSelectedCharacter`로 준비합니다. 초상화가 없는 대상은 null로 제외하고 등록된 신규 스킬만 포함합니다. 미검수 상태를 강제로 변경하지 않으며 전체 검수 Export의 완료 조건도 유지합니다. 현재 DB hash와 필수 이미지·자동 행동 참조 오류가 있으면 반영하지 않습니다. 준비한 데이터·이미지는 에이전트가 확인한 뒤 `src/assets/characters/<ID>/`에 기록합니다. 기존 공개 ID와 Rotation 데이터는 유지합니다.
+
+관련 명세: [선택 항목 반영](../../specs/2026-10-01-011-selected-review-registration.md).

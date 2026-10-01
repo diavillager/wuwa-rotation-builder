@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "reviewStatus": "approved",
+  "characterId": "1207",
+  "displayName": "루파",
+  "attribute": "용융",
+  "portrait": "assets/f8619b4c03c3cad9a74e00645eeb4b2b38aa5a13728342180296103dd70e15de.webp",
+  "skills": [
+    {
+      "skillId": "1207:skill:c394cce2c53427323014bc6d203c79aedb31cdf7a00e31ef19b58ad9a21eebe3",
+      "category": "기본 공격",
+      "displayName": "불타는 별",
+      "visible": true,
+      "asset": "assets/1ce19ad7e76ce190fdc2973536588db119a8fc05596a21f650b341ed6d4c6b24.webp"
+    },
+    {
+      "skillId": "1207:skill:6e3a0cc387fbe33ad86bd2f39db9a4ea8b8acac5402995823a8bf6750e240ff8",
+      "category": "공명 스킬",
+      "displayName": "포위 사냥",
+      "visible": true,
+      "asset": "assets/1f57e82c38e3d401dc4210f9e8322f5006acfc03f16898eaf5270452682db21f.webp"
+    },
+    {
+      "skillId": "1207:skill:07c253771ae01a682eb5c503eec7467c0db79266223765a8d54b2fe127ef77fc",
+      "category": "공명 해방",
+      "displayName": "영광이 그려내는 불꽃의 단꿈",
+      "visible": true,
+      "asset": "assets/9f7b26b53976b8f311050c064207fb2fd7107c8cbe39ec74707deeb98f5c6e38.webp"
+    },
+    {
+      "skillId": "1207:skill:ed2280e987e2891fd3058a856ad36d1bb726f7fb0e39fddc3535cb65f986adfc",
+      "category": "공명 회로",
+      "displayName": "불꽃 늑대의 선고",
+      "visible": true,
+      "asset": "assets/a2cfec73322400e5668b1dfaa4eed5ac36a539824a6c71963abddde91e897764.webp"
+    },
+    {
+      "skillId": "1207:skill:fd71ef2506d1681d04ea0d027a405ae979e8edf37b2ad527f4b6435847cf6ca0",
+      "category": "변주 스킬",
+      "displayName": "한 눈 팔지마!",
+      "visible": true,
+      "asset": "assets/e939a312f226871540bb8db40edf118db1ef6d4d0c641b7baa4372f367cbc994.webp"
+    },
+    {
+      "skillId": "1207:skill:4469e0129a87c4d30e7d108e152b2260b9683c0a6a6995b107fc8c08e1285653",
+      "category": "반주 스킬",
+      "displayName": "함께 싸우자 파트너!",
+      "visible": true,
+      "asset": "assets/03918204c614dcc5d5f155d5df66fd966ce190995737b814d051ec3c7b695605.webp"
+    },
+    {
+      "skillId": "1207:skill:2d36870b13e5be132c61cde0fa33ba34316460a3aac6d5ad716058258da8b1c3",
+      "category": "조화도 파괴",
+      "displayName": "조화도 파괴 · 대검",
+      "visible": true,
+      "asset": "assets/0eb197fb2ec7fa17a59c567030c946ddb5ea2ba2f7da63fcb4191ce092d15e17.webp"
+    }
+  ],
+  "autoActions": {
+    "normalSwitchAttack": "1207:skill:c394cce2c53427323014bc6d203c79aedb31cdf7a00e31ef19b58ad9a21eebe3",
+    "intro": "1207:skill:fd71ef2506d1681d04ea0d027a405ae979e8edf37b2ad527f4b6435847cf6ca0",
+    "outro": "1207:skill:4469e0129a87c4d30e7d108e152b2260b9683c0a6a6995b107fc8c08e1285653"
+  }
+}

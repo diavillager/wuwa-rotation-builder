@@ -1,6 +1,6 @@
 # 최종 검수된 공명자 데이터
 
-`{characterId}/data/{characterId}.json`과 `{characterId}/assets/*.webp`에 최종 데이터를 둡니다. 후보 초안은 이 디렉터리에 넣지 않습니다. 현재 실제 공명자는 아직 등록하지 않았습니다.
+`{characterId}/data/{characterId}.json`과 `{characterId}/assets/*.webp`에 반영 데이터를 둡니다. 후보 초안은 이 디렉터리에 넣지 않습니다. 사용자 백업에서 초상화가 선택된 장리(1205)·브렌트(1206)·루파(1207)의 등록 스킬 각 7개를 시범 반영했습니다. 미검수 신규 후보는 제외했습니다.
 
 JSON 계약은 `src/data/characters/contract.ts`를 따릅니다.
 

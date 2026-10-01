@@ -149,6 +149,51 @@ function complete(
   return next
 }
 describe('검수 검증과 JSON 전달', () => {
+  it('초상화가 없는 공명자는 선택 반영에서 제외한다', async () => {
+    const f = await fixture()
+    const state = (await f.repository.load(target)).state
+    expect(await f.repository.prepareSelectedCharacter(state)).toBeNull()
+  })
+  it('선택 반영은 등록 후보만 준비하고 미검수 상태와 전체 Export 검증은 유지한다', async () => {
+    const f = await fixture()
+    const state = complete(
+      (await f.repository.load(target)).state,
+      f.candidates,
+    )
+    state.candidates[1].decision = 'pending'
+    state.candidates[2].decision = 'exclude'
+    state.autoActions.intro = state.autoActions.outro =
+      state.autoActions.normalSwitchAttack
+    const original = structuredClone(state)
+    const result = await f.repository.prepareSelectedCharacter(state)
+    expect(result?.data.skills.map((s) => s.skillId)).toEqual([
+      state.autoActions.normalSwitchAttack,
+    ])
+    expect(state).toEqual(original)
+    await expect(f.repository.exportCharacter(state)).rejects.toThrow(
+      '미검수 후보',
+    )
+    state.autoActions.intro = candidateSkillId(
+      '1102',
+      f.candidates[2].candidateId,
+    )
+    await expect(f.repository.prepareSelectedCharacter(state)).rejects.toThrow(
+      '노출·등록',
+    )
+  })
+  it('선택 반영도 현재 DB와 백업 기준이 달라지면 거부한다', async () => {
+    const f = await fixture(true)
+    const state = (await f.repository.load(target)).state
+    await f.repository.importFile({
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [await f.repository.backupCharacter(state)],
+    })
+    await writeFile(f.finalFile, (await readFile(f.finalFile, 'utf8')) + '\n')
+    await expect(f.repository.prepareSelectedCharacter(state)).rejects.toThrow(
+      '현재 DB',
+    )
+  })
   it('여러 파일을 연속 Import해도 이전 파일의 이미지와 검수를 백업할 수 있다', async () => {
     const f = await fixture()
     const first = await f.repository.backupCharacter(

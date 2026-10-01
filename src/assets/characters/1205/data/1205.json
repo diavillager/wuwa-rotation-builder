@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "reviewStatus": "approved",
+  "characterId": "1205",
+  "displayName": "장리",
+  "attribute": "용융",
+  "portrait": "assets/c93dfbaa347d4b1976dd279652a8442940240188b8cd167cfa26c25c24b4bc9a.webp",
+  "skills": [
+    {
+      "skillId": "1205:skill:5bf50ce050eb7bf3dcf34b4b43b3574361fa6190e210fd1013b4fa416b67e56d",
+      "category": "기본 공격",
+      "displayName": "불사조의 힘",
+      "visible": true,
+      "asset": "assets/4c0720eddfd4ef2176fc86672daa0f147ff9884c72def662eeaf53e19a3c6f1c.webp"
+    },
+    {
+      "skillId": "1205:skill:d70aa1b722f5da15cf3e0af6184344ce0e6e7693346eccbc7e06801333f0cc08",
+      "category": "공명 스킬",
+      "displayName": "불멸의 깃털",
+      "visible": true,
+      "asset": "assets/4a4cd4a61f03d28a7638a1adedaf57aabbc060ea047bb89a537c704aca3f5682.webp"
+    },
+    {
+      "skillId": "1205:skill:6f3475e3af8d575d2c47ec8457f201c87bc6b93901e35267b652abb9dd5fa55f",
+      "category": "공명 해방",
+      "displayName": "이화의 충성심",
+      "visible": true,
+      "asset": "assets/269bd0616b988a9bbefb9df52f216985c00fcc168570d4eb59b10e279513b502.webp"
+    },
+    {
+      "skillId": "1205:skill:d791c6b46429c473ab4008fa37058ea784d83b8d6750f52b94b16fe7617d670d",
+      "category": "공명 회로",
+      "displayName": "이화의 화신",
+      "visible": true,
+      "asset": "assets/234c4f3ebdb58a103744831bc17168c01ae1a4d9a107669fe4e0fc0abefec2b2.webp"
+    },
+    {
+      "skillId": "1205:skill:04e0ebd7c07213d37d0936cb1ba20f945b743bc5a9d4208369167f8a36db3e43",
+      "category": "변주 스킬",
+      "displayName": "정의의 심판",
+      "visible": true,
+      "asset": "assets/2d1bf56693027e06fe4e581a35b44ba0aa4f03beb1efd8a9d8474ae50ad0579f.webp"
+    },
+    {
+      "skillId": "1205:skill:67cd8ddde2fd44a2a663227d3734a1b5ba1c92ad18d2b2f858496b5390fd0299",
+      "category": "반주 스킬",
+      "displayName": "끊이지 않는 전법",
+      "visible": true,
+      "asset": "assets/102b53b565c8c526d096d1f50807718e42dd81453294ca15357f26ec4ef83fb7.webp"
+    },
+    {
+      "skillId": "1205:skill:4856119349840d755806820895e52b090dd41cfe46079f7614bea9a80437b45b",
+      "category": "조화도 파괴",
+      "displayName": "조화도 파괴 · 직검",
+      "visible": true,
+      "asset": "assets/52ca7c18eccc97f859f503e46dc89f13854735270a22bab35d3c574e138bd7a7.webp"
+    }
+  ],
+  "autoActions": {
+    "normalSwitchAttack": "1205:skill:5bf50ce050eb7bf3dcf34b4b43b3574361fa6190e210fd1013b4fa416b67e56d",
+    "intro": "1205:skill:04e0ebd7c07213d37d0936cb1ba20f945b743bc5a9d4208369167f8a36db3e43",
+    "outro": "1205:skill:67cd8ddde2fd44a2a663227d3734a1b5ba1c92ad18d2b2f858496b5390fd0299"
+  }
+}

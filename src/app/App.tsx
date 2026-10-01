@@ -154,7 +154,7 @@ export function App({
             draggable={false}
           />
         )}
-        {skillLabel(id)}
+        <span title={skillLabel(id)}>{skill?.category ?? skillLabel(id)}</span>
       </>
     )
   }
@@ -907,7 +907,7 @@ export function App({
                           draggable={false}
                         />
                       )}
-                      {item.displayName}
+                      <span className="selector-name">{item.displayName}</span>
                     </button>
                   ))
                 )}
@@ -935,6 +935,7 @@ export function App({
                     <div
                       className="catalog-skill"
                       key={skill.id}
+                      title={skill.displayName}
                       draggable
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = 'copy'
@@ -950,7 +951,7 @@ export function App({
                           draggable={false}
                         />
                       )}
-                      {skill.displayName}
+                      {skill.category ?? skill.displayName}
                       <small>InputBlock으로 드래그</small>
                     </div>
                   ))}

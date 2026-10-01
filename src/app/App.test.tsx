@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
+import { demoCatalog } from './demo'
 
 let root: Root
 let time = 0
@@ -69,6 +70,40 @@ async function dragDrop(source: Element, target: Element) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('파티 선택에는 초상화와 이름, 스킬 진열에는 아이콘과 분류를 표시한다', async () => {
+    const catalog = structuredClone(demoCatalog)
+    const character = catalog.characters[0]
+    character.assetUrl = '/reviewed-portrait.webp'
+    character.element = '응결'
+    const skill = character.skills[0]
+    skill.assetUrl = '/reviewed-skill.webp'
+    skill.category = '기본 공격'
+    await act(async () => root.render(<App catalogOverride={catalog} />))
+    const card = document.querySelector('.catalog-skill')!
+    expect(card.textContent).toContain('기본 공격')
+    expect(card.getAttribute('title')).toBe(skill.displayName)
+    expect(card.querySelector('img')?.getAttribute('src')).toBe(skill.assetUrl)
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await dragDrop(card, grid().querySelector('.input-card')!)
+    const linked = grid().querySelector('.linked-skill')!
+    expect(linked.textContent).toContain('기본 공격')
+    expect(linked.querySelector('img')?.getAttribute('src')).toBe(
+      skill.assetUrl,
+    )
+    expect(linked.querySelector('[title]')?.getAttribute('title')).toBe(
+      skill.displayName,
+    )
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.party-slot')!.click(),
+    )
+    const option = document.querySelector('.character-options button')!
+    expect(option.textContent).toContain(character.displayName)
+    expect(option.querySelector('img')?.getAttribute('src')).toBe(
+      character.assetUrl,
+    )
+  })
   it('Cycle 제목 옆 버튼은 해당 사이클만 복원하고 hover는 Redo를 지우지 않는다', async () => {
     for (const id of ['opening', 'repeat']) {
       expect(historyButton(id, 'undo').disabled).toBe(true)

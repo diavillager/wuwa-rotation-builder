@@ -312,9 +312,32 @@ button {
 .character-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 12px;
   min-height: 28px;
   margin-top: 16px;
+}
+.character-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 156px;
+  padding: 12px;
+}
+.character-options button:not(:disabled):hover {
+  border-color: #8fc9b8;
+  background: #315047;
+}
+.character-options button:focus-visible {
+  outline: 2px solid #8fc9b8;
+  outline-offset: 3px;
+}
+.selector-name {
+  width: 100%;
+  text-align: center;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 .character-options button:disabled {
   opacity: 0.45;
@@ -351,11 +374,10 @@ button {
   pointer-events: none;
 }
 .selector-portrait {
-  width: 32px;
-  height: 40px;
+  width: 128px;
+  height: 160px;
   object-fit: contain;
-  vertical-align: middle;
-  margin-right: 8px;
+  display: block;
   pointer-events: none;
 }
 .skill-icon {
