@@ -260,7 +260,7 @@ Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와
    WW_Asset_Webp에서 추가 발견한 후보는 고정 commit의 원본 WebP에도 동일 검증을 적용한다. 경로와 출처 commit을 보존하고 파일명만으로 스킬 의미를 확정하지 않는다.
 5. 후보 ID와 자산 참조를 가진 JSON 초안을 만든다.
 6. **실제 아이콘이 보이는 로컬 검수 UI**에서 사람이 `displayName`, 사용 여부, `normalSwitchAttack`, `intro`, `outro`를 지정한다.
-7. 누락 등록을 선택하고 검증을 통과한 지정 공명자 전체를 한 JSON 파일로 Export한다. 미완성 공명자는 제외하고 오류를 표시한다. 웹에서 DB나 Git을 갱신하지 않는다.
+7. 등록을 선택하고 누락 검증을 통과한 지정 공명자 전체를 한 JSON 파일로 Export한다. 미완성 공명자는 제외하고 오류를 표시한다. 웹에서 DB나 Git을 갱신하지 않는다.
 8. 사용자가 Export 파일을 에이전트에게 전달하면 이미지·출처·참조·기존 공개 ID 및 아래 필수 항목을 재검증한 뒤 최종 공명자 DB에 반영한다. Export만으로 등록 완료 처리하지 않는다.
 
 최종 Character의 필수 검증 항목은 다음과 같다.
