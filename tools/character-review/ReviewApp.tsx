@@ -393,14 +393,6 @@ export function ReviewApp() {
                   변주 스킬 → 변주 · 반주 스킬 → 반주
                 </p>
                 <button
-                  className="sort-cards"
-                  onClick={() =>
-                    change((s) => sortReviewCardsByCategory(s, source))
-                  }
-                >
-                  분류순 정렬
-                </button>
-                <button
                   className="assignment-toggle"
                   aria-pressed={!!active.receipt}
                   disabled={
@@ -412,6 +404,14 @@ export function ReviewApp() {
                   {active.receipt
                     ? 'Encore 자동 배정 해제'
                     : 'Encore 자동 배정'}
+                </button>
+                <button
+                  className="sort-cards"
+                  onClick={() =>
+                    change((s) => sortReviewCardsByCategory(s, source))
+                  }
+                >
+                  분류순 정렬
                 </button>
                 {AUTO_KINDS.map((kind) => (
                   <label key={kind}>

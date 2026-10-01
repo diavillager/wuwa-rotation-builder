@@ -351,8 +351,8 @@ it('자동 배정과 별도 정렬 버튼을 분리하고 해제해도 정렬 �
     )
   const buttons = [...document.querySelectorAll('.decision-panel button')]
   expect(buttons.map((b) => b.textContent)).toEqual([
-    '분류순 정렬',
     'Encore 자동 배정',
+    '분류순 정렬',
   ])
   await click('Encore 자동 배정')
   expect(order()).toEqual(['candidate-one', 'candidate-two'])
