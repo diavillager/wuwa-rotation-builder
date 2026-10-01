@@ -126,7 +126,7 @@ h2 {
 }
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
+  grid-template-columns: minmax(0, 1fr) 496px;
   grid-template-areas: 'cycles skills';
   gap: 22px;
 }
@@ -367,7 +367,7 @@ button {
 }
 .skill-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-content: start;
   gap: 8px;
   margin-top: 18px;
@@ -386,8 +386,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  aspect-ratio: 1;
-  min-height: 148px;
+  height: 148px;
   border: 1px solid #63887f;
   border-radius: 9px;
   padding: 10px;
@@ -761,7 +760,7 @@ button {
   align-items: stretch;
   gap: 4px;
   max-width: none;
-  min-height: 49px;
+  height: calc(var(--timeline-line-size, 128px) - 14px);
   padding: 4px;
   border: 1px solid #6c9e96;
   border-radius: 8px;
