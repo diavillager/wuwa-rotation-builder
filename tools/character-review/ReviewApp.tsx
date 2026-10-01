@@ -738,8 +738,8 @@ export function ReviewApp() {
             <p className="eyebrow">VALIDATION & FILES</p>
             <h2>검증 및 파일 관리</h2>
             <p className="muted">
-              검증을 통과한 공명자를 한 파일로 내보냅니다. 편집 내용은 이
-              브라우저에 자동 저장됩니다.
+              등록을 선택하고 검증을 통과한 공명자를 한 파일로 내보냅니다. 편집
+              내용은 이 브라우저에 자동 저장됩니다.
             </p>
             <p className="storage-status" role="status">
               브라우저 저장: {storageStatus}
@@ -836,9 +836,12 @@ export function ReviewApp() {
                     <p className="eyebrow">RESONATOR</p>
                     <h2>공명자 정보</h2>
                   </div>
-                  <span className="status-badge">
-                    {source.target.displayName}
-                  </span>
+                  {state.registration === 'include' && (
+                    <span className="category-badge">등록</span>
+                  )}
+                  {state.registration === 'exclude' && (
+                    <span className="excluded-badge">미등록</span>
+                  )}
                 </div>
                 <div className="basic-grid">
                   <div className="portrait-preview">
@@ -905,7 +908,34 @@ export function ReviewApp() {
                         ))}
                       </select>
                     </label>
-                    <label>
+                    <div className="registration-field">
+                      <span id="registration-label">등록 여부</span>
+                      <div
+                        className="decision-options character-decision"
+                        role="group"
+                        aria-labelledby="registration-label"
+                      >
+                        {(['include', 'exclude'] as const).map((value) => (
+                          <label key={value}>
+                            <input
+                              type="checkbox"
+                              aria-label={`공명자 ${value === 'include' ? '등록' : '미등록'}`}
+                              checked={state.registration === value}
+                              onChange={(e) =>
+                                change((s) => ({
+                                  ...s,
+                                  registration: e.target.checked
+                                    ? value
+                                    : 'pending',
+                                }))
+                              }
+                            />
+                            {value === 'include' ? '등록' : '미등록'}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <label className="portrait-field">
                       초상화
                       <select
                         value={state.portraitCandidateId ?? ''}

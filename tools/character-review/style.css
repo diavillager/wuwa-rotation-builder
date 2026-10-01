@@ -272,8 +272,8 @@ fieldset {
   grid-template-columns: minmax(100px, 1fr) 100px;
   gap: 12px;
 }
-.basic-fields label:last-child {
-  grid-column: 1 / span 2;
+.basic-fields .portrait-field {
+  grid-column: 2 / span 2;
 }
 label {
   display: flex;
@@ -559,9 +559,10 @@ code {
   grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
 }
 .decision-options {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  gap: 18px;
+  gap: 0;
   margin: 16px 0;
   padding: 10px;
   border-radius: 8px;
@@ -573,6 +574,21 @@ code {
   align-items: center;
   gap: 8px;
   margin: 0;
+  justify-content: flex-start;
+  grid-column: auto;
+}
+.registration-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #c3d3d6;
+  font-size: 13px;
+}
+.character-decision {
+  margin: 0;
+  min-height: 41px;
+  border: 1px solid #40555e;
+  background: #202e35;
 }
 .decision-options input {
   width: 16px;
@@ -610,7 +626,7 @@ code {
     grid-template-columns: 1fr;
     gap: 10px;
   }
-  .basic-fields label:last-child {
+  .basic-fields .portrait-field {
     grid-column: 1;
   }
 }

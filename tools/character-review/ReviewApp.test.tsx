@@ -231,6 +231,41 @@ async function selectCandidate() {
   await act(async () => decision('등록').click())
 }
 
+it('초상화 왼쪽의 등록 선택은 상호 배타적이며 해제·배지·백업을 함께 갱신한다', async () => {
+  await render()
+  const include = document.querySelector<HTMLInputElement>(
+    '[aria-label="공명자 등록"]',
+  )!
+  const exclude = document.querySelector<HTMLInputElement>(
+    '[aria-label="공명자 미등록"]',
+  )!
+  const badge = () =>
+    document.querySelector('.basic-panel .section-heading > span')
+  expect(include.checked).toBe(false)
+  expect(exclude.checked).toBe(false)
+  expect(badge()).toBeNull()
+  expect(
+    document.querySelector('.registration-field')!.nextElementSibling
+      ?.className,
+  ).toBe('portrait-field')
+  await act(async () => include.click())
+  expect(badge()?.textContent).toBe('등록')
+  await act(async () => exclude.click())
+  expect(include.checked).toBe(false)
+  expect(exclude.checked).toBe(true)
+  expect(badge()?.textContent).toBe('미등록')
+  await click('JSON으로 백업하기')
+  expect((postedStates[0] as ReviewSession['state']).registration).toBe(
+    'exclude',
+  )
+  await act(async () => exclude.click())
+  expect(badge()).toBeNull()
+  await click('JSON으로 백업하기')
+  expect((postedStates[0] as ReviewSession['state']).registration).toBe(
+    'pending',
+  )
+})
+
 it('무기군 초기값을 표시하고 수동 변경과 명시적인 미지정을 백업에 전달한다', async () => {
   saved.state.weaponType = '직검'
   await render()

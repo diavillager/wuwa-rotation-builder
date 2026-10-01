@@ -17,7 +17,7 @@ import { scanRegistered } from '../../scripts/character-sync/io'
 import { setWorkspaceTargets } from './workspace'
 import type { CharacterData } from '../../src/data/characters/contract'
 import { ReviewRepository } from './repository'
-import { candidateSkillId, type ReviewState } from './model'
+import { candidateSkillId, initialReview, type ReviewState } from './model'
 import { reviewApi } from './api'
 import { prepareWorkspaceReset } from './reset'
 
@@ -136,6 +136,7 @@ function complete(
   candidates: Awaited<ReturnType<typeof fixture>>['candidates'],
 ) {
   const next = structuredClone(state)
+  next.registration = 'include'
   next.portraitCandidateId = candidates[0].candidateId
   for (const [index, candidate] of next.candidates.entries()) {
     candidate.decision = 'include'
@@ -149,6 +150,93 @@ function complete(
   return next
 }
 describe('검수 검증과 JSON 전달', () => {
+  it('첫 유효 초상화를 기본 선택하고 공명자 등록 의사는 추론하지 않는다', async () => {
+    const f = await fixture(true)
+    const { source, state } = await f.repository.load(target)
+    expect(state.registration).toBe('pending')
+    expect(state.portraitCandidateId).toBe(f.candidates[0].candidateId)
+    source.draft.candidates = source.draft.candidates.filter(
+      (c) => c.kind !== 'portrait',
+    )
+    expect(initialReview(source).portraitCandidateId).toBeNull()
+  })
+  it('기존 백업은 등록 미선택으로 복원하고 초상화 기본값 외 수동 검수를 보존한다', async () => {
+    const f = await fixture()
+    const old = complete((await f.repository.load(target)).state, f.candidates)
+    delete old.registration
+    old.portraitCandidateId = null
+    old.cardOrder = old.candidates.map((c) => c.candidateId).reverse()
+    const row = await f.repository.backupCharacter(old)
+    const [restored] = await f.repository.importFile({
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [row],
+    })
+    expect(restored.state).toEqual({
+      ...old,
+      registration: 'pending',
+      portraitCandidateId: f.candidates[0].candidateId,
+    })
+    expect(
+      await f.repository.prepareSelectedCharacter(restored.state),
+    ).toBeNull()
+    for (const registration of ['pending', 'include', 'exclude'] as const) {
+      restored.state.registration = registration
+      const backup = await f.repository.backupCharacter(restored.state)
+      const [again] = await f.repository.importFile({
+        format: 'wuwa-character-review-backup',
+        schemaVersion: 2,
+        characters: [backup],
+      })
+      expect(again.state).toEqual(restored.state)
+      if (registration !== 'include') {
+        expect(
+          await f.repository.prepareSelectedCharacter(again.state),
+        ).toBeNull()
+        await expect(f.repository.exportCharacter(again.state)).rejects.toThrow(
+          '등록 여부',
+        )
+      }
+    }
+    Object.assign(row.review, { registration: 'invalid' })
+    await expect(
+      f.repository.importFile({
+        format: 'wuwa-character-review-backup',
+        schemaVersion: 2,
+        characters: [row],
+      }),
+    ).rejects.toThrow('기본 검수 정보')
+  })
+  it('구버전 Export를 먼저 검증하고 등록 미선택으로 복원한다', async () => {
+    const f = await fixture(true)
+    const state = complete(
+      (await f.repository.load(target)).state,
+      f.candidates,
+    )
+    state.portraitCandidateId = null
+    const row = await f.repository.exportCharacter(state)
+    delete row.review.registration
+    const [restored] = await f.repository.importFile({
+      format: 'wuwa-character-review',
+      schemaVersion: 2,
+      status: 'pending-agent-validation',
+      characters: [row],
+    })
+    expect(restored.state.registration).toBe('pending')
+    expect(restored.state.portraitCandidateId).toBe(f.candidates[0].candidateId)
+    expect(restored.state.candidates).toEqual(state.candidates)
+  })
+  it('등록 선택 시 초상화 누락은 제외로 숨기지 않고 검증 오류로 반환한다', async () => {
+    const f = await fixture()
+    const state = complete(
+      (await f.repository.load(target)).state,
+      f.candidates,
+    )
+    state.portraitCandidateId = null
+    await expect(f.repository.prepareSelectedCharacter(state)).rejects.toThrow(
+      '초상화',
+    )
+  })
   it('구버전 백업의 누락 무기군만 보충하고 수동 지정·미지정과 다른 편집은 유지한다', async () => {
     const f = await fixture()
     const original = complete(
@@ -221,7 +309,7 @@ describe('검수 검증과 JSON 전달', () => {
       '기본 검수 정보',
     )
   })
-  it('초상화가 없는 공명자는 선택 반영에서 제외한다', async () => {
+  it('초상화가 있어도 등록 미선택인 공명자는 선택 반영에서 제외한다', async () => {
     const f = await fixture()
     const state = (await f.repository.load(target)).state
     expect(await f.repository.prepareSelectedCharacter(state)).toBeNull()
@@ -261,6 +349,7 @@ describe('검수 검증과 JSON 전달', () => {
       schemaVersion: 2,
       characters: [await f.repository.backupCharacter(state)],
     })
+    state.registration = 'include'
     await writeFile(f.finalFile, (await readFile(f.finalFile, 'utf8')) + '\n')
     await expect(f.repository.prepareSelectedCharacter(state)).rejects.toThrow(
       '현재 DB',
@@ -503,6 +592,7 @@ describe('검수 검증과 JSON 전달', () => {
     const before = await readFile(f.finalFile)
     const state = (await f.repository.load(target)).state
     state.existingSkills[0].displayName = '변경할 이름'
+    state.registration = 'include'
     state.candidates.forEach((c) => {
       c.decision = 'exclude'
     })
@@ -701,6 +791,21 @@ describe('로컬 검수 파일 API', () => {
       ),
     ).toEqual(['1102', '1103'])
     expect(batchPayload.results[2].errors.length).toBeGreaterThan(0)
+    // 검수 내용이 완성되어 있어도 등록 의사를 표시한 대상만 내보낸다.
+    for (const registration of ['pending', 'exclude'] as const) {
+      const selected = await fetch(`${base}/export`, {
+        ...init,
+        body: JSON.stringify({
+          states: [completeState, { ...second, registration }],
+        }),
+      })
+      expect(selected.status).toBe(200)
+      expect(
+        (await selected.json()).file.characters.map(
+          (c: { characterId: string }) => c.characterId,
+        ),
+      ).toEqual(['1102'])
+    }
     expect(await scanRegistered(f.root)).toEqual([])
     const listing = await (
       await fetch(`${base}/targets`, { headers: host })

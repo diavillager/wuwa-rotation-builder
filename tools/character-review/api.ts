@@ -145,14 +145,18 @@ export function reviewApi(root: string) {
             displayName: state.displayName,
             ...checked,
           })
-          if (url.pathname === '/api/review/export' && !checked.errors.length)
+          if (
+            url.pathname === '/api/review/export' &&
+            state.registration === 'include' &&
+            !checked.errors.length
+          )
             characters.push(await repository.exportCharacter(state))
         }
         if (url.pathname === '/api/review/validate')
           return json(200, { results })
         if (!characters.length)
           throw new Error(
-            '검증을 통과한 공명자가 없습니다. 누락 항목을 확인해 주세요.',
+            '등록을 선택하고 검증을 통과한 공명자가 없습니다. 등록 여부와 누락 항목을 확인해 주세요.',
           )
         // 모든 선택 대상의 원본/DB 기준을 마지막에 다시 확인한다.
         for (const character of characters)

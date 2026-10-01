@@ -58,6 +58,7 @@ export const AUTO_LABELS = {
 }
 
 export interface ReviewState {
+  registration?: 'pending' | 'include' | 'exclude'
   weaponType?: WeaponType | null
   schemaVersion: 1
   runId: string
@@ -99,9 +100,17 @@ export interface ReviewValidation {
 }
 export const candidateSkillId = (characterId: string, candidateId: string) =>
   `${characterId}:skill:${candidateId.replace('candidate-', '')}`
+export function defaultPortrait(source: ReviewSource) {
+  return (
+    source.draft.candidates.find(
+      (c) => c.kind === 'portrait' && c.download.status === 'verified',
+    )?.candidateId ?? null
+  )
+}
 export function initialReview(source: ReviewSource): ReviewState {
   const current = source.current
   return {
+    registration: 'pending',
     schemaVersion: 1,
     runId: source.target.runId,
     characterId: source.target.characterId,
@@ -116,7 +125,7 @@ export function initialReview(source: ReviewSource): ReviewState {
             current?.weaponType ?? source.draft.basicCandidate.weaponType,
         }
       : {}),
-    portraitCandidateId: null,
+    portraitCandidateId: defaultPortrait(source),
     existingSkills:
       current?.skills.map((s) => ({
         skillId: s.skillId,

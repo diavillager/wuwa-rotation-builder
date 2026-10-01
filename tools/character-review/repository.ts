@@ -32,6 +32,7 @@ import {
   AUTO_KINDS,
   AUTO_LABELS,
   candidateSkillId,
+  defaultPortrait,
   initialReview,
   reviewCards,
   type ReviewSession,
@@ -56,6 +57,8 @@ export function parseReview(value: unknown, source: ReviewSource): ReviewState {
     )
   if (
     typeof state.displayName !== 'string' ||
+    (state.registration !== undefined &&
+      !['pending', 'include', 'exclude'].includes(state.registration)) ||
     !ELEMENTS.includes(state.attribute) ||
     (state.weaponType !== undefined &&
       state.weaponType !== null &&
@@ -271,6 +274,11 @@ export class ReviewRepository {
           )
             throw new Error('Export 이미지가 검수 원본과 일치하지 않습니다.')
         }
+      }
+      // 구버전 Export 일치 검증 뒤 새 기본값을 적용한다. 등록 의사는 추론하지 않는다.
+      if (state.registration === undefined) {
+        state.registration = 'pending'
+        state.portraitCandidateId ??= defaultPortrait(restored.source)
       }
       // 구버전 Export 일치 검증 뒤 새 메타데이터만 보충한다.
       // 수동 지정값과 명시적인 null은 그대로 보존한다.
@@ -509,7 +517,7 @@ export class ReviewRepository {
   async prepareSelectedCharacter(state: ReviewState) {
     const source = await this.source(state)
     parseReview(state, source)
-    if (!state.portraitCandidateId && !source.current?.portrait) return null
+    if (state.registration !== 'include') return null
     const current = (await scanRegistered(this.root)).find(
       (entry) => entry.characterId === state.characterId,
     )
@@ -523,6 +531,8 @@ export class ReviewRepository {
     return { data: prepared.data, assets: prepared.assets }
   }
   async exportCharacter(state: ReviewState) {
+    if (state.registration !== 'include')
+      throw new Error('공명자 등록 여부에서 등록을 선택해 주세요.')
     const prepared = await this.prepare(state)
     if (prepared.errors.length || !prepared.data)
       throw new Error(prepared.errors.join('\n') || '검증 실패')
