@@ -98,6 +98,7 @@ export interface AppProps {
   initialRotation?: Rotation
   catalogOverride?: CharacterCatalog
   projectControls?: ReactNode
+  headerControls?: ReactNode
   references?: ProjectReferences
   onRotationChange?: (rotation: Rotation) => void
   locked?: boolean
@@ -108,6 +109,7 @@ export function App({
   initialRotation,
   catalogOverride,
   projectControls,
+  headerControls,
   references,
   onRotationChange,
   locked = false,
@@ -745,9 +747,7 @@ export function App({
           <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
           <h1>WUWA Rotation Builder</h1>
         </div>
-        <span className="foundation-badge">
-          {demo ? '개발 검증 데이터' : 'Editor'}
-        </span>
+        {headerControls}
       </header>
       {projectControls}
       <div

@@ -56,8 +56,13 @@ async function render() {
 }
 function button(text: string) {
   return [
-    ...document.querySelectorAll<HTMLButtonElement>('.project-panel button'),
-  ].find((item) => item.textContent === text)!
+    ...document.querySelectorAll<HTMLButtonElement>(
+      '.header-project button, .project-error button, .confirm-dialog button',
+    ),
+  ].find(
+    (item) =>
+      item.textContent === text || item.getAttribute('aria-label') === text,
+  )!
 }
 async function click(text: string) {
   await act(async () => button(text).click())
@@ -76,67 +81,60 @@ async function insertE() {
   })
 }
 async function select(id: string) {
-  if (!document.querySelector('.project-picker'))
-    await act(async () =>
-      document.querySelector<HTMLButtonElement>('.project-current')!.click(),
-    )
   await act(async () => {
-    document
-      .querySelector<HTMLButtonElement>(
-        `.project-options [data-project-id="${id}"]`,
-      )!
-      .click()
+    const select = document.querySelector<HTMLSelectElement>(
+      '[aria-label="프로젝트 선택"]',
+    )!
+    select.value = id
+    select.dispatchEvent(new Event('change', { bubbles: true }))
   })
-  await waitFor(() =>
-    expect(
-      document
-        .querySelector('.project-current')
-        ?.getAttribute('data-project-id'),
-    ).toBe(id),
-  )
+  await waitFor(() => {
+    const select = document.querySelector<HTMLSelectElement>(
+      '[aria-label="프로젝트 선택"]',
+    )!
+    expect(select.value).toBe(id)
+    expect(select.disabled).toBe(false)
+  })
 }
 
 describe('프로젝트 관리 화면', () => {
-  it('이름 블록 선택창은 편집을 숨기고 입력을 차단하며 닫기·같은 선택은 현재 이력을 유지한다', async () => {
+  it('제목 오른쪽 두 줄에서 이름 수정·프로젝트 선택을 지원하고 수정은 이력을 유지한다', async () => {
     await render()
     await click('새 프로젝트')
     await waitFor(() =>
       expect(document.querySelector('.party-panel')).not.toBeNull(),
     )
     await insertE()
-    const id = document
-      .querySelector('.project-current')!
-      .getAttribute('data-project-id')!
-    expect(document.querySelector('select')).toBeNull()
-    await act(async () =>
-      document.querySelector<HTMLButtonElement>('.project-current')!.click(),
-    )
+    expect(document.querySelector('.project-panel')).toBeNull()
+    expect(document.querySelector('.foundation-badge')).toBeNull()
     expect(
-      document.querySelector('.project-current')!.getAttribute('aria-expanded'),
-    ).toBe('true')
+      document.querySelector('.header-project')!.closest('.page-heading'),
+    ).not.toBeNull()
     expect(
-      document.querySelector<HTMLElement>('.party-panel')!.parentElement!
-        .hidden,
-    ).toBe(true)
+      document
+        .querySelector('.project-save-state')!
+        .closest('.header-project-name'),
+    ).not.toBeNull()
     expect(
-      document.querySelector<HTMLElement>('.project-controls')!.hidden,
-    ).toBe(true)
-    expect(document.querySelector('.project-name')).toBeNull()
-    await insertE()
-    expect(document.querySelectorAll('.input-card')).toHaveLength(1)
-    await click('닫기')
-    expect(
-      document.querySelector<HTMLElement>('.party-panel')!.parentElement!
-        .hidden,
-    ).toBe(false)
-    expect(
-      document.querySelector<HTMLButtonElement>(
-        '[aria-label="개막 사이클 실행 취소"]',
-      )!.disabled,
-    ).toBe(false)
-    await select(id)
+      document
+        .querySelector('[aria-label="프로젝트 선택"]')!
+        .closest('.header-project-actions'),
+    ).not.toBeNull()
+    await act(async () => {
+      const input = document.querySelector<HTMLInputElement>(
+        '[aria-label="프로젝트 이름"]',
+      )!
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )!.set!.call(input, '제목 변경')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await click('이름 변경')
     await waitFor(() =>
-      expect(document.querySelector('.project-picker')).toBeNull(),
+      expect(document.querySelector('select option:checked')?.textContent).toBe(
+        '제목 변경',
+      ),
     )
     expect(document.querySelectorAll('.input-card')).toHaveLength(1)
     expect(
@@ -172,7 +170,8 @@ describe('프로젝트 관리 화면', () => {
     await click('새 프로젝트')
     await waitFor(() =>
       expect(
-        document.querySelector('.project-current strong')?.textContent,
+        document.querySelector<HTMLInputElement>('[aria-label="프로젝트 이름"]')
+          ?.value,
       ).toBe('새 로테이션 2'),
     )
     await select(first.id)
@@ -191,7 +190,7 @@ describe('프로젝트 관리 화면', () => {
     ).toBe(true)
     expect(
       document
-        .querySelector('.project-panel')!
+        .querySelector('.header-project')!
         .compareDocumentPosition(document.querySelector('.party-panel')!) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
@@ -206,7 +205,8 @@ describe('프로젝트 관리 화면', () => {
     await click('복제')
     await waitFor(() =>
       expect(
-        document.querySelector('.project-current strong')?.textContent,
+        document.querySelector<HTMLInputElement>('[aria-label="프로젝트 이름"]')
+          ?.value,
       ).toBe('새 로테이션 1 - 복제본'),
     )
     expect(document.querySelectorAll('.input-card')).toHaveLength(1)
@@ -227,7 +227,8 @@ describe('프로젝트 관리 화면', () => {
     await click('이름 변경')
     await waitFor(() =>
       expect(
-        document.querySelector('.project-current strong')?.textContent,
+        document.querySelector<HTMLInputElement>('[aria-label="프로젝트 이름"]')
+          ?.value,
       ).toBe('이름 수정'),
     )
     await click('삭제')
@@ -281,9 +282,8 @@ describe('프로젝트 관리 화면', () => {
     await render()
     expect(document.querySelectorAll('.input-card')).toHaveLength(1)
     expect(
-      document
-        .querySelector('.project-current')
-        ?.getAttribute('data-project-id'),
+      document.querySelector<HTMLSelectElement>('[aria-label="프로젝트 선택"]')
+        ?.value,
     ).toBe(id)
     expect(
       document.querySelector<HTMLButtonElement>(

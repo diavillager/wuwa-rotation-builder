@@ -32,7 +32,6 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   const [name, setName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [selectingProject, setSelectingProject] = useState(false)
   const currentName = state.current?.name ?? ''
   const currentId = state.current?.id
   useEffect(() => {
@@ -43,12 +42,6 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
     setName(currentName)
   }, [currentId, currentName])
   const disabled = state.loading || state.busy || confirmDelete
-  const showPicker =
-    selectingProject || (!state.current && state.projects.length > 0)
-  const chooseProject = async (id: string) => {
-    await store.open(id)
-    if (store.snapshot().current?.id === id) setSelectingProject(false)
-  }
   const saveLabel = state.loading
     ? '불러오는 중…'
     : state.status === 'saving'
@@ -60,70 +53,56 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
           : state.current
             ? '저장됨'
             : '미선택'
-  const toolbar = (
-    <section className="project-panel" aria-label="프로젝트 관리">
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">PROJECT MANAGEMENT</span>
-          <h2>프로젝트 관리</h2>
-        </div>
-        <span
-          className="status project-save-state"
-          role="status"
-          aria-live="polite"
-        >
-          {saveLabel}
-        </span>
-      </div>
-      {state.current && (
+  const headerControls = (
+    <div className="header-project" aria-label="프로젝트 관리">
+      <form
+        className="header-project-name"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void store.rename(name)
+        }}
+      >
+        <label htmlFor="header-project-name">
+          선택된 프로젝트 :
+          <span className="project-save-state" role="status" aria-live="polite">
+            {saveLabel}
+          </span>
+        </label>
+        <input
+          id="header-project-name"
+          aria-label="프로젝트 이름"
+          value={name}
+          title={currentName}
+          disabled={disabled || !state.current}
+          placeholder="프로젝트 미선택"
+          onChange={(event) => setName(event.target.value)}
+        />
         <button
-          className="project-current"
-          data-project-id={currentId}
-          aria-label="프로젝트 선택창 열기"
-          aria-expanded={showPicker}
-          aria-controls="project-picker"
-          disabled={disabled}
-          onClick={() => setSelectingProject(!selectingProject)}
+          aria-label="이름 변경"
+          disabled={disabled || !state.current || name.trim() === currentName}
         >
-          <small>현재 프로젝트</small>
-          <strong>{currentName}</strong>
+          수정
         </button>
-      )}
-      {showPicker && (
-        <div
-          id="project-picker"
-          className="project-picker"
+      </form>
+      <div className="header-project-actions">
+        <select
           aria-label="프로젝트 선택"
+          title={currentName || '프로젝트 선택'}
+          value={currentId ?? ''}
+          disabled={disabled || (!!state.error && !state.current)}
+          onChange={(event) => {
+            if (event.target.value) void store.open(event.target.value)
+          }}
         >
-          <div className="selector-heading">
-            <strong>프로젝트 선택</strong>
-            {state.current && (
-              <button
-                disabled={state.busy}
-                onClick={() => setSelectingProject(false)}
-              >
-                닫기
-              </button>
-            )}
-          </div>
-          <div className="project-options">
-            {state.projects.map((project) => (
-              <button
-                key={project.id}
-                data-project-id={project.id}
-                className={currentId === project.id ? 'selected' : ''}
-                aria-pressed={currentId === project.id}
-                disabled={state.busy}
-                onClick={() => void chooseProject(project.id)}
-              >
-                <strong>{project.name}</strong>
-                {currentId === project.id && <small>현재 프로젝트</small>}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="project-controls" hidden={showPicker}>
+          <option value="" disabled>
+            프로젝트 선택
+          </option>
+          {state.projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </select>
         <button
           disabled={disabled || (!!state.error && !state.current)}
           onClick={() => void store.create()}
@@ -142,27 +121,11 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
         >
           삭제
         </button>
-        <div className="project-export-slot" aria-hidden="true" />
       </div>
-      {state.current && !showPicker && (
-        <form
-          className="project-name"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void store.rename(name)
-          }}
-        >
-          <input
-            aria-label="프로젝트 이름"
-            value={name}
-            disabled={disabled}
-            onChange={(event) => setName(event.target.value)}
-          />
-          <button disabled={disabled || name.trim() === state.current.name}>
-            이름 변경
-          </button>
-        </form>
-      )}
+    </div>
+  )
+  const notices = (
+    <>
       {!state.current && !state.loading && (
         <p className="project-empty">
           새 프로젝트를 만들거나 목록에서 선택해 주세요.
@@ -236,7 +199,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
           </section>
         </div>
       )}
-    </section>
+    </>
   )
   if (state.current && !state.loading)
     return (
@@ -245,10 +208,10 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
         initialRotation={state.current.rotation}
         catalogOverride={activeCatalog}
         references={state.current.references}
-        projectControls={toolbar}
+        headerControls={headerControls}
+        projectControls={notices}
         onRotationChange={store.updateRotation}
         locked={state.busy || confirmDelete}
-        hideEditor={showPicker}
       />
     )
   return (
@@ -258,8 +221,9 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
           <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
           <h1>WUWA Rotation Builder</h1>
         </div>
+        {headerControls}
       </header>
-      {toolbar}
+      {notices}
     </main>
   )
 }

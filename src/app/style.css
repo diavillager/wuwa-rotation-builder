@@ -351,118 +351,78 @@ button {
   align-items: center;
   gap: 8px;
 }
-.project-panel {
-  margin-bottom: 24px;
-  padding: 18px 22px;
-  border: 1px solid #303941;
-  border-radius: 18px;
-  background: #171d24;
+.page-heading {
+  gap: 20px;
 }
-.project-controls,
-.project-error {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.project-controls {
-  margin-top: 20px;
-  flex-wrap: nowrap;
-}
-.project-export-slot {
-  margin-left: auto;
-  min-width: 100px;
-}
-.project-name input,
-.project-panel button {
-  padding: 8px 12px;
-  border: 1px solid #52626a;
-  border-radius: 8px;
-  background: #293941;
-  color: #e4eeee;
-  font: inherit;
-}
-.project-controls[hidden] {
-  display: none;
-}
-.project-panel .project-current {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  width: 100%;
-  margin-top: 20px;
-  padding: 20px;
-  border-color: #3d4c55;
-  border-radius: 12px;
-  background: #202932;
-  text-align: left;
-}
-.project-current small,
-.project-options small {
-  color: #96b5b1;
-  font-size: 12px;
-}
-.project-current strong {
-  font-size: 20px;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-.project-options strong {
-  white-space: normal;
-}
-.project-picker {
-  margin-top: 16px;
-  padding: 18px;
-  border: 1px solid #40505a;
-  border-radius: 12px;
-  background: #202932;
-}
-.project-picker .selector-heading {
-  justify-content: space-between;
-}
-.project-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
-}
-.project-options button {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  min-height: 90px;
-  padding: 18px;
-  text-align: left;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.project-options .selected {
-  border-color: #8fc9b8;
-  background: #315047;
-}
-.project-name {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  margin-top: 12px;
-}
-.project-name input {
-  width: 100%;
-  min-width: 0;
-}
-.project-panel button {
-  cursor: pointer;
-  flex-shrink: 0;
+.page-heading h1 {
   white-space: nowrap;
 }
-.project-panel button:disabled {
+.header-project {
+  flex: 0 0 480px;
+  width: 480px;
+  display: grid;
+  grid-template-rows: 26px 26px;
+  gap: 4px;
+}
+.header-project-name {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 42px;
+  gap: 5px;
+  align-items: center;
+  margin: 0;
+}
+.header-project-name label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #a6b6bd;
+}
+.header-project .project-save-state {
+  font-size: 10px;
+  color: #8fc9b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.header-project-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 40px 40px;
+  gap: 5px;
+}
+.header-project input,
+.header-project select,
+.header-project button {
+  min-width: 0;
+  width: 100%;
+  height: 26px;
+  border: 1px solid #42525b;
+  border-radius: 6px;
+  background: #202c34;
+  color: #e4eeee;
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.header-project button {
+  padding-inline: 4px;
+  cursor: pointer;
+}
+.header-project button:hover:not(:disabled) {
+  background: #35544d;
+}
+.header-project button:disabled,
+.header-project input:disabled,
+.header-project select:disabled {
   opacity: 0.45;
   cursor: default;
 }
-.project-panel button:hover:not(:disabled) {
-  background: #35544d;
+.header-project :focus-visible {
+  outline: 2px solid #8fc9b8;
+  outline-offset: 2px;
 }
 .project-empty {
   margin-top: 16px;
@@ -470,8 +430,20 @@ button {
   font-size: 12px;
 }
 .project-error {
-  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
   color: #f0b9ae;
+}
+.project-error button {
+  padding: 7px 10px;
+  border: 1px solid #52626a;
+  border-radius: 8px;
+  background: #293941;
+  color: #e4eeee;
+  cursor: pointer;
 }
 .cycle-tools button {
   border: 1px solid #52626a;
