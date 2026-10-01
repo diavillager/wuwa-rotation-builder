@@ -9,6 +9,7 @@ import {
 } from './editing'
 import { initialReview, candidateSkillId, type ReviewSource } from './model'
 import { encoreCandidates } from '../../scripts/character-sync/candidates'
+import type { SkillCategory } from '../../src/data/characters/categories'
 
 const raw = {
   Id: 1001,
@@ -74,6 +75,55 @@ function fixture() {
   return { source, state: initialReview(source) }
 }
 describe('명시적인 Encore 의미와 검수 순서', () => {
+  it('자동 배정은 전체 분류 순으로 안정 정렬하고 해제해도 정렬을 유지한다', () => {
+    const { source } = fixture()
+    const categories: (SkillCategory | undefined)[] = [
+      '고유 스킬',
+      '기본 공격',
+      undefined,
+      '공명 해방',
+      '반주 스킬',
+      '공명 스킬',
+      '공명 회로',
+      '조화도 파괴',
+      '변주 스킬',
+      '기본 공격',
+    ]
+    const template = source.draft.candidates.find((c) => c.kind === 'skill')!
+    source.draft.candidates = categories.map((_, i) => ({
+      ...template,
+      candidateId: `candidate-${i}`,
+    }))
+    source.encoreMatches = Object.fromEntries(
+      categories.flatMap((category, i) =>
+        category
+          ? [
+              [
+                `candidate-${i}`,
+                { category, displayName: `실제 스킬 ${i}`, skillId: `${i}` },
+              ],
+            ]
+          : [],
+      ),
+    )
+    const state = initialReview(source)
+    state.cardOrder = [9, 0, 1, 8, 7, 6, 5, 4, 3, 2].map(
+      (i) => `candidate-${i}`,
+    )
+    const before = structuredClone(state)
+    const assigned = assignEncore(state, source)
+    expect(assigned.cardOrder).toEqual(
+      [2, 9, 1, 5, 3, 6, 8, 4, 7, 0].map((i) => `candidate-${i}`),
+    )
+    const undone = undoEncore(assigned, {
+      before: state,
+      after: assigned,
+      manual: [],
+    })
+    expect(undone.cardOrder).toEqual(assigned.cardOrder)
+    expect(undone.candidates).toEqual(state.candidates)
+    expect(state).toEqual(before)
+  })
   it('자동 배정 해제는 직접 바꾼 값과 순서를 보존하고 자동 값만 되돌린다', () => {
     const { state, source } = fixture()
     const after = assignEncore(state, source)

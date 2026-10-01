@@ -1,10 +1,12 @@
 import {
   AUTO_CATEGORIES,
+  SKILL_CATEGORIES,
   isSkillCategory,
 } from '../../src/data/characters/categories'
 import {
   AUTO_KINDS,
   candidateSkillId,
+  reviewCards,
   type ReviewSource,
   type ReviewState,
 } from './model'
@@ -59,6 +61,14 @@ export function assignEncore(
       candidate.decision =
         match.category === '고유 스킬' ? 'exclude' : 'include'
   }
+  // 현재 표시 순서를 기준으로 안정 정렬하여 같은 분류의 수동 배치를 보존한다.
+  const categoryRank = (card: ReturnType<typeof reviewCards>[number]) => {
+    const category = next[card.group][card.index].category
+    return category ? SKILL_CATEGORIES.indexOf(category) + 1 : 0
+  }
+  next.cardOrder = reviewCards(next, source)
+    .sort((a, b) => categoryRank(a) - categoryRank(b))
+    .map((card) => card.key)
   return linkCategorizedActions(next)
 }
 
