@@ -73,8 +73,18 @@ export function sortReviewCardsByCategory(
     const category = state[card.group][card.index].category
     return category ? SKILL_CATEGORIES.indexOf(category) + 1 : 0
   }
+  const excludedRank = (card: ReturnType<typeof reviewCards>[number]) => {
+    const item = state[card.group][card.index]
+    return Number(
+      item.decision === 'exclude' ||
+        (item.decision === undefined && 'visible' in item && !item.visible),
+    )
+  }
   const cardOrder = reviewCards(state, source)
-    .sort((a, b) => categoryRank(a) - categoryRank(b))
+    .sort(
+      (a, b) =>
+        excludedRank(a) - excludedRank(b) || categoryRank(a) - categoryRank(b),
+    )
     .map((card) => card.key)
   return { ...state, cardOrder }
 }

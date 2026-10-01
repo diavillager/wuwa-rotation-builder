@@ -76,6 +76,40 @@ function fixture() {
   return { source, state: initialReview(source) }
 }
 describe('명시적인 Encore 의미와 검수 순서', () => {
+  it('반복 정렬은 새로 미등록한 카드를 뒤로 보내고 재등록 시 분류 위치로 돌린다', () => {
+    const { state, source } = fixture()
+    const first = sortReviewCardsByCategory(assignEncore(state, source), source)
+    const attack = first.candidates.find((c) => c.category === '기본 공격')!
+    const changed = structuredClone(first)
+    changed.candidates.find(
+      (c) => c.candidateId === attack.candidateId,
+    )!.decision = 'exclude'
+    const second = sortReviewCardsByCategory(changed, source)
+    const ordered = second.cardOrder!.map((id) =>
+      second.candidates.find((c) => c.candidateId === id)!,
+    )
+    expect(ordered.map((c) => c.category)).toEqual([
+      '변주 스킬',
+      '반주 스킬',
+      '기본 공격',
+      '고유 스킬',
+      '고유 스킬',
+    ])
+    expect(ordered.map((c) => c.decision)).toEqual([
+      'include',
+      'include',
+      'exclude',
+      'exclude',
+      'exclude',
+    ])
+    expect(sortReviewCardsByCategory(second, source)).toEqual(second)
+    second.candidates.find(
+      (c) => c.candidateId === attack.candidateId,
+    )!.decision = 'include'
+    expect(sortReviewCardsByCategory(second, source).cardOrder).toEqual(
+      first.cardOrder,
+    )
+  })
   it('자동 배정은 순서를 바꾸지 않고 별도 분류 정렬은 해제 후에도 유지한다', () => {
     const { source } = fixture()
     const categories: (SkillCategory | undefined)[] = [
