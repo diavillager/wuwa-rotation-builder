@@ -25,8 +25,7 @@ export function deletionTargetAt(
     return { kind: 'auto', cycleId, actionId }
   const skillId =
     element?.closest<HTMLElement>('[data-skill-id]')?.dataset.skillId
-  if (skillId && Number(card.dataset.skillCount) > 1)
-    return { kind: 'skill', cycleId, actionId, skillId }
+  if (skillId) return { kind: 'skill', cycleId, actionId, skillId }
   return { kind: 'input', cycleId, actionId }
 }
 

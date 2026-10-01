@@ -1062,6 +1062,55 @@ describe('App 실제 입력 연결', () => {
     expect(workspace.hidden).toBe(false)
     expect(grid().querySelector('.input-card')?.textContent).toContain('FTap')
   })
+  it('마지막 스킬도 입력을 남기고 삭제하며 빈 입력 삭제는 별도 Undo 단계다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    const input = grid().querySelector('.input-card')!
+    const inputId = input.getAttribute('data-action-id')
+    for (const card of [...document.querySelectorAll('.catalog-skill')].slice(
+      0,
+      2,
+    ))
+      await dragDrop(card, input)
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () =>
+        grid().querySelector('.linked-skill') ??
+        grid().querySelector('.input-card'),
+    })
+    const backspace = async () => {
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Backspace',
+            bubbles: true,
+            cancelable: true,
+          }),
+        )
+      })
+    }
+    await hover(input.querySelector('.linked-skill')!)
+    for (const count of [1, 0]) {
+      await backspace()
+      expect(grid().querySelectorAll('.linked-skill')).toHaveLength(count)
+      expect(
+        grid().querySelector('.input-card')?.getAttribute('data-action-id'),
+      ).toBe(inputId)
+    }
+    expect(grid().querySelector('.input-card')?.textContent).toBe('ETap')
+    await hover(grid().querySelector('.input-card')!)
+    await backspace()
+    expect(grid().querySelector('.input-card')).toBeNull()
+    for (const count of [0, 1, 2]) {
+      await clickHistory('opening', 'undo')
+      expect(grid().querySelectorAll('.linked-skill')).toHaveLength(count)
+      expect(
+        grid().querySelector('.input-card')?.getAttribute('data-action-id'),
+      ).toBe(inputId)
+    }
+    expect(grid('repeat').querySelector('.input-card')).toBeNull()
+  })
   it('커서를 옮기지 않고 Backspace를 반복해 다음 블록을 삭제한다', async () => {
     await hover(grid())
     for (let index = 0; index < 3; index++) {
