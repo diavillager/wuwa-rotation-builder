@@ -500,6 +500,9 @@ export function App() {
             <h2>{title}</h2>
           </div>
           <div className="cycle-tools">
+            {focusedCycle === cycleId && (
+              <span className="status">편집 중</span>
+            )}
             <button
               type="button"
               aria-label={`${title} 실행 취소`}
@@ -528,9 +531,6 @@ export function App() {
             >
               <span aria-hidden="true">↷</span>
             </button>
-            <span className="status">
-              {focusedCycle === cycleId ? '편집 중' : 'Cycle'}
-            </span>
           </div>
         </div>
         <div
