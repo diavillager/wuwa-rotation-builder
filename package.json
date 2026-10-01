@@ -13,7 +13,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "character-sync": "tsx scripts/character-sync/cli.ts",
+    "characters:validate": "tsx scripts/character-sync/cli.ts --validate"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -32,6 +34,8 @@
     "globals": "^15.0.0",
     "jsdom": "^30.1.1",
     "prettier": "^3.0.0",
+    "sharp": "^0.35.5",
+    "tsx": "^4.23.15",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0",
     "vite": "^8.3.1",
