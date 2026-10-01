@@ -32,6 +32,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   const [name, setName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [selectingProject, setSelectingProject] = useState(false)
   const currentName = state.current?.name ?? ''
   const currentId = state.current?.id
   useEffect(() => {
@@ -42,6 +43,12 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
     setName(currentName)
   }, [currentId, currentName])
   const disabled = state.loading || state.busy || confirmDelete
+  const showPicker =
+    selectingProject || (!state.current && state.projects.length > 0)
+  const chooseProject = async (id: string) => {
+    await store.open(id)
+    if (store.snapshot().current?.id === id) setSelectingProject(false)
+  }
   const saveLabel = state.loading
     ? '불러오는 중…'
     : state.status === 'saving'
@@ -68,27 +75,55 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
           {saveLabel}
         </span>
       </div>
-      <div className="project-controls">
-        <label>
-          <select
-            aria-label="프로젝트 선택"
-            title={currentName || '프로젝트 선택'}
-            value={state.current?.id ?? ''}
-            disabled={disabled || (!!state.error && !state.current)}
-            onChange={(event) => {
-              if (event.target.value) void store.open(event.target.value)
-            }}
-          >
-            <option value="" disabled>
-              프로젝트를 선택해 주세요
-            </option>
+      {state.current && (
+        <button
+          className="project-current"
+          data-project-id={currentId}
+          aria-label="프로젝트 선택창 열기"
+          aria-expanded={showPicker}
+          aria-controls="project-picker"
+          disabled={disabled}
+          onClick={() => setSelectingProject(!selectingProject)}
+        >
+          <small>현재 프로젝트</small>
+          <strong>{currentName}</strong>
+        </button>
+      )}
+      {showPicker && (
+        <div
+          id="project-picker"
+          className="project-picker"
+          aria-label="프로젝트 선택"
+        >
+          <div className="selector-heading">
+            <strong>프로젝트 선택</strong>
+            {state.current && (
+              <button
+                disabled={state.busy}
+                onClick={() => setSelectingProject(false)}
+              >
+                닫기
+              </button>
+            )}
+          </div>
+          <div className="project-options">
             {state.projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
+              <button
+                key={project.id}
+                data-project-id={project.id}
+                className={currentId === project.id ? 'selected' : ''}
+                aria-pressed={currentId === project.id}
+                disabled={state.busy}
+                onClick={() => void chooseProject(project.id)}
+              >
+                <strong>{project.name}</strong>
+                {currentId === project.id && <small>현재 프로젝트</small>}
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+        </div>
+      )}
+      <div className="project-controls" hidden={showPicker}>
         <button
           disabled={disabled || (!!state.error && !state.current)}
           onClick={() => void store.create()}
@@ -109,7 +144,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
         </button>
         <div className="project-export-slot" aria-hidden="true" />
       </div>
-      {state.current && (
+      {state.current && !showPicker && (
         <form
           className="project-name"
           onSubmit={(event) => {
@@ -213,6 +248,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
         projectControls={toolbar}
         onRotationChange={store.updateRotation}
         locked={state.busy || confirmDelete}
+        hideEditor={showPicker}
       />
     )
   return (

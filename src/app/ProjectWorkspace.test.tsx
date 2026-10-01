@@ -76,23 +76,75 @@ async function insertE() {
   })
 }
 async function select(id: string) {
+  if (!document.querySelector('.project-picker'))
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.project-current')!.click(),
+    )
   await act(async () => {
-    const select = document.querySelector<HTMLSelectElement>(
-      '[aria-label="프로젝트 선택"]',
-    )!
-    select.value = id
-    select.dispatchEvent(new Event('change', { bubbles: true }))
+    document
+      .querySelector<HTMLButtonElement>(
+        `.project-options [data-project-id="${id}"]`,
+      )!
+      .click()
   })
   await waitFor(() =>
     expect(
       document
-        .querySelector('[aria-label="프로젝트 선택"]')
-        ?.getAttribute('disabled'),
-    ).toBeNull(),
+        .querySelector('.project-current')
+        ?.getAttribute('data-project-id'),
+    ).toBe(id),
   )
 }
 
 describe('프로젝트 관리 화면', () => {
+  it('이름 블록 선택창은 편집을 숨기고 입력을 차단하며 닫기·같은 선택은 현재 이력을 유지한다', async () => {
+    await render()
+    await click('새 프로젝트')
+    await waitFor(() =>
+      expect(document.querySelector('.party-panel')).not.toBeNull(),
+    )
+    await insertE()
+    const id = document
+      .querySelector('.project-current')!
+      .getAttribute('data-project-id')!
+    expect(document.querySelector('select')).toBeNull()
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.project-current')!.click(),
+    )
+    expect(
+      document.querySelector('.project-current')!.getAttribute('aria-expanded'),
+    ).toBe('true')
+    expect(
+      document.querySelector<HTMLElement>('.party-panel')!.parentElement!
+        .hidden,
+    ).toBe(true)
+    expect(
+      document.querySelector<HTMLElement>('.project-controls')!.hidden,
+    ).toBe(true)
+    expect(document.querySelector('.project-name')).toBeNull()
+    await insertE()
+    expect(document.querySelectorAll('.input-card')).toHaveLength(1)
+    await click('닫기')
+    expect(
+      document.querySelector<HTMLElement>('.party-panel')!.parentElement!
+        .hidden,
+    ).toBe(false)
+    expect(
+      document.querySelector<HTMLButtonElement>(
+        '[aria-label="개막 사이클 실행 취소"]',
+      )!.disabled,
+    ).toBe(false)
+    await select(id)
+    await waitFor(() =>
+      expect(document.querySelector('.project-picker')).toBeNull(),
+    )
+    expect(document.querySelectorAll('.input-card')).toHaveLength(1)
+    expect(
+      document.querySelector<HTMLButtonElement>(
+        '[aria-label="개막 사이클 실행 취소"]',
+      )!.disabled,
+    ).toBe(false)
+  })
   it('빈 목록에서 명시적으로 생성하고 자동저장 후 Undo를 유지하며 다시 열면 초기화한다', async () => {
     await render()
     expect(document.querySelector('.party-panel')).toBeNull()
@@ -119,7 +171,9 @@ describe('프로젝트 관리 화면', () => {
     expect((await repo.list())[0].rotation.opening.columns).toHaveLength(1)
     await click('새 프로젝트')
     await waitFor(() =>
-      expect(document.querySelectorAll('select option')).toHaveLength(3),
+      expect(
+        document.querySelector('.project-current strong')?.textContent,
+      ).toBe('새 로테이션 2'),
     )
     await select(first.id)
     await waitFor(() =>
@@ -151,7 +205,9 @@ describe('프로젝트 관리 화면', () => {
     await insertE()
     await click('복제')
     await waitFor(() =>
-      expect(document.querySelectorAll('select option')).toHaveLength(3),
+      expect(
+        document.querySelector('.project-current strong')?.textContent,
+      ).toBe('새 로테이션 1 - 복제본'),
     )
     expect(document.querySelectorAll('.input-card')).toHaveLength(1)
     const generationUndo = document.querySelector<HTMLButtonElement>(
@@ -170,9 +226,9 @@ describe('프로젝트 관리 화면', () => {
     })
     await click('이름 변경')
     await waitFor(() =>
-      expect(document.querySelector('select option:checked')?.textContent).toBe(
-        '이름 수정',
-      ),
+      expect(
+        document.querySelector('.project-current strong')?.textContent,
+      ).toBe('이름 수정'),
     )
     await click('삭제')
     expect(
@@ -203,7 +259,7 @@ describe('프로젝트 관리 화면', () => {
       document.querySelector<HTMLButtonElement>('.confirm-submit')!.click(),
     )
     await waitFor(() =>
-      expect(document.querySelectorAll('select option')).toHaveLength(1),
+      expect(document.querySelector('.party-panel')).toBeNull(),
     )
     expect(await repo.list()).toEqual([])
   })
@@ -225,8 +281,9 @@ describe('프로젝트 관리 화면', () => {
     await render()
     expect(document.querySelectorAll('.input-card')).toHaveLength(1)
     expect(
-      document.querySelector<HTMLSelectElement>('[aria-label="프로젝트 선택"]')!
-        .value,
+      document
+        .querySelector('.project-current')
+        ?.getAttribute('data-project-id'),
     ).toBe(id)
     expect(
       document.querySelector<HTMLButtonElement>(

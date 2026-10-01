@@ -101,6 +101,7 @@ export interface AppProps {
   references?: ProjectReferences
   onRotationChange?: (rotation: Rotation) => void
   locked?: boolean
+  hideEditor?: boolean
 }
 
 export function App({
@@ -110,6 +111,7 @@ export function App({
   references,
   onRotationChange,
   locked = false,
+  hideEditor = false,
 }: AppProps = {}) {
   const demo = demoEnabled()
   const catalog: CharacterCatalog =
@@ -208,12 +210,13 @@ export function App({
       rotation,
       blocked:
         locked ||
+        hideEditor ||
         selectingSlot !== null ||
         pendingReplacement !== null ||
         drag !== null,
     }
     if (liveRef.current.blocked) captureRef.current?.cancel()
-  }, [rotation, selectingSlot, pendingReplacement, drag, locked])
+  }, [rotation, selectingSlot, pendingReplacement, drag, locked, hideEditor])
 
   useLayoutEffect(() => {
     const target = revealColumnRef.current
@@ -324,7 +327,7 @@ export function App({
   }
 
   const run = (command: (current: Rotation) => Rotation) => {
-    if (locked) return
+    if (locked || hideEditor) return
     captureRef.current?.cancel()
     try {
       setRotation(command(rotation))
@@ -337,6 +340,7 @@ export function App({
   const restoreCycle = (cycleId: CycleId, direction: 'undo' | 'redo') => {
     if (
       locked ||
+      hideEditor ||
       selectingSlot !== null ||
       pendingReplacement !== null ||
       drag !== null
@@ -747,6 +751,7 @@ export function App({
       </header>
       {projectControls}
       <div
+        hidden={hideEditor}
         ref={(element) => {
           if (locked) element?.setAttribute('inert', '')
           else element?.removeAttribute('inert')

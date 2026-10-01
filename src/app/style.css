@@ -373,16 +373,6 @@ button {
   margin-left: auto;
   min-width: 100px;
 }
-.project-controls label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #9ecbc4;
-  font-size: 13px;
-  flex: 0 0 280px;
-  min-width: 0;
-}
-.project-controls select,
 .project-name input,
 .project-panel button {
   padding: 8px 12px;
@@ -392,12 +382,65 @@ button {
   color: #e4eeee;
   font: inherit;
 }
-.project-controls select {
-  width: 280px;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.project-controls[hidden] {
+  display: none;
+}
+.project-panel .project-current {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 20px;
+  border-color: #3d4c55;
+  border-radius: 12px;
+  background: #202932;
+  text-align: left;
+}
+.project-current small,
+.project-options small {
+  color: #96b5b1;
+  font-size: 12px;
+}
+.project-current strong {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.project-options strong {
+  white-space: normal;
+}
+.project-picker {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #40505a;
+  border-radius: 12px;
+  background: #202932;
+}
+.project-picker .selector-heading {
+  justify-content: space-between;
+}
+.project-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.project-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 90px;
+  padding: 18px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.project-options .selected {
+  border-color: #8fc9b8;
+  background: #315047;
 }
 .project-name {
   display: grid;
@@ -414,8 +457,7 @@ button {
   flex-shrink: 0;
   white-space: nowrap;
 }
-.project-panel button:disabled,
-.project-controls select:disabled {
+.project-panel button:disabled {
   opacity: 0.45;
   cursor: default;
 }
