@@ -239,6 +239,8 @@ Undo/Redo는 현재 열린 로테이션의 사이클 편집에만 적용하며 �
 
 ## 13. 공명자 데이터 파이프라인
 
+검수 완료 데이터에 JSON 오류·필수 이미지 누락·검증 실패가 있으면 해당 공명자만 선택 목록에서 제외하고 ID와 오류를 표시한다. 정상 공명자는 계속 사용한다. 기존 프로젝트는 정확한 ID의 현재 데이터 또는 최소 snapshot을 사용하고 저장된 이름·블록을 보존하며 다른 공명자나 스킬로 자동 대체하지 않는다.
+
 공명자별 데이터는 `src/assets/characters/{characterId}/data/{characterId}.json`, WebP 자산은 `src/assets/characters/{characterId}/assets/*.webp`에 둔다. UI용 스킬 `displayName`과 사용 여부는 사람이 검수한다. `autoActions.normalSwitchAttack`, `autoActions.intro`, `autoActions.outro`도 각각 독립적으로 사람이 지정한다. 원본 파일명은 UI에 노출하지 않는다.
 
 Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와 WW_Data의 합집합 후보 수집 및 Encore api-v2 Resource의 WebP 조회를 확인했다. 이 spike는 후보 수집·이미지 조회의 기술 검증이며 **스킬의 의미가 자동으로 검증되었다는 뜻은 아니다**. 출시 전 외부 데이터·이미지의 라이선스 및 게임 IP 재배포 문제를 별도 재확인한다.

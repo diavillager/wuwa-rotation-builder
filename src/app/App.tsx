@@ -140,6 +140,24 @@ export function App({
       ? `${snapshot.displayName} (데이터 누락)`
       : skillName(catalog, id)
   }
+  const skillContent = (id: string) => {
+    const skill = catalog.characters
+      .flatMap((character) => character.skills)
+      .find((item) => item.id === id)
+    return (
+      <>
+        {skill?.assetUrl && (
+          <img
+            className="skill-icon"
+            src={skill.assetUrl}
+            alt=""
+            draggable={false}
+          />
+        )}
+        {skillLabel(id)}
+      </>
+    )
+  }
   const [editor, setEditor] = useState(() =>
     createEditorHistory(
       initialRotation ??
@@ -535,7 +553,7 @@ export function App({
           }}
           title="휠로 단수 변경 · Backspace로 삭제"
         >
-          {skillLabel(skill.skillRef)}
+          {skillContent(skill.skillRef)}
           {skill.stage > 0 && <small>{skill.stage}단</small>}
         </span>
       ))}
@@ -681,7 +699,7 @@ export function App({
                                 ? '변주'
                                 : '교체 공격'}
                           </small>
-                          {skillLabel(column.action.skillRef)}
+                          {skillContent(column.action.skillRef)}
                         </div>
                       ))}
                   </div>
@@ -806,9 +824,21 @@ export function App({
                 }}
               >
                 <span className="slot-index">0{index + 1}</span>
-                <span className="portrait-placeholder" aria-hidden="true">
-                  ◇
-                </span>
+                {catalog.characters.find((item) => item.id === id)?.assetUrl ? (
+                  <img
+                    className="character-portrait"
+                    src={
+                      catalog.characters.find((item) => item.id === id)!
+                        .assetUrl
+                    }
+                    alt=""
+                    draggable={false}
+                  />
+                ) : (
+                  <span className="portrait-placeholder" aria-hidden="true">
+                    ◇
+                  </span>
+                )}
                 <span>
                   <strong>{characterLabel(id)}</strong>
                   <small>슬롯 {index + 1}</small>
@@ -869,6 +899,14 @@ export function App({
                         } else applyReplacement(slotIndex, item.id)
                       }}
                     >
+                      {item.assetUrl && (
+                        <img
+                          className="selector-portrait"
+                          src={item.assetUrl}
+                          alt=""
+                          draggable={false}
+                        />
+                      )}
                       {item.displayName}
                     </button>
                   ))
@@ -891,21 +929,31 @@ export function App({
             </p>
             {activeCharacter ? (
               <div className="skill-list">
-                {activeCharacter.skills.map((skill) => (
-                  <div
-                    className="catalog-skill"
-                    key={skill.id}
-                    draggable
-                    onDragStart={(event) => {
-                      event.dataTransfer.effectAllowed = 'copy'
-                      setDrag({ kind: 'catalogSkill', ref: skill.id })
-                    }}
-                    onDragEnd={() => setDrag(null)}
-                  >
-                    {skill.displayName}
-                    <small>InputBlock으로 드래그</small>
-                  </div>
-                ))}
+                {activeCharacter.skills
+                  .filter((skill) => skill.visible !== false)
+                  .map((skill) => (
+                    <div
+                      className="catalog-skill"
+                      key={skill.id}
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = 'copy'
+                        setDrag({ kind: 'catalogSkill', ref: skill.id })
+                      }}
+                      onDragEnd={() => setDrag(null)}
+                    >
+                      {skill.assetUrl && (
+                        <img
+                          className="skill-icon"
+                          src={skill.assetUrl}
+                          alt=""
+                          draggable={false}
+                        />
+                      )}
+                      {skill.displayName}
+                      <small>InputBlock으로 드래그</small>
+                    </div>
+                  ))}
               </div>
             ) : (
               <div className="skills-empty">

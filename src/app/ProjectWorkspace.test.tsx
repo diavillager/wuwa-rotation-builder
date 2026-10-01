@@ -5,8 +5,12 @@ import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProjectWorkspace } from './ProjectWorkspace'
 import { IndexedDbProjectRepository } from '../storage/project-repository'
-import { createProject } from '../domain/project'
-import { createInputDemoRotation, demoCatalog } from './demo'
+import { captureReferences, createProject } from '../domain/project'
+import {
+  createDemoRotation,
+  createInputDemoRotation,
+  demoCatalog,
+} from './demo'
 
 let root: Root
 let repo: IndexedDbProjectRepository
@@ -105,6 +109,69 @@ async function select(id: string) {
 }
 
 describe('프로젝트 관리 화면', () => {
+  it('검증된 이미지와 노출 스킬을 표시하고 데이터 오류가 정상 편집이나 저장된 블록을 바꾸지 않는다', async () => {
+    const catalog = {
+      characters: demoCatalog.characters.map((character) => ({
+        ...character,
+        assetUrl: `/verified/${character.id}.webp`,
+        skills: character.skills.map((skill) => ({
+          ...skill,
+          assetUrl: `/verified/${skill.id}.webp`,
+          visible: skill.id !== 'demo-skill-a2',
+        })),
+      })),
+    }
+    const project = createProject(
+      'images',
+      '이미지 연결',
+      '2026-10-01T03:00:00.000Z',
+      createDemoRotation(),
+      captureReferences(createDemoRotation(), demoCatalog),
+    )
+    await repo.put(project)
+    await repo.select(project.id)
+    await act(async () =>
+      root.render(
+        <ProjectWorkspace
+          repository={repo}
+          catalog={catalog}
+          catalogIssues={[
+            {
+              characterId: 'invalid',
+              path: 'invalid.json',
+              message: '자산 누락',
+            },
+          ]}
+        />,
+      ),
+    )
+    await waitFor(() =>
+      expect(
+        document.querySelector('.party-slot img')?.getAttribute('src'),
+      ).toBe('/verified/demo-a.webp'),
+    )
+    await act(async () => {
+      document
+        .querySelector('[data-capture-cycle="opening"] .end-cell')!
+        .dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    const shelf = document.querySelector('.skill-list')!
+    expect(shelf.querySelector('img')?.getAttribute('src')).toBe(
+      '/verified/demo-skill-a.webp',
+    )
+    expect(shelf.textContent).not.toContain('데모 스킬 A2')
+    expect(document.querySelector('.cycles')?.textContent).toContain(
+      '데모 스킬 A2',
+    )
+    expect(
+      document.querySelectorAll('.cycles .skill-icon').length,
+    ).toBeGreaterThan(0)
+    expect(document.querySelector('.catalog-issues')?.textContent).toContain(
+      'invalid: 자산 누락',
+    )
+    expect(document.querySelector('.cycles')!.closest('[inert]')).toBeNull()
+    expect((await repo.list())[0].rotation).toEqual(project.rotation)
+  })
   it('클릭은 선택창을 유지하고 전환 중 더블클릭은 선택 완료 후 닫는다', async () => {
     await render()
     await click('새 프로젝트')

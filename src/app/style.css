@@ -343,6 +343,41 @@ button {
   color: #93afa7;
   margin-top: 5px;
 }
+.character-portrait {
+  width: 52px;
+  height: 64px;
+  object-fit: contain;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.selector-portrait {
+  width: 32px;
+  height: 40px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 8px;
+  pointer-events: none;
+}
+.skill-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 6px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.catalog-issues {
+  border: 1px solid #70534d;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  color: #f0b9ae;
+  font-size: 13px;
+}
+.catalog-issues summary {
+  cursor: pointer;
+}
 .focused-cycle {
   border-color: #6a9e91;
 }

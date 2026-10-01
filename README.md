@@ -6,6 +6,8 @@ Wuthering Waves 3인 파티의 개막·반복 로테이션을 실제 입력 순�
 
 Rotation 도메인 모델, 파티·타임라인 Editor, 실제 입력 캡처, 사이클별 Undo/Redo와 IndexedDB 프로젝트 저장·관리를 제공합니다. Export와 검수된 실제 공명자 데이터는 아직 제공하지 않습니다.
 
+공명자 JSON 계약·검증기와 로컬 WebP 로더, 초상화·스킬 이미지 표시 연결을 제공합니다. 최종 데이터는 [공명자 데이터 안내](src/assets/characters/README.md)의 형식으로 등록합니다. 잘못된 공명자만 선택 목록에서 제외하고 오류를 표시하며 기존 프로젝트 내용은 보존합니다. 실제 후보 수집·사람 검수·등록 및 `wuwa-character-sync` 스킬은 후속 단계입니다. 웹사이트 공통 UI 아이콘은 [별도 자산 안내](src/assets/ui/README.md)에 따라 관리합니다.
+
 공명자 항목은 커서 진입 시에만 활성화하며 항목 위 입력은 현재 활성 공명자 소유로 전역 끝에 추가합니다. 숫자키 교체 후에도 커서를 옮기지 않고 도착 공명자로 입력을 이어갑니다. 블록 배치 영역에서는 커서 라인을 실시간으로 활성화합니다. 빈 셀에서는 그 라인의 마지막 편집 가능 위치에, InputBlock과 내부 스킬 위에서는 해당 입력 블록 바로 뒤에 삽입합니다. 배치 영역의 숫자키 교체 후에는 커서 라인을 유지합니다. 라인 밖에서는 마지막 활성 표시와 진열을 유지합니다.
 
 ## 개발 환경
@@ -65,6 +67,7 @@ npm run build
 - [수동 입력·교체 삽입 spec](specs/2026-09-30-004-manual-transition-editing.md): 커서 라인 활성화와 라인 끝·InputBlock 뒤 수동 삽입 규칙
 - [사이클별 Undo/Redo spec](specs/2026-10-01-000-cycle-undo-redo.md): 독립 편집 이력과 파티 변경 처리
 - [프로젝트 저장·관리 spec](specs/2026-10-01-001-project-storage.md): IndexedDB 자동저장·복원과 관리 UX
+- [공명자 데이터 파이프라인 spec](specs/2026-10-01-002-character-data-pipeline.md): 데이터 계약·동기화·검수와 공통 UI 아이콘 수집 단계
 - [AGENTS.md](AGENTS.md): 저장소 작업 지침
 
 `specs/`는 기능별 구현 계획을 담으며 체크리스트나 PRD를 대체하지 않습니다.

@@ -14,12 +14,18 @@ export type Element = (typeof ELEMENTS)[number]
 export interface CatalogSkill {
   id: string
   displayName: string
+  /** 저장 snapshot에는 안정적인 asset ID만 넣고 배포별 URL은 저장하지 않는다. */
+  asset?: string
+  assetUrl?: string
+  visible?: boolean
 }
 
 export interface CatalogCharacter {
   id: CharacterId
   displayName: string
   element: Element
+  asset?: string
+  assetUrl?: string
   skills: readonly CatalogSkill[]
   /** 사람이 명시적으로 지정한 자동 행동 Skill ID. 일반 입력과 자동 연결하지 않는다. */
   autoActions?: Partial<

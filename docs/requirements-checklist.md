@@ -67,6 +67,8 @@
 
 ## 6. 공명자 데이터와 개발용 Skill
 
+- [x] 검수 완료 데이터의 JSON 오류·필수 이미지 누락·검증 실패는 해당 공명자만 선택 목록에서 제외하고 ID와 오류를 표시한다. 정상 공명자는 계속 사용할 수 있으며 기존 프로젝트의 저장된 이름과 블록은 유지한다.
+
 - [x] 데이터 경로: `src/assets/characters/{characterId}/data/{characterId}.json`; 이미지 경로: `src/assets/characters/{characterId}/assets/*.webp`.
 - [x] `wuwa-character-sync`는 기존 등록 확인→Encore 목록 비교→미등록 탐지→기본 정보/한국어 이름/속성/초상화 후보 수집→Encore Character API와 WW_Data의 스킬 아이콘 후보 합집합→Encore api-v2 Resource WebP 다운로드/검증→JSON 초안→실제 아이콘이 보이는 로컬 검수 UI→사람의 displayName/사용 여부/세 autoActions 지정→최종 JSON 반영→검증 순서다.
 - [x] 자동화는 후보를 넓게 수집해 검수 UI에 제공한다. asset 파일명·path·suffix가 `QTE`/`A1`/`B3`/`Intro`처럼 보이더라도 그것만으로 Skill `displayName`, 노출 여부, 세 autoAction 매핑을 확정하지 않는다. 실제 아이콘과 후보 데이터를 사람이 검수해 의미를 확정한다.
