@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { App } from './App'
 import { emptyCatalog, type CharacterCatalog } from './catalog'
 import { createInputDemoRotation, demoCatalog } from './demo'
@@ -32,6 +32,9 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   const [name, setName] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const headerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const currentName = state.current?.name ?? ''
   const currentId = state.current?.id
   useEffect(() => {
@@ -41,6 +44,19 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
   useEffect(() => {
     setName(currentName)
   }, [currentId, currentName])
+  useEffect(() => {
+    if (!pickerOpen) return
+    const outside = (event: PointerEvent) => {
+      if (!headerRef.current?.contains(event.target as Node))
+        setPickerOpen(false)
+    }
+    document.addEventListener('pointerdown', outside)
+    return () => document.removeEventListener('pointerdown', outside)
+  }, [pickerOpen])
+  const manage = async (operation: () => Promise<unknown>) => {
+    await operation()
+    if (!store.snapshot().error) setPickerOpen(false)
+  }
   const disabled = state.loading || state.busy || confirmDelete
   const saveLabel = state.loading
     ? '불러오는 중…'
@@ -54,74 +70,113 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
             ? '저장됨'
             : '미선택'
   const headerControls = (
-    <div className="header-project" aria-label="프로젝트 관리">
-      <form
-        className="header-project-name"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void store.rename(name)
-        }}
+    <div
+      className="header-project"
+      aria-label="프로젝트 관리"
+      ref={headerRef}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && pickerOpen) {
+          event.stopPropagation()
+          setPickerOpen(false)
+          triggerRef.current?.focus()
+        }
+      }}
+    >
+      <span className="project-save-state" role="status" aria-live="polite">
+        {saveLabel}
+      </span>
+      <button
+        className="project-trigger"
+        data-project-id={currentId}
+        ref={triggerRef}
+        aria-label="프로젝트 선택"
+        aria-expanded={pickerOpen}
+        aria-controls="project-dropdown"
+        disabled={disabled}
+        title={currentName || '프로젝트 선택'}
+        onClick={() => setPickerOpen(!pickerOpen)}
       >
-        <div className="header-project-name-field">
-          <label htmlFor="header-project-name">선택된 프로젝트 :</label>
-          <input
-            id="header-project-name"
-            aria-label="프로젝트 이름"
-            value={name}
-            title={currentName}
-            disabled={disabled || !state.current}
-            placeholder="프로젝트 미선택"
-            onChange={(event) => setName(event.target.value)}
-          />
+        <span>{currentName || '프로젝트 선택'}</span>
+        <span aria-hidden="true">▾</span>
+      </button>
+      {pickerOpen && (
+        <div
+          className="project-dropdown"
+          id="project-dropdown"
+          role="region"
+          aria-label="프로젝트 선택창"
+        >
+          <form
+            className="header-project-name"
+            onSubmit={(event) => {
+              event.preventDefault()
+              void store.rename(name)
+            }}
+          >
+            <label htmlFor="header-project-name">현재 프로젝트</label>
+            <input
+              id="header-project-name"
+              aria-label="프로젝트 이름"
+              value={name}
+              title={currentName}
+              disabled={disabled || !state.current}
+              placeholder="프로젝트 미선택"
+              onChange={(event) => setName(event.target.value)}
+            />
+            <div className="header-project-actions">
+              <button
+                aria-label="이름 변경"
+                disabled={
+                  disabled || !state.current || name.trim() === currentName
+                }
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                disabled={disabled || !state.current}
+                onClick={() => void manage(() => store.duplicate())}
+              >
+                복제
+              </button>
+              <button
+                type="button"
+                disabled={disabled || !state.current}
+                onClick={() => setConfirmDelete(true)}
+              >
+                삭제
+              </button>
+            </div>
+          </form>
+          <div className="project-dropdown-list" aria-label="프로젝트 목록">
+            {state.projects.map((project) => (
+              <button
+                type="button"
+                key={project.id}
+                data-project-id={project.id}
+                aria-pressed={currentId === project.id}
+                title={project.name}
+                disabled={disabled || (!!state.error && !state.current)}
+                onClick={() => void manage(() => store.open(project.id))}
+              >
+                <span aria-hidden="true">
+                  {currentId === project.id ? '✓' : ''}
+                </span>
+                <span>{project.name}</span>
+              </button>
+            ))}
+            {!state.projects.length && <p>저장된 프로젝트가 없습니다.</p>}
+          </div>
+          <button
+            className="project-create"
+            type="button"
+            disabled={disabled || (!!state.error && !state.current)}
+            onClick={() => void manage(() => store.create())}
+          >
+            새 프로젝트
+          </button>
         </div>
-        <button
-          aria-label="이름 변경"
-          disabled={disabled || !state.current || name.trim() === currentName}
-        >
-          수정
-        </button>
-        <span className="project-save-state" role="status" aria-live="polite">
-          {saveLabel}
-        </span>
-      </form>
-      <div className="header-project-actions">
-        <select
-          aria-label="프로젝트 선택"
-          title={currentName || '프로젝트 선택'}
-          value={currentId ?? ''}
-          disabled={disabled || (!!state.error && !state.current)}
-          onChange={(event) => {
-            if (event.target.value) void store.open(event.target.value)
-          }}
-        >
-          <option value="" disabled>
-            프로젝트 선택
-          </option>
-          {state.projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
-        <button
-          disabled={disabled || (!!state.error && !state.current)}
-          onClick={() => void store.create()}
-        >
-          새 프로젝트
-        </button>
-        <button
-          disabled={disabled || !state.current}
-          onClick={() => void store.duplicate()}
-        >
-          복제
-        </button>
-        <button
-          disabled={disabled || !state.current}
-          onClick={() => setConfirmDelete(true)}
-        >
-          삭제
-        </button>
-      </div>
+      )}
     </div>
   )
   const notices = (
@@ -211,7 +266,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
         headerControls={headerControls}
         projectControls={notices}
         onRotationChange={store.updateRotation}
-        locked={state.busy || confirmDelete}
+        locked={state.busy || confirmDelete || pickerOpen}
       />
     )
   return (
