@@ -31,6 +31,7 @@ export interface ReviewDraft {
   errors: string[]
 }
 export interface ReviewSource {
+  encoreSkillSourceId?: string
   encoreTooltips?: SkillTooltip[]
   encoreMatches?: Record<
     string,

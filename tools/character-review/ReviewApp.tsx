@@ -65,6 +65,8 @@ const SOURCE_LABELS = {
 export function ReviewApp() {
   const [works, setWorks] = useState<Work[]>([])
   const [activeId, setActiveId] = useState('')
+  const [selectedElement, setSelectedElement] =
+    useState<(typeof ELEMENTS)[number]>('응결')
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(true)
   const [errors, setErrors] = useState<string[]>([])
@@ -523,11 +525,83 @@ export function ReviewApp() {
       </div>
       <div className="review-layout">
         <aside className="review-sidebar">
+          <nav className="review-panel target-panel" aria-label="공명자 목록">
+            <p className="eyebrow">RESONATORS</p>
+            <h2>공명자 목록</h2>
+            <p className="muted">지정한 공명자 {works.length}명</p>
+            <div
+              className="attribute-tabs"
+              role="group"
+              aria-label="공명자 속성 필터"
+            >
+              {ELEMENTS.map((element) => (
+                <button
+                  key={element}
+                  aria-pressed={selectedElement === element}
+                  onClick={() => setSelectedElement(element)}
+                >
+                  {element}
+                </button>
+              ))}
+            </div>
+            <div
+              className="target-list review-scroll"
+              tabIndex={0}
+              aria-label="공명자 목록 스크롤"
+            >
+              {works
+                .filter((w) => w.state.attribute === selectedElement)
+                .map((w) => {
+                  const result = results.find(
+                    (r) => r.characterId === w.state.characterId,
+                  )
+                  const hasSourceError =
+                    !!w.session.conflict ||
+                    w.session.source.draft.errors.length > 0
+                  const status = result
+                    ? result.errors.length
+                      ? 'error'
+                      : 'passed'
+                    : hasSourceError
+                      ? 'error'
+                      : 'pending'
+                  const label = {
+                    pending: '미검증',
+                    error: '오류',
+                    passed: '통과',
+                  }[status]
+                  return (
+                    <button
+                      key={w.state.characterId}
+                      disabled={busy}
+                      title={`ID ${w.state.characterId}`}
+                      aria-current={
+                        w.state.characterId === activeId ? 'page' : undefined
+                      }
+                      onClick={() => setActiveId(w.state.characterId)}
+                    >
+                      <strong>{w.session.source.target.displayName}</strong>
+                      <span className={`review-status review-status-${status}`}>
+                        {label}
+                      </span>
+                    </button>
+                  )
+                })}
+              {!works.some((w) => w.state.attribute === selectedElement) && (
+                <p className="muted">해당 속성의 공명자가 없습니다.</p>
+              )}
+            </div>
+            {errors.map((e, i) => (
+              <p key={i} className="error">
+                {e}
+              </p>
+            ))}
+          </nav>
           {state && source && active && (
             <section className="review-panel decision-panel">
               <fieldset disabled={blocked}>
-                <p className="eyebrow">AUTO ACTIONS</p>
-                <h2>자동 행동 연결</h2>
+                <p className="eyebrow">MAPPING & SORTING</p>
+                <h2>자동 매핑 및 정렬</h2>
                 <p className="muted">
                   기본 공격 → 일반 교체 공격
                   <br />
@@ -582,6 +656,12 @@ export function ReviewApp() {
                   </label>
                 ))}
               </fieldset>
+              {source.encoreSkillSourceId && (
+                <p className="muted">
+                  회절 남성 방랑자 ({source.encoreSkillSourceId})의 공유 스킬
+                  정보로 보완했습니다.
+                </p>
+              )}
               {source.encoreErrors?.map((e, i) => (
                 <p className="error" key={i}>
                   {humanError(e)}
@@ -589,9 +669,10 @@ export function ReviewApp() {
               ))}
             </section>
           )}
+
           <section className="review-panel export-panel">
             <p className="eyebrow">VALIDATION & FILES</p>
-            <h2>검증·파일 관리</h2>
+            <h2>검증 및 파일 관리</h2>
             <p className="muted">
               검증을 통과한 공명자를 한 파일로 내보냅니다. 편집 내용은 이
               브라우저에 자동 저장됩니다.
@@ -673,73 +754,6 @@ export function ReviewApp() {
               </div>
             )}
           </section>
-          <nav className="review-panel target-panel" aria-label="공명자 목록">
-            <p className="eyebrow">RESONATORS</p>
-            <h2>공명자 목록</h2>
-            <p className="muted">지정한 공명자 {works.length}명</p>
-            <div
-              className="target-list review-scroll"
-              tabIndex={0}
-              aria-label="공명자 목록 스크롤"
-            >
-              {ELEMENTS.map((element) => {
-                const group = works.filter((w) => w.state.attribute === element)
-                if (!group.length) return null
-                return (
-                  <details className="attribute-group" key={element} open>
-                    <summary>
-                      {element} <span>{group.length}</span>
-                    </summary>
-                    {group.map((w) => {
-                      const result = results.find(
-                        (r) => r.characterId === w.state.characterId,
-                      )
-                      const hasSourceError =
-                        !!w.session.conflict ||
-                        w.session.source.draft.errors.length > 0
-                      const status = result
-                        ? result.errors.length
-                          ? 'error'
-                          : 'passed'
-                        : hasSourceError
-                          ? 'error'
-                          : 'pending'
-                      const label = {
-                        pending: '미검증',
-                        error: '오류',
-                        passed: '통과',
-                      }[status]
-                      return (
-                        <button
-                          key={w.state.characterId}
-                          disabled={busy}
-                          title={`ID ${w.state.characterId}`}
-                          aria-current={
-                            w.state.characterId === activeId
-                              ? 'page'
-                              : undefined
-                          }
-                          onClick={() => setActiveId(w.state.characterId)}
-                        >
-                          <strong>{w.session.source.target.displayName}</strong>
-                          <span
-                            className={`review-status review-status-${status}`}
-                          >
-                            {label}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </details>
-                )
-              })}
-            </div>
-            {errors.map((e, i) => (
-              <p key={i} className="error">
-                {e}
-              </p>
-            ))}
-          </nav>
         </aside>
         {state && source && active ? (
           <main className="review-main">

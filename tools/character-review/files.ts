@@ -11,6 +11,10 @@ import {
 import { errorMessage, readInside } from '../../scripts/character-sync/io'
 import type { ReviewDraft, ReviewSource, ReviewTarget } from './model'
 import { matchEncore } from './encore'
+import {
+  resolveSharedSkills,
+  sharedSkillDonor,
+} from '../../scripts/character-sync/shared-skills'
 
 export function assertTarget(
   target: Pick<ReviewTarget, 'runId' | 'characterId'>,
@@ -148,18 +152,33 @@ export async function loadSource(
   const directory = targetDirectory(root, target)
   const raw = await readInside(root, path.join(directory, 'draft.json'))
   const draft = parseDraft(JSON.parse(raw.toString('utf8')), target.characterId)
-  let encore: Pick<
+  const encore: Pick<
     ReviewSource,
-    'encoreMatches' | 'encoreErrors' | 'encoreTooltips'
+    'encoreMatches' | 'encoreErrors' | 'encoreTooltips' | 'encoreSkillSourceId'
   > = {}
   try {
     const savedEncore = await optionalFile(
       root,
       path.join(directory, 'encore.json'),
     )
-    if (savedEncore)
-      encore = matchEncore(JSON.parse(savedEncore.toString('utf8')), draft)
-    else encore.encoreErrors = ['Encore 원본이 없어 자동 배정할 수 없습니다.']
+    if (savedEncore) {
+      let detail: unknown = JSON.parse(savedEncore.toString('utf8'))
+      const donorId = sharedSkillDonor(detail)
+      const shared =
+        donorId &&
+        (await optionalFile(
+          root,
+          path.join(directory, 'encore-shared-skills.json'),
+        ))
+      if (shared) {
+        detail = resolveSharedSkills(
+          detail,
+          JSON.parse(shared.toString('utf8')),
+        )
+        encore.encoreSkillSourceId = donorId
+      }
+      Object.assign(encore, matchEncore(detail, draft))
+    } else encore.encoreErrors = ['Encore 원본이 없어 자동 배정할 수 없습니다.']
   } catch (error) {
     encore.encoreErrors = [`Encore 대조 오류: ${errorMessage(error)}`]
   }

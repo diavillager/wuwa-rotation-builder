@@ -20,6 +20,7 @@ import {
 import type { Sources, WwSnapshot } from './sources'
 import { assetCandidates, type AssetSnapshot } from './assets'
 import { setWorkspaceTargets } from '../../tools/character-review/workspace'
+import { resolveSharedSkills, sharedSkillDonor } from './shared-skills'
 
 export type Mode =
   { all: true } | { character: string } | { characters: string[] }
@@ -127,6 +128,19 @@ export async function runSync(
       await writeJson(path.join(characterDirectory, 'encore.json'), detail)
       basic = parseDetail(detail, id)
       encore = encoreCandidates(detail, id)
+      const donorId = sharedSkillDonor(detail)
+      if (donorId) {
+        const donor = await sources.detail(donorId)
+        resolveSharedSkills(detail, donor)
+        await writeJson(
+          path.join(characterDirectory, 'encore-shared-skills.json'),
+          donor,
+        )
+        encore = mergeCandidates(
+          encore,
+          encoreCandidates(donor, donorId).filter((c) => c.kind === 'skill'),
+        )
+      }
       if (!encore.some((candidate) => candidate.kind === 'skill'))
         errors.push(
           'Encore: 스킬 후보가 비어 있습니다. 초상화는 별도로 수집했습니다.',

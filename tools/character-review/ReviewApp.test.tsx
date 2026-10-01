@@ -541,7 +541,7 @@ it('사이드바 순서와 검증 상태를 표시하고 편집한 공명자만 
     [...document.querySelectorAll('.review-sidebar h2')].map(
       (h) => h.textContent,
     ),
-  ).toEqual(['자동 행동 연결', '검증·파일 관리', '공명자 목록'])
+  ).toEqual(['공명자 목록', '자동 매핑 및 정렬', '검증 및 파일 관리'])
   const statuses = () =>
     [...document.querySelectorAll('.target-list .review-status')].map(
       (s) => s.textContent,
@@ -578,15 +578,26 @@ it('확인된 수집 오류는 검증 버튼을 누르기 전에도 오류로 �
   expect(document.querySelector('.review-status')?.textContent).toBe('통과')
 })
 
-it('속성 그룹을 정해진 순서로 표시하고 열고 닫을 수 있는 목록을 제공한다', async () => {
+it('응결로 시작하며 가로 속성 필터로 목록만 변경하고 검수 편집을 보존한다', async () => {
   saved.state.attribute = '인멸'
   await render()
-  expect(document.querySelector('.attribute-group summary')?.textContent).toBe(
-    '인멸 2',
-  )
   expect(
-    document.querySelector('details.attribute-group')?.hasAttribute('open'),
-  ).toBe(true)
+    [...document.querySelectorAll('.attribute-tabs button')].map(
+      (b) => b.textContent,
+    ),
+  ).toEqual(['응결', '용융', '전도', '기류', '회절', '인멸'])
+  expect(
+    document.querySelector('.attribute-tabs [aria-pressed="true"]')
+      ?.textContent,
+  ).toBe('응결')
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(0)
+  await click('인멸')
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(2)
+  await selectCandidate()
+  await click('응결')
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(0)
+  await click('인멸')
+  expect(decision('등록').checked).toBe(true)
 })
 it('검수 내용을 자동 저장하고 실패 시 편집을 보존한 채 재시도한다', async () => {
   vi.useFakeTimers()

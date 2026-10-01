@@ -181,20 +181,29 @@ p {
 .target-list {
   max-height: 420px;
 }
-.attribute-group + .attribute-group {
+.attribute-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   margin-top: 14px;
+  border: 1px solid #40575d;
+  border-radius: 8px;
+  overflow: hidden;
 }
-.attribute-group summary {
-  padding: 8px 0;
-  color: #c1dfd5;
-  font-weight: 600;
-  cursor: pointer;
-}
-.attribute-group summary span {
-  color: #91aaa4;
+.attribute-tabs button {
+  border: 0;
+  border-radius: 0;
+  padding: 10px 0;
   font-size: 12px;
-  margin-left: 6px;
+  background: #17282d;
 }
+.attribute-tabs button + button {
+  border-left: 1px solid #40575d;
+}
+.attribute-tabs button[aria-pressed='true'] {
+  background: #385e54;
+  color: #c5f6e5;
+}
+
 .storage-status {
   color: #a9d4c7;
   font-size: 12px;

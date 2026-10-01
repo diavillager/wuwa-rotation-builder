@@ -24,6 +24,7 @@ import type { Sources } from './sources'
 import { main } from './cli'
 import type { CharacterData } from '../../src/data/characters/contract'
 import { assetCandidates, ASSET_ROOT } from './assets'
+import { ReviewRepository } from '../../tools/character-review/repository'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -239,6 +240,65 @@ describe('실제 이미지 검증', () => {
   })
 })
 describe('등록 판정과 보존', () => {
+  it('1502의 공유 스킬 원본·초상화·출처·툴팁을 수집하고 백업 Import까지 보존한다', async () => {
+    const root = await temp()
+    const sources = await sourceFixture()
+    sources.list = async () => ({
+      roleList: [
+        { ...listing.roleList[0], Id: 1502, Element: { Name: '회절' } },
+      ],
+    })
+    sources.detail = async (id) => ({
+      ...detail(id),
+      SkillId: 1501,
+      SkillTreeGroupId: 1501,
+      ElementName: '회절',
+      RoleHeadIconLarge: `/Game/Portrait/${id}.webp`,
+      Skills:
+        id === '1502'
+          ? []
+          : [
+              {
+                ...detail().Skills[0],
+                SkillType: '기본 공격',
+                SkillDescribe: '공유 설명',
+              },
+            ],
+    })
+    sources.ww = async () => ({
+      ref: 'a'.repeat(40),
+      data: { ...ww, roles: [{ Id: 1502, SkillId: 55 }] },
+    })
+    const result = await runSync(root, sources, { character: '1502' })
+    if (result.plan) throw new Error('잘못된 결과')
+    expect(result.report.errors).toEqual([])
+    const repository = new ReviewRepository(root)
+    const session = await repository.load({
+      runId: result.report.runId,
+      characterId: '1502',
+    })
+    expect(session.source.encoreSkillSourceId).toBe('1501')
+    expect(session.source.encoreTooltips?.[0].description).toBe('공유 설명')
+    expect(
+      session.source.draft.candidates
+        .filter((c) => c.kind === 'portrait')
+        .map((c) => c.resourcePath),
+    ).toEqual(['/Game/Portrait/1502.webp'])
+    expect(
+      session.source.draft.candidates.some((c) =>
+        c.sources.some((s) => s.document.endsWith('/1501')),
+      ),
+    ).toBe(true)
+    const restored = await new ReviewRepository(root).importFile({
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [await repository.backupCharacter(session.state)],
+    })
+    expect(restored[0].source.encoreSkillSourceId).toBe('1501')
+    expect(restored[0].source.encoreTooltips).toEqual(
+      session.source.encoreTooltips,
+    )
+  })
   it('Encore 스킬 목록이 비어 있어도 초상화를 수집하고 부분 수집으로 보고한다', async () => {
     const root = await temp()
     const sources = await sourceFixture()

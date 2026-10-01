@@ -69,7 +69,15 @@ export async function parseSnapshot(value: unknown): Promise<LoadedSnapshot> {
     )
       throw new Error('복원 자료의 Encore 대응이 유효하지 않습니다.')
   }
+  if (
+    raw.encoreSkillSourceId !== undefined &&
+    (target.characterId !== '1502' || raw.encoreSkillSourceId !== '1501')
+  )
+    throw new Error('지원하지 않는 공유 스킬 출처입니다.')
   const source: ReviewSource = {
+    ...(raw.encoreSkillSourceId
+      ? { encoreSkillSourceId: raw.encoreSkillSourceId as string }
+      : {}),
     ...(raw.encoreTooltips !== undefined
       ? { encoreTooltips: parseTooltips(raw.encoreTooltips) }
       : {}),
