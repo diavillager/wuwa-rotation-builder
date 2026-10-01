@@ -148,7 +148,10 @@ export async function loadSource(
   const directory = targetDirectory(root, target)
   const raw = await readInside(root, path.join(directory, 'draft.json'))
   const draft = parseDraft(JSON.parse(raw.toString('utf8')), target.characterId)
-  let encore: Pick<ReviewSource, 'encoreMatches' | 'encoreErrors'> = {}
+  let encore: Pick<
+    ReviewSource,
+    'encoreMatches' | 'encoreErrors' | 'encoreTooltips'
+  > = {}
   try {
     const savedEncore = await optionalFile(
       root,

@@ -5,6 +5,7 @@ import {
 } from '../../scripts/character-sync/candidates'
 import { isSkillCategory } from '../../src/data/characters/categories'
 import type { ReviewDraft, ReviewSource } from './model'
+import { extractTooltips } from './tooltips'
 
 /** 원본에 명시된 의미와 정확한 자산 경로만 대응한다. 모호한 의미는 배정하지 않는다. */
 export function matchEncore(value: unknown, draft: ReviewDraft) {
@@ -51,5 +52,9 @@ export function matchEncore(value: unknown, draft: ReviewDraft) {
       skillId: String(s.SkillId),
     }
   }
-  return { encoreMatches: matches, encoreErrors: errors }
+  return {
+    encoreMatches: matches,
+    encoreErrors: errors,
+    encoreTooltips: extractTooltips(value),
+  }
 }

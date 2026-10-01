@@ -4,6 +4,7 @@ import { validateCharacterData } from '../../src/data/characters/contract'
 import { isSkillCategory } from '../../src/data/characters/categories'
 import { assertTarget, parseDraft } from './files'
 import type { ReviewSource } from './model'
+import { parseTooltips } from './tooltips'
 
 export interface SnapshotImage {
   key: string
@@ -69,6 +70,9 @@ export async function parseSnapshot(value: unknown): Promise<LoadedSnapshot> {
       throw new Error('복원 자료의 Encore 대응이 유효하지 않습니다.')
   }
   const source: ReviewSource = {
+    ...(raw.encoreTooltips !== undefined
+      ? { encoreTooltips: parseTooltips(raw.encoreTooltips) }
+      : {}),
     target: {
       runId: target.runId,
       characterId: target.characterId,

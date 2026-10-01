@@ -13,6 +13,7 @@ import {
   type AssignmentReceipt,
 } from './editing'
 import {
+  TOOLTIP_CATEGORIES,
   AUTO_KINDS,
   AUTO_LABELS,
   reviewCards,
@@ -882,6 +883,40 @@ export function ReviewApp() {
                 {humanError(e)}
               </p>
             ))}
+            <section
+              className="review-panel tooltip-panel"
+              aria-labelledby="skill-tooltip-heading"
+              key={state.characterId}
+            >
+              <p className="eyebrow">SKILL TOOLTIPS</p>
+              <h2 id="skill-tooltip-heading">스킬 툴팁</h2>
+              <p className="muted">
+                {source.target.displayName} · Encore 스킬 설명
+              </p>
+              {TOOLTIP_CATEGORIES.map((category) => {
+                const tooltips =
+                  source.encoreTooltips?.filter(
+                    (entry) => entry.category === category,
+                  ) ?? []
+                return (
+                  <details key={category}>
+                    <summary>{category}</summary>
+                    {tooltips.length ? (
+                      tooltips.map((tooltip, index) => (
+                        <div key={`${tooltip.skillId}-${index}`}>
+                          <h3>{tooltip.displayName}</h3>
+                          <p className="skill-tooltip-text">
+                            {tooltip.description}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">Encore 원본 설명이 없습니다.</p>
+                    )}
+                  </details>
+                )
+              })}
+            </section>
           </main>
         ) : (
           <main className="review-panel review-welcome">

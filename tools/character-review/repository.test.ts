@@ -148,6 +148,47 @@ function complete(
   return next
 }
 describe('검수 검증과 JSON 전달', () => {
+  it('Encore 설명은 백업으로 보존하고 설명 없는 이전 백업도 불러온다', async () => {
+    const f = await fixture()
+    await writeFile(
+      path.join(
+        f.root,
+        '.character-sync/runs',
+        target.runId,
+        target.characterId,
+        'encore.json',
+      ),
+      JSON.stringify({
+        Id: target.characterId,
+        Skills: [
+          {
+            SkillId: 1,
+            SkillType: '기본 공격',
+            SkillName: '기본 공격 이름',
+            SkillDescribe: '본문<br>다음 줄',
+            SkillAttributes: [{ values: ['999%'] }],
+          },
+        ],
+      }),
+    )
+    const session = await f.repository.load(target)
+    expect(session.source.encoreTooltips?.[0].description).toBe('본문\n다음 줄')
+    const backup = await f.repository.backupCharacter(session.state)
+    const restored = new ReviewRepository(f.root)
+    const file = {
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [backup],
+    }
+    expect((await restored.importFile(file))[0].source.encoreTooltips).toEqual(
+      session.source.encoreTooltips,
+    )
+    expect(JSON.stringify(backup)).not.toContain('999%')
+    delete backup.workspace.source.encoreTooltips
+    expect(
+      (await restored.importFile(file))[0].source.encoreTooltips,
+    ).toBeUndefined()
+  })
   it('미완성 백업은 수집 폴더 없는 저장소에서도 목록·타수·순서·이미지를 복원한다', async () => {
     const f = await fixture()
     const state = (await f.repository.load(target)).state

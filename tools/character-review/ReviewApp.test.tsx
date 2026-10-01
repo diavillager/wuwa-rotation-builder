@@ -175,6 +175,41 @@ async function selectCandidate() {
   await act(async () => decision('등록').click())
 }
 
+it('스킬 툴팁을 검토 화면 맨 아래에서 자동 배정 없이 안전한 텍스트로 읽는다', async () => {
+  saved.source.encoreTooltips = [
+    {
+      category: '기본 공격',
+      skillId: '123',
+      displayName: '실제 공격',
+      description: '강공격 설명\n<img src=x onerror=alert(1)>',
+    },
+  ]
+  await render()
+  const panel = document.querySelector('.tooltip-panel')!
+  expect(document.querySelector('.review-main')!.lastElementChild).toBe(panel)
+  expect(
+    [...panel.querySelectorAll('summary')].map((item) => item.textContent),
+  ).toEqual([
+    '기본 공격',
+    '공명 스킬',
+    '공명 해방',
+    '공명 회로',
+    '변주 스킬',
+    '반주 스킬',
+  ])
+  expect(panel.textContent).toContain('강공격 설명')
+  expect(panel.querySelector('img')).toBeNull()
+  expect(panel.textContent).toContain('Encore 원본 설명이 없습니다.')
+  await act(async () =>
+    document
+      .querySelectorAll<HTMLButtonElement>('.target-list button')[1]
+      .click(),
+  )
+  expect(document.querySelector('.tooltip-panel')!.textContent).toContain(
+    '다음 공명자 · Encore 스킬 설명',
+  )
+})
+
 it('지정 공명자만 표시하고 실행 이력·저장·최종 반영·분리 필드·화살표 버튼이 없다', async () => {
   await render()
   expect(document.querySelectorAll('.target-list button')).toHaveLength(2)

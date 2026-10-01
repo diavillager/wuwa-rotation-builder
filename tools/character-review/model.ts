@@ -2,6 +2,21 @@ import type { CharacterData } from '../../src/data/characters/contract'
 import type { Element } from '../../src/app/catalog'
 import type { DownloadedCandidate } from '../../scripts/character-sync/run'
 import type { SkillCategory } from '../../src/data/characters/categories'
+export const TOOLTIP_CATEGORIES = [
+  '기본 공격',
+  '공명 스킬',
+  '공명 해방',
+  '공명 회로',
+  '변주 스킬',
+  '반주 스킬',
+] as const
+
+export interface SkillTooltip {
+  category: (typeof TOOLTIP_CATEGORIES)[number]
+  skillId: string
+  displayName: string
+  description: string
+}
 
 export interface ReviewTarget {
   runId: string
@@ -16,6 +31,7 @@ export interface ReviewDraft {
   errors: string[]
 }
 export interface ReviewSource {
+  encoreTooltips?: SkillTooltip[]
   encoreMatches?: Record<
     string,
     { category: SkillCategory; displayName: string; skillId: string }

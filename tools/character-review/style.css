@@ -124,6 +124,23 @@ p {
 .review-main {
   min-width: 0;
 }
+.tooltip-panel {
+  margin-top: 18px;
+}
+.tooltip-panel details {
+  padding: 14px 0;
+  border-top: 1px solid #33464e;
+}
+.tooltip-panel h3 {
+  margin: 16px 0 10px;
+  color: #b5dfd3;
+}
+.skill-tooltip-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  color: #d2e0e4;
+}
 .target-run {
   border-top: 1px solid #34464e;
   margin-top: 18px;
