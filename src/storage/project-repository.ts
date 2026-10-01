@@ -4,6 +4,11 @@ export interface ProjectRepository {
   list(): Promise<RotationProject[]>
   put(project: RotationProject): Promise<void>
   delete(id: string): Promise<void>
+  deleteAndSelect(
+    id: string,
+    selectedId: string,
+    replacement?: RotationProject,
+  ): Promise<void>
   selectedId(): Promise<string | null>
   select(id: string | null): Promise<void>
 }
@@ -108,6 +113,51 @@ export class IndexedDbProjectRepository implements ProjectRepository {
     await this.transaction('readwrite', (store) => store.delete(id))
   }
 
+  /** 삭제·마지막 항목의 대체 생성·선택 기록은 모두 성공하거나 모두 취소된다. */
+  async deleteAndSelect(
+    id: string,
+    selectedId: string,
+    replacement?: RotationProject,
+  ): Promise<void> {
+    const snapshot = replacement
+      ? structuredClone(validateProject(replacement))
+      : undefined
+    const database = await this.open()
+    return new Promise((resolve, reject) => {
+      let transaction: IDBTransaction
+      try {
+        transaction = database.transaction(
+          ['projects', 'metadata'],
+          'readwrite',
+        )
+      } catch (error) {
+        database.close()
+        reject(error)
+        return
+      }
+      transaction.oncomplete = () => {
+        database.close()
+        resolve()
+      }
+      transaction.onabort = () => {
+        database.close()
+        reject(
+          transaction.error ??
+            new Error('프로젝트 삭제와 전환이 취소되었습니다.'),
+        )
+      }
+      try {
+        const projects = transaction.objectStore('projects')
+        projects.delete(id)
+        if (snapshot) projects.put(snapshot)
+        transaction.objectStore('metadata').put(selectedId, 'selectedId')
+      } catch (error) {
+        transaction.abort()
+        reject(error)
+      }
+    })
+  }
+
   async selectedId(): Promise<string | null> {
     const id: unknown = await this.transaction(
       'readonly',
@@ -136,6 +186,15 @@ export class ProjectWriteQueue {
   }
   delete(id: string): Promise<void> {
     return this.enqueue(() => this.repository.delete(id))
+  }
+  deleteAndSelect(
+    id: string,
+    selectedId: string,
+    replacement?: RotationProject,
+  ): Promise<void> {
+    return this.enqueue(() =>
+      this.repository.deleteAndSelect(id, selectedId, replacement),
+    )
   }
   private enqueue(command: () => Promise<void>): Promise<void> {
     const next = this.tail.then(command)

@@ -105,7 +105,7 @@ async function select(id: string) {
 }
 
 describe('프로젝트 관리 화면', () => {
-  it('선택창을 열면 사이클 입력을 차단하고 Escape와 외부 클릭으로 닫는다', async () => {
+  it('선택창을 열어도 편집 필드를 유지하고 Escape와 외부 클릭으로만 닫는다', async () => {
     await render()
     await click('새 프로젝트')
     await waitFor(() =>
@@ -123,7 +123,13 @@ describe('프로젝트 관리 화면', () => {
         new KeyboardEvent('keyup', { code: 'KeyE', bubbles: true }),
       )
     })
-    expect(document.querySelectorAll('.input-card')).toHaveLength(0)
+    expect(document.querySelectorAll('.input-card')).toHaveLength(1)
+    expect(
+      document
+        .querySelector('.party-panel')!
+        .parentElement!.hasAttribute('inert'),
+    ).toBe(false)
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
     expect(
       document
         .querySelector('.project-create')
@@ -165,7 +171,6 @@ describe('프로젝트 관리 화면', () => {
         .closest('.header-project'),
     ).not.toBeNull()
     await openPicker()
-    await openPicker()
     await act(async () => {
       const input = document.querySelector<HTMLInputElement>(
         '[aria-label="프로젝트 이름"]',
@@ -192,7 +197,7 @@ describe('프로젝트 관리 화면', () => {
   })
   it('빈 목록에서 명시적으로 생성하고 자동저장 후 Undo를 유지하며 다시 열면 초기화한다', async () => {
     await render()
-    expect(document.querySelector('.party-panel')).toBeNull()
+    expect(document.querySelector('.party-panel')).not.toBeNull()
     await click('새 프로젝트')
     await waitFor(() =>
       expect(document.querySelector('.party-panel')).not.toBeNull(),
@@ -239,7 +244,7 @@ describe('프로젝트 관리 화면', () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
   })
-  it('복제·이름 변경을 저장하고 삭제 취소·확정과 마지막 삭제 후 빈 목록을 처리한다', async () => {
+  it('수정·복제·삭제 후 선택창을 유지하며 이전 프로젝트와 마지막 삭제의 새 프로젝트를 선택한다', async () => {
     await render()
     await click('새 프로젝트')
     await waitFor(() =>
@@ -252,6 +257,12 @@ describe('프로젝트 관리 화면', () => {
         document.querySelector('.project-trigger')?.getAttribute('title'),
       ).toBe('새 로테이션 1 - 복제본'),
     )
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
+    expect(
+      document
+        .querySelector('.project-dropdown-list [aria-pressed="true"]')
+        ?.getAttribute('title'),
+    ).toBe('새 로테이션 1 - 복제본')
     expect(document.querySelectorAll('.input-card')).toHaveLength(1)
     const generationUndo = document.querySelector<HTMLButtonElement>(
       '[aria-label="개막 사이클 실행 취소"]',
@@ -274,6 +285,7 @@ describe('프로젝트 관리 화면', () => {
         document.querySelector('.project-trigger')?.getAttribute('title'),
       ).toBe('이름 수정'),
     )
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
     await click('삭제')
     expect(
       document.querySelector('#project-delete-description')?.textContent,
@@ -288,24 +300,34 @@ describe('프로젝트 관리 화면', () => {
     expect(await repo.list()).toHaveLength(2)
     await click('삭제')
     await act(async () =>
+      document
+        .querySelector('.confirm-submit')!
+        .dispatchEvent(new Event('pointerdown', { bubbles: true })),
+    )
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
+    await act(async () =>
       document.querySelector<HTMLButtonElement>('.confirm-submit')!.click(),
     )
     await waitFor(() =>
-      expect(document.querySelector('.party-panel')).toBeNull(),
+      expect(document.querySelector('[role="dialog"]')).toBeNull(),
     )
     const remaining = (await repo.list())[0]
-    await select(remaining.id)
-    await waitFor(() =>
-      expect(document.querySelector('.party-panel')).not.toBeNull(),
-    )
+    expect(button('프로젝트 선택').dataset.projectId).toBe(remaining.id)
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
     await click('삭제')
     await act(async () =>
       document.querySelector<HTMLButtonElement>('.confirm-submit')!.click(),
     )
     await waitFor(() =>
-      expect(document.querySelector('.party-panel')).toBeNull(),
+      expect(document.querySelector('[role="dialog"]')).toBeNull(),
     )
-    expect(await repo.list()).toEqual([])
+    const projects = await repo.list()
+    expect(projects).toHaveLength(1)
+    expect(projects[0].id).not.toBe(remaining.id)
+    expect(projects[0].rotation.opening.columns).toEqual([])
+    expect(button('프로젝트 선택').dataset.projectId).toBe(projects[0].id)
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
+    expect(document.querySelector('.party-panel')).not.toBeNull()
   })
   it('마지막 프로젝트를 다시 마운트해 복원하되 Undo/Redo를 저장하지 않는다', async () => {
     await render()

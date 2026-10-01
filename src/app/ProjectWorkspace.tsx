@@ -3,6 +3,7 @@ import { App } from './App'
 import { emptyCatalog, type CharacterCatalog } from './catalog'
 import { createInputDemoRotation, demoCatalog } from './demo'
 import { ProjectStore } from './project-store'
+import { createRotation } from '../domain/rotation'
 import {
   IndexedDbProjectRepository,
   type ProjectRepository,
@@ -31,6 +32,9 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
   )
   const state = useSyncExternalStore(store.subscribe, store.snapshot)
   const [name, setName] = useState('')
+  const [emptyRotation] = useState(() =>
+    createRotation(['slot-one', 'slot-two', 'slot-three']),
+  )
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const headerRef = useRef<HTMLDivElement>(null)
@@ -47,16 +51,13 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
   useEffect(() => {
     if (!pickerOpen) return
     const outside = (event: PointerEvent) => {
+      if (confirmDelete) return
       if (!headerRef.current?.contains(event.target as Node))
         setPickerOpen(false)
     }
     document.addEventListener('pointerdown', outside)
     return () => document.removeEventListener('pointerdown', outside)
-  }, [pickerOpen])
-  const manage = async (operation: () => Promise<unknown>) => {
-    await operation()
-    if (!store.snapshot().error) setPickerOpen(false)
-  }
+  }, [pickerOpen, confirmDelete])
   const disabled = state.loading || state.busy || confirmDelete
   const saveLabel = state.loading
     ? '불러오는 중…'
@@ -135,7 +136,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
               <button
                 type="button"
                 disabled={disabled || !state.current}
-                onClick={() => void manage(() => store.duplicate())}
+                onClick={() => void store.duplicate()}
               >
                 복제
               </button>
@@ -157,7 +158,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
                 aria-pressed={currentId === project.id}
                 title={project.name}
                 disabled={disabled || (!!state.error && !state.current)}
-                onClick={() => void manage(() => store.open(project.id))}
+                onClick={() => void store.open(project.id)}
               >
                 <span aria-hidden="true">
                   {currentId === project.id ? '✓' : ''}
@@ -171,7 +172,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
             className="project-create"
             type="button"
             disabled={disabled || (!!state.error && !state.current)}
-            onClick={() => void manage(() => store.create())}
+            onClick={() => void store.create()}
           >
             새 프로젝트
           </button>
@@ -256,29 +257,16 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
       )}
     </>
   )
-  if (state.current && !state.loading)
-    return (
-      <App
-        key={state.generation}
-        initialRotation={state.current.rotation}
-        catalogOverride={activeCatalog}
-        references={state.current.references}
-        headerControls={headerControls}
-        projectControls={notices}
-        onRotationChange={store.updateRotation}
-        locked={state.busy || confirmDelete || pickerOpen}
-      />
-    )
   return (
-    <main className="app-shell">
-      <header className="page-heading">
-        <div>
-          <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
-          <h1>WUWA Rotation Builder</h1>
-        </div>
-        {headerControls}
-      </header>
-      {notices}
-    </main>
+    <App
+      key={state.generation}
+      initialRotation={state.current?.rotation ?? emptyRotation}
+      catalogOverride={activeCatalog}
+      references={state.current?.references}
+      headerControls={headerControls}
+      projectControls={notices}
+      onRotationChange={store.updateRotation}
+      locked={state.loading || !state.current || state.busy || confirmDelete}
+    />
   )
 }

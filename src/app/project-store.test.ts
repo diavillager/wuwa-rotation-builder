@@ -16,6 +16,12 @@ function memoryRepository(): ProjectRepository {
     delete: async (id) => {
       projects.delete(id)
     },
+    deleteAndSelect: async (id, selectedId, replacement) => {
+      projects.delete(id)
+      if (replacement)
+        projects.set(replacement.id, structuredClone(replacement))
+      selected = selectedId
+    },
     selectedId: async () => selected,
     select: async (id) => {
       selected = id
@@ -179,20 +185,59 @@ describe('프로젝트 자동저장과 관리', () => {
     )
     store.dispose()
   })
-  it('마지막 프로젝트 삭제 후 자동 생성하지 않고 다음 시작에서도 빈 목록을 유지한다', async () => {
+  it('마지막 프로젝트 삭제 후 독립 새 프로젝트를 생성하고 다음 시작에서 복원한다', async () => {
     const { store, repo } = setup()
     await store.initialize()
     await store.create()
+    const deletedId = store.snapshot().current!.id
+    store.updateRotation(input(store.snapshot().current!.rotation))
     await store.deleteCurrent()
-    expect(store.snapshot().current).toBeNull()
-    expect(await repo.list()).toEqual([])
-    expect(await repo.selectedId()).toBeNull()
+    const replacement = store.snapshot().current!
+    expect(replacement.id).not.toBe(deletedId)
+    expect(replacement.rotation.opening.columns).toEqual([])
+    expect(await repo.list()).toEqual([replacement])
+    expect(await repo.selectedId()).toBe(replacement.id)
     const next = setup(repo).store
     await next.initialize()
-    expect(next.snapshot().projects).toEqual([])
-    expect(next.snapshot().current).toBeNull()
+    expect(next.snapshot().projects).toEqual([replacement])
+    expect(next.snapshot().current).toEqual(replacement)
     store.dispose()
     next.dispose()
+  })
+  it('중간 항목 삭제는 바로 위를 선택하고 첫 항목 삭제는 바로 아래를 선택한다', async () => {
+    const { store, repo } = setup()
+    await store.initialize()
+    await store.create()
+    const first = store.snapshot().current!
+    await store.create()
+    const second = store.snapshot().current!
+    await store.create()
+    const third = store.snapshot().current!
+    await store.open(second.id)
+    await store.deleteCurrent()
+    expect(store.snapshot().current!.id).toBe(first.id)
+    expect(await repo.selectedId()).toBe(first.id)
+    expect(store.snapshot().projects.map((p) => p.id)).toEqual([
+      first.id,
+      third.id,
+    ])
+    await store.deleteCurrent()
+    expect(store.snapshot().current!.id).toBe(third.id)
+    expect(await repo.selectedId()).toBe(third.id)
+    store.dispose()
+  })
+  it('삭제와 대체 생성의 실패는 현재 내용과 선택을 보존한다', async () => {
+    const { store, repo } = setup()
+    await store.initialize()
+    await store.create()
+    const current = store.snapshot().current!
+    vi.spyOn(repo, 'deleteAndSelect').mockRejectedValue(new Error('삭제 실패'))
+    await store.deleteCurrent()
+    expect(store.snapshot().current).toBe(current)
+    expect(store.snapshot().error).toBe('삭제 실패')
+    expect(await repo.list()).toEqual([current])
+    expect(await repo.selectedId()).toBe(current.id)
+    store.dispose()
   })
   it('읽기 실패 시 새 데이터로 덮어쓰지 않고 재시도로 복구한다', async () => {
     const repo = memoryRepository()

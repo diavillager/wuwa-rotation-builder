@@ -181,16 +181,19 @@ export class ProjectStore {
     })
   create = async () =>
     this.perform(async () => {
-      const rotation = this.initialRotation()
-      const project = createProject(
-        this.id(),
-        nextProjectName(this.state.projects),
-        this.now(),
-        rotation,
-        captureReferences(rotation, this.catalog),
-      )
+      const project = this.newProject(this.state.projects)
       await this.addAndOpen(project)
     })
+  private newProject(projects: RotationProject[]) {
+    const rotation = this.initialRotation()
+    return createProject(
+      this.id(),
+      nextProjectName(projects),
+      this.now(),
+      rotation,
+      captureReferences(rotation, this.catalog),
+    )
+  }
   duplicate = async () =>
     this.perform(async () => {
       const current = this.state.current
@@ -247,18 +250,25 @@ export class ProjectStore {
     this.perform(async () => {
       const current = this.state.current
       if (!current) return
-      await this.writes.delete(current.id)
-      this.saved = null
+      const index = this.state.projects.findIndex(
+        (project) => project.id === current.id,
+      )
+      const remaining = this.state.projects.filter(
+        (project) => project.id !== current.id,
+      )
+      const replacement = remaining.length
+        ? undefined
+        : this.newProject(remaining)
+      const next = replacement ?? remaining[Math.max(0, index - 1)]
+      await this.writes.deleteAndSelect(current.id, next.id, replacement)
+      this.saved = next
       this.publish({
-        current: null,
-        projects: this.state.projects.filter(
-          (project) => project.id !== current.id,
-        ),
+        current: next,
+        projects: replacement ? [replacement] : remaining,
         generation: this.state.generation + 1,
         status: 'saved',
         error: '',
       })
-      await this.repository.select(null)
     })
   dispose() {
     this.cancelTimer()

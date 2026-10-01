@@ -1,4 +1,4 @@
-import { IDBFactory } from 'fake-indexeddb'
+import { IDBFactory, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createProject } from '../domain/project'
 import { createDemoRotation } from '../app/demo'
@@ -12,6 +12,32 @@ import {
 const project = () =>
   createProject('id', '저장 테스트', '2026-10-01T03:00:00.000Z')
 describe('IndexedDB 프로젝트 Repository', () => {
+  it('삭제·대체 저장·선택 변경을 하나의 transaction으로 처리하고 실패 시 되돌린다', async () => {
+    const repo = new IndexedDbProjectRepository(
+      'atomic-delete',
+      new IDBFactory(),
+    )
+    const original = project()
+    const replacement = { ...original, id: 'replacement', name: '새 프로젝트' }
+    await repo.put(original)
+    await repo.select(original.id)
+    const actualPut = IDBObjectStore.prototype.put
+    const put = vi
+      .spyOn(IDBObjectStore.prototype, 'put')
+      .mockImplementation(function (this: IDBObjectStore, value, key) {
+        if (this.name === 'metadata') throw new Error('선택 기록 실패')
+        return actualPut.call(this, value, key)
+      })
+    await expect(
+      repo.deleteAndSelect(original.id, replacement.id, replacement),
+    ).rejects.toThrow('선택 기록 실패')
+    put.mockRestore()
+    expect(await repo.list()).toEqual([original])
+    expect(await repo.selectedId()).toBe(original.id)
+    await repo.deleteAndSelect(original.id, replacement.id, replacement)
+    expect(await repo.list()).toEqual([replacement])
+    expect(await repo.selectedId()).toBe(replacement.id)
+  })
   it('파티 순서·Shared Timeline·교체·stage와 삭제된 자동 행동 suppression을 그대로 복원한다', async () => {
     let rotation = createDemoRotation()
     const auto = rotation.opening.columns.find(
@@ -89,6 +115,7 @@ describe('IndexedDB 프로젝트 Repository', () => {
       list: async () => [],
       selectedId: async () => null,
       select: async () => {},
+      deleteAndSelect: async () => {},
       put: vi.fn(async (value) => {
         seen.push(value.name)
         if (value.name === '첫 저장')

@@ -353,23 +353,25 @@ button {
 }
 .page-heading {
   gap: 20px;
+  align-items: flex-end;
 }
 .page-heading h1 {
   white-space: nowrap;
 }
 .header-project {
   position: relative;
-  flex: 0 0 420px;
-  width: 420px;
+  flex: 0 0 476px;
+  width: 476px;
   display: grid;
-  grid-template-columns: 70px minmax(0, 1fr);
+  grid-template-columns: 88px 380px;
   gap: 8px;
   align-items: center;
 }
 .header-project .project-save-state {
-  font-size: 11px;
+  font-size: 14px;
   color: #8fc9b8;
   white-space: nowrap;
+  text-align: right;
 }
 .header-project button,
 .header-project input {
