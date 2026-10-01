@@ -366,7 +366,7 @@ button {
 }
 .header-project-name {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 42px;
+  grid-template-columns: minmax(0, 1fr) 42px 119px;
   gap: 5px;
   align-items: center;
   margin: 0;
@@ -379,11 +379,23 @@ button {
   font-size: 11px;
   color: #a6b6bd;
 }
+.header-project-name-field {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 26px;
+  padding-left: 7px;
+  border: 1px solid #42525b;
+  border-radius: 6px;
+  background: #202c34;
+}
 .header-project .project-save-state {
   font-size: 10px;
   color: #8fc9b8;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: right;
+  white-space: nowrap;
 }
 .header-project-actions {
   display: grid;
@@ -406,6 +418,11 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.header-project .header-project-name-field input {
+  border: 0;
+  height: 24px;
+  background: transparent;
 }
 .header-project button {
   padding-inline: 4px;

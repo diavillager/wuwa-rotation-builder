@@ -62,27 +62,27 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
           void store.rename(name)
         }}
       >
-        <label htmlFor="header-project-name">
-          선택된 프로젝트 :
-          <span className="project-save-state" role="status" aria-live="polite">
-            {saveLabel}
-          </span>
-        </label>
-        <input
-          id="header-project-name"
-          aria-label="프로젝트 이름"
-          value={name}
-          title={currentName}
-          disabled={disabled || !state.current}
-          placeholder="프로젝트 미선택"
-          onChange={(event) => setName(event.target.value)}
-        />
+        <div className="header-project-name-field">
+          <label htmlFor="header-project-name">선택된 프로젝트 :</label>
+          <input
+            id="header-project-name"
+            aria-label="프로젝트 이름"
+            value={name}
+            title={currentName}
+            disabled={disabled || !state.current}
+            placeholder="프로젝트 미선택"
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
         <button
           aria-label="이름 변경"
           disabled={disabled || !state.current || name.trim() === currentName}
         >
           수정
         </button>
+        <span className="project-save-state" role="status" aria-live="polite">
+          {saveLabel}
+        </span>
       </form>
       <div className="header-project-actions">
         <select
