@@ -62,6 +62,89 @@ async function dragDrop(source: Element, target: Element) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it.each(['opening', 'repeat'])(
+    '%s의 InputBlock 드래그는 같은 소유 라인의 가장자리에서만 스크롤하고 drop 시 중단한다',
+    async (cycleId) => {
+      await hover(emptyLine('demo-a', cycleId))
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+      const card = grid(cycleId).querySelector('.input-card')!
+      const scroll = grid(cycleId).closest<HTMLElement>('.timeline-scroll')!
+      const otherId = cycleId === 'opening' ? 'repeat' : 'opening'
+      const other = grid(otherId).closest<HTMLElement>('.timeline-scroll')!
+      Object.defineProperties(scroll, {
+        clientWidth: { configurable: true, value: 500 },
+        clientHeight: { configurable: true, value: 216 },
+        scrollWidth: { configurable: true, value: 1400 },
+      })
+      vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue({
+        left: 100,
+        top: 100,
+      } as DOMRect)
+      vi.spyOn(
+        scroll.querySelector('.line-label')!,
+        'getBoundingClientRect',
+      ).mockReturnValue({ right: 260 } as DOMRect)
+      scroll.scrollLeft = 30
+      other.scrollLeft = 42
+      let pending: FrameRequestCallback | null = null
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation(
+        (callback) => {
+          pending = callback
+          return 1
+        },
+      )
+      vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {
+        pending = null
+      })
+      await act(async () => {
+        const event = new Event('dragstart', { bubbles: true })
+        Object.defineProperty(event, 'dataTransfer', {
+          value: { effectAllowed: '' },
+        })
+        card.dispatchEvent(event)
+      })
+      const over = async (target: Element, x = 599) => {
+        await act(async () =>
+          target.dispatchEvent(
+            new MouseEvent('dragover', {
+              clientX: x,
+              clientY: 150,
+              bubbles: true,
+              cancelable: true,
+            }),
+          ),
+        )
+      }
+      await over(emptyLine('demo-a', otherId))
+      expect(pending).toBeNull()
+      await over(emptyLine('demo-b', cycleId))
+      expect(pending).toBeNull()
+      await over(grid(cycleId).querySelector('.line-label')!)
+      expect(pending).toBeNull()
+      await over(emptyLine('demo-a', cycleId))
+      expect(pending).not.toBeNull()
+      const callback = pending as FrameRequestCallback | null
+      callback?.(16)
+      expect(scroll.scrollLeft).toBeGreaterThan(30)
+      expect(other.scrollLeft).toBe(42)
+      expect(grid(cycleId).querySelectorAll('.input-card')).toHaveLength(1)
+      expect(grid(cycleId).querySelectorAll('.auto-card')).toHaveLength(0)
+      await act(async () =>
+        emptyLine('demo-a', cycleId).dispatchEvent(
+          new Event('drop', { bubbles: true, cancelable: true }),
+        ),
+      )
+      expect(pending).toBeNull()
+      expect(grid(cycleId).querySelector('.input-card')).toBe(card)
+      expect(
+        grid(cycleId)
+          .querySelector('.active-line')
+          ?.getAttribute('data-row-owner'),
+      ).toBe('demo-a')
+    },
+  )
+
   it('교체 앞 입력 전체 삭제 후 뒤쪽 입력을 첫 셀로 드래그하면 교체 공격과 연결된다', async () => {
     await hover(emptyLine())
     await key('keydown', 'KeyE')

@@ -40,6 +40,7 @@ import {
 import { TimelineWires } from './TimelineWires'
 import { attachCaptureEvents } from './input-events'
 import { applyCapturedInput } from './input-command'
+import { attachDragScroll } from './drag-scroll'
 
 type DragItem =
   | { kind: 'party'; id: string }
@@ -105,6 +106,38 @@ export function App() {
     null,
   )
   const liveRef = useRef({ rotation, blocked: false })
+  useEffect(() => {
+    if (!drag || drag.kind === 'party') return
+    return attachDragScroll(document, (target) => {
+      if (!(target instanceof Element) || target.closest('.line-label'))
+        return null
+      const cell = target.closest<HTMLElement>('[data-capture-owner]')
+      const cycleId = cell?.closest<HTMLElement>('[data-capture-cycle]')
+        ?.dataset.captureCycle
+      const ownerId = cell?.dataset.captureOwner
+      if ((cycleId !== 'opening' && cycleId !== 'repeat') || !ownerId)
+        return null
+      const state = liveRef.current.rotation
+      if (drag.kind === 'input') {
+        if (!canDropInput(state, drag, cycleId, ownerId)) return null
+      } else if (drag.kind === 'catalogSkill') {
+        if (
+          cycleId !== focusedCycle ||
+          ownerId !== state[cycleId].activeCharacterId
+        )
+          return null
+      } else {
+        if (
+          drag.cycleId !== cycleId ||
+          state[cycleId].columns.find(
+            (column) => column.action.id === drag.actionId,
+          )?.ownerId !== ownerId
+        )
+          return null
+      }
+      return timelineRefs.current[cycleId] ?? null
+    })
+  }, [drag, focusedCycle])
   useLayoutEffect(() => {
     liveRef.current = {
       rotation,
