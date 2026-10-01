@@ -201,6 +201,42 @@ it('체크박스는 상호 배타적이고 둘 다 해제하면 미검수다', a
   expect(decision('등록').checked).toBe(false)
   expect(decision('미등록').checked).toBe(false)
 })
+it('분류 배지는 미분류일 때 숨기고 미등록 배지를 우선 표시한다', async () => {
+  await render()
+  const category = document.querySelector<HTMLSelectElement>(
+    '[aria-label="후보 1 분류"]',
+  )!
+  const select = async (value: string) =>
+    act(async () => {
+      category.value = value
+      category.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+  expect(document.querySelector('.category-badge')).toBeNull()
+  for (const name of [
+    '기본 공격',
+    '공명 스킬',
+    '공명 해방',
+    '공명 회로',
+    '변주 스킬',
+    '반주 스킬',
+    '조화도 파괴',
+    '고유 스킬',
+  ]) {
+    await select(name)
+    expect(document.querySelector('.category-badge')?.textContent).toBe(name)
+  }
+  await act(async () => decision('미등록').click())
+  expect(document.querySelector('.category-badge')).toBeNull()
+  expect(document.querySelector('.excluded-badge')?.textContent).toBe('미등록')
+  expect(category.value).toBe('고유 스킬')
+  await selectCandidate()
+  expect(document.querySelector('.excluded-badge')).toBeNull()
+  expect(document.querySelector('.category-badge')?.textContent).toBe(
+    '고유 스킬',
+  )
+  await select('')
+  expect(document.querySelector('.category-badge')).toBeNull()
+})
 it('공명자를 오가도 페이지 메모리에 편집을 유지하며 서버 저장을 요청하지 않는다', async () => {
   await render()
   await selectCandidate()

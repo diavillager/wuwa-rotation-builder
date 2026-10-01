@@ -625,6 +625,11 @@ export function ReviewApp() {
                           {decision === 'exclude' && (
                             <span className="excluded-badge">미등록</span>
                           )}
+                          {decision !== 'exclude' && item.category && (
+                            <span className="category-badge">
+                              {item.category}
+                            </span>
+                          )}
                         </div>
                         <div className="card-top">
                           <div className="icon-preview">

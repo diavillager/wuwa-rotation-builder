@@ -244,7 +244,8 @@ select {
   filter: grayscale(1);
   opacity: 0.45;
 }
-.excluded-badge {
+.excluded-badge,
+.category-badge {
   align-self: center;
   padding: 3px 8px;
   border: 1px solid #88959d;
@@ -253,6 +254,11 @@ select {
   color: #f0f3f5;
   font-size: 12px;
   font-weight: 700;
+}
+.category-badge {
+  border-color: #6eb8a6;
+  background: #244d43;
+  color: #c5f4e6;
 }
 .card-top {
   display: flex;
