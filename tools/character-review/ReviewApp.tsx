@@ -219,12 +219,12 @@ export function ReviewApp() {
         )
         setNotice(
           action === 'backup'
-            ? `${exported.size}명의 미완성 검수와 이미지까지 백업했습니다. JSON Import로 다시 불러올 수 있습니다.`
+            ? `${exported.size}명의 미완성 검수와 이미지까지 백업했습니다. 'JSON으로 불러오기'로 다시 불러올 수 있습니다.`
             : `${exported.size}명의 JSON을 내보냈습니다. 파일을 에이전트에게 전달하면 재검증 후 DB에 반영합니다.${(response.results?.length ?? 0) > exported.size ? ' 미완료 공명자는 제외했습니다.' : ''}`,
         )
       } else
         setNotice(
-          `누락 검증: ${passed.length}명 통과 / ${response.results?.length ?? 0}명`,
+          `검수 내용 검증: ${passed.length}명 통과 / ${response.results?.length ?? 0}명`,
         )
     } catch (e) {
       setFailure((e as Error).message)
@@ -458,15 +458,15 @@ export function ReviewApp() {
             <div className="review-actions">
               <button
                 disabled={busy || !works.length}
-                onClick={() => void submit('backup')}
+                onClick={() => void submit('validate')}
               >
-                검수 백업
+                검수 내용 검증
               </button>
               <button
                 disabled={busy}
                 onClick={() => importInput.current?.click()}
               >
-                JSON Import
+                JSON으로 불러오기
               </button>
               <input
                 ref={importInput}
@@ -483,16 +483,16 @@ export function ReviewApp() {
               />
               <button
                 disabled={busy || !works.length}
-                onClick={() => void submit('validate')}
+                onClick={() => void submit('backup')}
               >
-                누락 검증
+                JSON으로 백업하기
               </button>
               <button
                 className="primary"
                 disabled={busy || !works.length}
                 onClick={() => void submit('export')}
               >
-                JSON Export
+                JSON으로 내보내기
               </button>
             </div>
             {results.map((result) => (

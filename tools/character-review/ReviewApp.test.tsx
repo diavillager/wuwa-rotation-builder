@@ -295,7 +295,7 @@ it('분류가 있어도 자동 배정을 켜지 않고 자동 행동과 0~10 타
     '기본 공격 · 10타',
   )
   expect(action.value).toBe('1102:skill:one')
-  await click('검수 백업')
+  await click('JSON으로 백업하기')
   expect(
     (postedStates[0] as { candidates: { hitCount: number }[] }).candidates[0]
       .hitCount,
@@ -395,15 +395,15 @@ it('자동 배정 해제는 직접 수정한 값만 유지하고 자동 필드�
 it('검증과 Export는 전체 공명자를 전송하고 실패 시 편집을 보존한다', async () => {
   await render()
   await selectCandidate()
-  await click('누락 검증')
+  await click('검수 내용 검증')
   expect(postedStates).toHaveLength(2)
   expect(document.body.textContent).toContain('미완료 검수')
   exportFails = true
-  await click('JSON Export')
+  await click('JSON으로 내보내기')
   expect(document.body.textContent).toContain('내보내기 실패')
   expect(decision('등록').checked).toBe(true)
   exportFails = false
-  await click('JSON Export')
+  await click('JSON으로 내보내기')
   expect(writes).toEqual(['validate', 'export', 'export'])
   expect(URL.createObjectURL).toHaveBeenCalledOnce()
   expect(document.body.textContent).toContain('에이전트에게 전달')
@@ -458,7 +458,7 @@ it('이동 손잡이 드래그와 취소를 처리하고 Export 상태에 통합
     expect(
       document.querySelector('.review-card')?.getAttribute('data-review-key'),
     ).toBe('candidate-two')
-    await click('JSON Export')
+    await click('JSON으로 내보내기')
     expect((postedStates[0] as { cardOrder: string[] }).cardOrder).toEqual([
       'candidate-two',
       'candidate-one',
