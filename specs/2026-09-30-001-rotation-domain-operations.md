@@ -16,7 +16,7 @@
 1. 파티 슬롯의 공명자를 다른 공명자로 교체하는 도메인 명령을 추가한다. 두 Cycle에서 기존 공명자 소유의 행동을 초기화하고, 그 공명자가 관련된 Transition 및 연결 AutoAction·suppression을 참조 무결성이 유지되게 정리한다. 다른 공명자의 독립 행동과 두 Cycle의 전역 순서는 유지한다.
 2. InputBlock 삭제와 SkillBlock 추가·삭제·재정렬·stage 변경을 명령으로 제공한다. 빈 `skills`, 동일 `skillRef` 중복, 순서, `stage ≥ 0`을 보존한다. 입력키로 Skill을 추론하지 않는다.
 3. InputBlock 삽입·재정렬·삭제 뒤에도 Transition anchor가 존재하는 열 또는 유효한 경계를 가리키고, 해당 교체의 AutoAction이 경계의 올바른 쪽에 남도록 한다. AutoAction 자체는 이동·수정하지 않는다.
-4. 각 명령은 성공 시 완결된 새 Rotation을 반환하고, 오류 시 원본을 변경하지 않는다. 작업 결과는 이후 Undo/Redo가 한 명령을 한 편집 단위로 기록할 수 있어야 한다.
+4. 각 명령은 성공 시 완결된 새 Rotation을 반환하고, 오류 시 원본을 변경하지 않는다. 사이클 편집 명령의 결과는 이후 Cycle별 Undo/Redo가 한 명령을 한 편집 단위로 기록할 수 있어야 한다. 파티 변경 명령은 Undo/Redo 대상에서 제외한다.
 5. 기존 `assertRotation`을 새 연산의 전후 검증에 맞게 보강한다.
 
 ## 비범위
