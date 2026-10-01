@@ -62,6 +62,70 @@ async function dragDrop(source: Element, target: Element) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('파티 선택창을 열 때 페이지 높이와 클릭 당시 스크롤을 보존하고 닫기·선택 완료 때 해제한다', async () => {
+    const shell = document.querySelector<HTMLElement>('.app-shell')!
+    vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+      height: 1400,
+    } as DOMRect)
+    vi.stubGlobal('scrollX', 0)
+    vi.stubGlobal('scrollY', 180)
+    const scrollTo = vi
+      .spyOn(window, 'scrollTo')
+      .mockImplementation((options: ScrollToOptions | number) => {
+        if (typeof options === 'object') vi.stubGlobal('scrollY', options.top)
+      })
+    // 레이아웃 변경으로 스크롤이 제한되는 브라우저 동작을 재현한다.
+    document.addEventListener('click', () => vi.stubGlobal('scrollY', 0), {
+      once: true,
+    })
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.party-slot')!.click(),
+    )
+    expect(shell.style.minHeight).toBe('1400px')
+    expect(window.scrollY).toBe(180)
+    expect(scrollTo).toHaveBeenCalledWith({
+      left: 0,
+      top: 180,
+      behavior: 'instant',
+    })
+    expect(document.querySelector<HTMLElement>('.workspace-grid')!.hidden).toBe(
+      true,
+    )
+    await act(async () =>
+      document
+        .querySelectorAll<HTMLButtonElement>('.element-tabs button')[1]
+        .click(),
+    )
+    expect(shell.style.minHeight).toBe('1400px')
+    await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('.party-slot')[1].click(),
+    )
+    expect(shell.style.minHeight).toBe('1400px')
+    expect(
+      document.querySelector('.selector-heading strong')?.textContent,
+    ).toContain('슬롯 2')
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('.selector-heading > button')!
+        .click(),
+    )
+    expect(shell.style.minHeight).toBe('')
+    expect(document.querySelector<HTMLElement>('.workspace-grid')!.hidden).toBe(
+      false,
+    )
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.party-slot')!.click(),
+    )
+    expect(shell.style.minHeight).toBe('1400px')
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('.character-options button')!
+        .click(),
+    )
+    expect(document.querySelector('.character-selector')).toBeNull()
+    expect(shell.style.minHeight).toBe('')
+  })
+
   it.each(['opening', 'repeat'])(
     '%s의 InputBlock 드래그는 같은 소유 라인의 가장자리에서만 스크롤하고 drop 시 중단한다',
     async (cycleId) => {

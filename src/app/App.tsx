@@ -41,6 +41,7 @@ import { TimelineWires } from './TimelineWires'
 import { attachCaptureEvents } from './input-events'
 import { applyCapturedInput } from './input-command'
 import { attachDragScroll } from './drag-scroll'
+import { usePartySelectorScroll } from './use-party-selector-scroll'
 
 type DragItem =
   | { kind: 'party'; id: string }
@@ -93,6 +94,7 @@ export function App() {
   )
   const [focusedCycle, setFocusedCycle] = useState<CycleId>('opening')
   const [selectingSlot, setSelectingSlot] = useState<number | null>(null)
+  const { shellRef, prepareOpen } = usePartySelectorScroll(selectingSlot)
   const [pendingReplacement, setPendingReplacement] =
     useState<PendingReplacement | null>(null)
   const [selectedElement, setSelectedElement] = useState<Element>(ELEMENTS[0])
@@ -614,7 +616,7 @@ export function App() {
     (item) => item.id === activeId,
   )
   return (
-    <main className="app-shell">
+    <main className="app-shell" ref={shellRef}>
       <header className="page-heading">
         <div>
           <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
@@ -644,6 +646,7 @@ export function App() {
               key={id}
               draggable
               onClick={() => {
+                if (selectingSlot !== index) prepareOpen()
                 setSelectedElement(ELEMENTS[0])
                 setSelectingSlot(selectingSlot === index ? null : index)
               }}
