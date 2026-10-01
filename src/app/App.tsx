@@ -531,9 +531,6 @@ export function App({
         {action.input}
         <small>{action.gesture === 'hold' ? 'Hold' : 'Tap'}</small>
       </span>
-      {action.skills.length === 0 && (
-        <span className="skill-placeholder">스킬 없음</span>
-      )}
       {action.skills.map((skill, index) => (
         <span
           key={skill.id}

@@ -70,6 +70,21 @@ async function dragDrop(source: Element, target: Element) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('빈 입력은 키와 Tap/Hold만 표시하고 연결 스킬은 키 뒤에 추가한다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    const input = grid().querySelector('.input-card')!
+    const label = input.querySelector('.input-key')!
+    expect(input.textContent).toBe('ETap')
+    expect(input.querySelector('.skill-placeholder')).toBeNull()
+    await dragDrop(document.querySelector('.catalog-skill')!, input)
+    expect(input.firstElementChild).toBe(label)
+    expect(input.children[1].className).toBe('linked-skill')
+    await dragDrop(document.querySelectorAll('.catalog-skill')[1], input)
+    expect(input.firstElementChild).toBe(label)
+    expect(input.querySelectorAll('.linked-skill')).toHaveLength(2)
+  })
   it('진열 스킬 전체 카드를 잡은 위치에 드래그 이미지로 연결한다', async () => {
     const card = document.querySelector<HTMLElement>('.catalog-skill')!
     vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({

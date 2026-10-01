@@ -1,4 +1,7 @@
 :root {
+  --timeline-line-size: calc(128px * 2 / 3);
+  --input-card-size: calc(var(--timeline-line-size) - 10px);
+  --input-tile-size: calc(var(--input-card-size) - 8px);
   font-family: Arial, 'Noto Sans KR', sans-serif;
   color: #edf0f1;
   background: #0d1116;
@@ -403,27 +406,27 @@ button {
   width: 100%;
   text-align: center;
   overflow-wrap: anywhere;
-  line-height: 1.3;
+  line-height: 1.2;
 }
 .catalog-skill-category {
   display: block;
   color: #a8d6cb;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
 }
 .catalog-skill-name {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.2;
   margin-top: 4px;
   color: #b4c8c3;
 }
 .catalog-skill .skill-icon {
-  width: 64px;
-  height: 64px;
+  width: 68px;
+  height: 68px;
   margin: 0;
 }
 .character-portrait {
@@ -664,7 +667,6 @@ button {
   background: #202c34;
 }
 .timeline-grid {
-  --timeline-line-size: calc(128px * 2 / 3);
   display: grid;
   grid-auto-rows: var(--timeline-line-size);
   position: relative;
@@ -759,9 +761,10 @@ button {
   display: flex;
   align-items: stretch;
   gap: 3px;
-  min-width: 160px;
+  flex-shrink: 0;
+  width: max-content;
   max-width: none;
-  height: calc(var(--timeline-line-size, 85.3333px) - 10px);
+  height: var(--input-card-size);
   padding: 3px;
   border: 1px solid #6c9e96;
   border-radius: 8px;
@@ -772,9 +775,13 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-width: 28px;
+  align-items: center;
+  flex: 0 0 var(--input-tile-size);
+  width: var(--input-tile-size);
+  height: var(--input-tile-size);
+  text-align: center;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 18px;
 }
 .input-key small,
 .auto-card small {
@@ -783,36 +790,39 @@ button {
   font-size: 10px;
   font-weight: 400;
 }
-.skill-placeholder {
-  align-self: center;
-  flex: 1;
-  text-align: center;
-  color: #819398;
-  font-size: 10px;
-  white-space: nowrap;
+.input-key small {
+  font-size: 11px;
 }
 .linked-skill {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 1;
+  flex: 0 0 var(--input-tile-size);
+  width: var(--input-tile-size);
+  height: var(--input-tile-size);
   padding: 3px;
-  min-width: 80px;
+  min-width: 0;
   border-radius: 5px;
   background: #3b6158;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.2;
   text-align: center;
   cursor: grab;
   white-space: nowrap;
 }
+.linked-skill > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .linked-skill small {
   color: #d6eadc;
+  font-size: 10px;
 }
 .linked-skill .skill-icon {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   margin: 0;
 }
 .drag-preview {
