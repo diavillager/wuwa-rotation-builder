@@ -231,7 +231,26 @@ select {
 }
 .review-card.excluded {
   border-style: dashed;
-  background: #1d282f;
+  border-color: #85939a;
+  background: #10171c;
+}
+.review-card.excluded .icon-preview {
+  background: #1b2227;
+  border-color: #59636a;
+}
+.review-card.excluded .icon-preview img {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+.excluded-badge {
+  align-self: center;
+  padding: 3px 8px;
+  border: 1px solid #88959d;
+  border-radius: 5px;
+  background: #3b454e;
+  color: #f0f3f5;
+  font-size: 12px;
+  font-weight: 700;
 }
 .card-top {
   display: flex;
@@ -258,7 +277,7 @@ select {
   height: 64px;
   object-fit: contain;
 }
-.review-card label + label {
+.review-card > label + label {
   margin-top: 12px;
 }
 .review-card .check {
@@ -436,6 +455,7 @@ code {
 }
 .decision-options {
   display: flex;
+  align-items: center;
   gap: 18px;
   margin: 16px 0;
   padding: 10px;
@@ -453,6 +473,8 @@ code {
   width: 16px;
   height: 16px;
   padding: 0;
+  margin: 0;
+  flex-shrink: 0;
   accent-color: #8dccb9;
 }
 .assignment-toggle {
