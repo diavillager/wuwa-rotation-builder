@@ -4,6 +4,7 @@
   "characterId": "1207",
   "displayName": "루파",
   "attribute": "용융",
+  "weaponType": "대검",
   "portrait": "assets/f8619b4c03c3cad9a74e00645eeb4b2b38aa5a13728342180296103dd70e15de.webp",
   "skills": [
     {

@@ -4,6 +4,7 @@
   "characterId": "1205",
   "displayName": "장리",
   "attribute": "용융",
+  "weaponType": "직검",
   "portrait": "assets/c93dfbaa347d4b1976dd279652a8442940240188b8cd167cfa26c25c24b4bc9a.webp",
   "skills": [
     {

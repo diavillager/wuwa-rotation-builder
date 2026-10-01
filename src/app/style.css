@@ -452,7 +452,7 @@ button {
 }
 .selector-portrait {
   width: 128px;
-  height: 160px;
+  height: 128px;
   object-fit: contain;
   display: block;
   pointer-events: none;
@@ -732,6 +732,12 @@ button {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
+}
+.character-portrait,
+.selector-portrait,
+.line-portrait {
+  object-fit: cover;
+  clip-path: circle(closest-side);
 }
 .line-portrait-placeholder {
   font-size: 28px;

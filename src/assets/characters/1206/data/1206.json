@@ -4,6 +4,7 @@
   "characterId": "1206",
   "displayName": "브렌트",
   "attribute": "용융",
+  "weaponType": "직검",
   "portrait": "assets/9441af5b5fb83713536ecedeab81c93fc22c9956d8141147db0bddca7b1353d4.webp",
   "skills": [
     {
