@@ -143,7 +143,7 @@ export function App({
       ? `${snapshot.displayName} (데이터 누락)`
       : skillName(catalog, id)
   }
-  const skillContent = (id: string) => {
+  const skillContent = (id: string, label?: string) => {
     const skill = catalog.characters
       .flatMap((character) => character.skills)
       .find((item) => item.id === id)
@@ -157,7 +157,7 @@ export function App({
             draggable={false}
           />
         )}
-        <span>{skill?.category ?? skillLabel(id)}</span>
+        <span>{label ?? skill?.category ?? skillLabel(id)}</span>
       </>
     )
   }
@@ -741,14 +741,14 @@ export function App({
                             column.action.skillRef,
                           )}
                         >
-                          <small>
-                            {column.action.kind === 'outro'
-                              ? '반주'
+                          {skillContent(
+                            column.action.skillRef,
+                            column.action.kind === 'outro'
+                              ? '반주 스킬'
                               : column.action.kind === 'intro'
-                                ? '변주'
-                                : '교체 공격'}
-                          </small>
-                          {skillContent(column.action.skillRef)}
+                                ? '변주 스킬'
+                                : '교체 공격',
+                          )}
                         </div>
                       ))}
                   </div>

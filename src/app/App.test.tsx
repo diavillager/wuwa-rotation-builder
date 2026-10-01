@@ -81,15 +81,24 @@ describe('App 실제 입력 연결', () => {
       const names = demoCatalog.characters.flatMap((character) =>
         character.skills.map((skill) => skill.displayName),
       )
+      vi.useFakeTimers()
       for (const card of cards) {
         expect(card.hasAttribute('title')).toBe(false)
         expect(card.querySelector('[title]')).toBeNull()
         expect(names).toContain(card.getAttribute('data-skill-tooltip'))
         await hover(card)
+        expect(document.querySelector('[role="tooltip"]')).toBeNull()
+        await act(async () => vi.advanceTimersByTime(500))
         expect(document.querySelector('[role="tooltip"]')?.textContent).toBe(
           card.getAttribute('data-skill-tooltip'),
         )
+        expect(
+          document.querySelector('[role="tooltip"]')?.getAttribute('data-tone'),
+        ).toBe('auto')
       }
+      expect(cards.map((card) => card.textContent)).toEqual(
+        duration === 10 ? ['교체 공격'] : ['반주 스킬', '변주 스킬'],
+      )
     },
   )
   it('빈 입력은 키와 Tap/Hold만 표시하고 연결 스킬은 키 뒤에 추가한다', async () => {
@@ -927,16 +936,18 @@ describe('App 실제 입력 연결', () => {
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
     ).toBe('demo-a')
-    expect(grid().querySelector('.auto-card')?.textContent).toContain(
-      '데모 E 교체 공격',
-    )
+    expect(
+      grid().querySelector('.auto-card')?.getAttribute('data-skill-tooltip'),
+    ).toBe('데모 E 교체 공격')
     await hover(emptyLine('demo-e'))
     await key('keydown', 'Digit3')
     await key('keyup', 'Digit3', 200)
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
     ).toBe('demo-e')
-    expect(grid().textContent).toContain('데모 E 반주')
+    expect(
+      grid().querySelector('[data-skill-tooltip="데모 E 반주"]'),
+    ).not.toBeNull()
     expect(document.querySelector('[role="status"]')).toBeNull()
   })
   it.each(['opening', 'repeat'])(

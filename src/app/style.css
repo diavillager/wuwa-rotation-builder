@@ -783,8 +783,7 @@ button {
   font-weight: 700;
   font-size: 18px;
 }
-.input-key small,
-.auto-card small {
+.input-key small {
   display: block;
   color: #a2cbc0;
   font-size: 10px;
@@ -845,32 +844,77 @@ button {
   pointer-events: none;
 }
 .skill-tooltip {
+  --tooltip-background: #202f32;
+  --tooltip-border: #6c9e96;
   position: fixed;
   z-index: 1100;
   pointer-events: none;
   max-width: min(360px, calc(100vw - 16px));
   max-height: calc(100vh - 16px);
-  overflow: hidden;
-  padding: 10px 14px;
-  border: 1px solid #6c9e96;
-  border-radius: 9px;
-  background: #202f32;
+  padding: 6px 9px;
+  border: 1px solid var(--tooltip-border);
+  border-radius: 7px;
+  background: var(--tooltip-background);
   box-shadow: 0 8px 24px #0008;
   color: #edf5f1;
-  font-size: 18px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 1.4;
   text-align: center;
   overflow-wrap: anywhere;
 }
+.skill-tooltip[data-tone='auto'] {
+  --tooltip-background: #312838;
+  --tooltip-border: #a68bbd;
+  color: #f0e7f6;
+}
+.skill-tooltip::before {
+  content: '';
+  position: absolute;
+  left: var(--tooltip-arrow-x);
+  width: 10px;
+  height: 10px;
+  background: var(--tooltip-background);
+  transform: translateX(-50%) rotate(45deg);
+}
+.skill-tooltip[data-placement='below']::before {
+  top: -6px;
+  border-top: 1px solid var(--tooltip-border);
+  border-left: 1px solid var(--tooltip-border);
+}
+.skill-tooltip[data-placement='above']::before {
+  bottom: -6px;
+  border-bottom: 1px solid var(--tooltip-border);
+  border-right: 1px solid var(--tooltip-border);
+}
+.skill-tooltip-text {
+  display: block;
+  max-height: calc(100vh - 30px);
+  overflow: hidden;
+}
 .auto-card {
   position: relative;
   z-index: 2;
-  width: max-content;
-  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 4px;
+  width: var(--input-card-size);
+  height: var(--input-card-size);
+  padding: 4px;
   border: 1px solid #866f9c;
   border-radius: 8px;
   background: #393044;
   color: #e2d5ee;
-  font-size: 11px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+.auto-card .skill-icon {
+  width: 32px;
+  height: 32px;
+  margin: 0;
 }
