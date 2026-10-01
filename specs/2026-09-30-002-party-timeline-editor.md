@@ -64,7 +64,7 @@
 
 - 검수된 카탈로그에 없는 공명자·스킬 참조는 임의의 이름이나 Skill 의미로 대체하지 않는다. 데이터가 없는 상태와 손상된 참조를 구분할 수 있어야 한다.
 - 비어 있는 Cycle, 스킬 0개 InputBlock, 동일 `skillRef`의 중복, 여러 Transition이 한 경계에 있는 상태도 렌더링한다.
-- AutoAction이 삭제·suppression된 교체는 렌더 과정에서 자동 행동을 재생성하지 않는다. 협주 linked pair 삭제 후에도 남은 Transition을 표시한다.
+- AutoAction이 삭제·suppression된 교체는 렌더 과정에서 자동 행동을 재생성하지 않는다. 현재 카드 삭제는 `2026-10-02-000-switch-card-deletion.md`에 따라 해당 Transition도 함께 제거한다. 과거 suppression 데이터는 계속 보존한다.
 - 파티 재정렬 후 active line은 원래 공명자를 계속 가리키며, 두 Cycle의 내용과 Transition·AutoAction 소유권은 바뀌지 않는다.
 - 다른 Cycle로의 직접 이동, 수직 이동에 따른 소유권 변경, AutoAction 드래그는 허용하지 않는다. 잘못된 명령은 UI 상태를 부분 변경하지 않는다.
 
@@ -77,7 +77,7 @@
 - 파티 순서 변경과 공명자 교체 뒤 두 Cycle의 표시·active line·원본 소유권 및 경고 내용을 확인한다.
 - InputBlock과 SkillBlock의 삭제·이동·stage 변경, AutoAction 읽기 전용 및 linked pair 삭제를 UI 이벤트와 도메인 상태 양쪽에서 확인한다.
 - 다른 라인/Cycle 드롭 거부, 수평 휠의 단수 유지, Backspace 연속 삭제 시 실제 커서 아래로 이동한 다음 블록 재판별, 블록 삭제 시 스크롤 영역 축소를 확인한다.
-- linked AutoAction을 삭제하면 해당 블록에 닿던 독립 교체선도 사라진다. Transition과 suppression 데이터는 보존하며, 남은 실제 행동 사이의 유효한 흐름선은 유지한다.
+- linked AutoAction을 삭제하면 해당 블록에 닿던 독립 교체선도 사라진다. 현재 삭제한 교체의 Transition과 suppression도 함께 제거하며, 다른 교체 및 과거 suppression 데이터는 보존한다. 남은 실제 행동 사이에 교체를 자동 생성하지 않는다.
 - 협주 outro/intro의 별도 열, Transition 무열 표시, suppression 유지, opening/repeat 독립성을 fixture로 확인한다.
 - 작업 완료 전 저장소의 `lint`, `test`, `build`를 실제로 실행한다. 구현 중 도메인 결함을 발견하면 해당 동작의 단위 테스트를 먼저 보강한다.
 

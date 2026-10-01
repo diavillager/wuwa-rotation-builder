@@ -17,7 +17,7 @@ import {
   addSkill,
   changeSkillStage,
   createRotation,
-  deleteAutoAction,
+  deleteSwitchForAutoAction,
   deleteInput,
   deleteSkill,
   hasCharacterCycleContent,
@@ -430,7 +430,9 @@ export function App({
       if (target.kind === 'input')
         run((state) => deleteInput(state, target.cycleId, target.actionId))
       else if (target.kind === 'auto')
-        run((state) => deleteAutoAction(state, target.cycleId, target.actionId))
+        run((state) =>
+          deleteSwitchForAutoAction(state, target.cycleId, target.actionId),
+        )
       else
         run((state) =>
           deleteSkill(state, target.cycleId, target.actionId, target.skillId),

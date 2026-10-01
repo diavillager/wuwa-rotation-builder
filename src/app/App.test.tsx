@@ -71,6 +71,77 @@ async function dragDrop(source: Element, target: Element) {
 
 describe('App 실제 입력 연결', () => {
   it.each([10, 500])(
+    '교체 카드 삭제 후 협주 재입력은 입력→반주 선을 연결한다 (%dms)',
+    async (duration) => {
+      await hover(emptyLine())
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+      await key('keydown', 'Digit2')
+      await key('keyup', 'Digit2', duration)
+      Object.defineProperty(document, 'elementFromPoint', {
+        configurable: true,
+        value: () => grid().querySelector('.auto-card'),
+      })
+      await hover(grid().querySelector('.auto-card')!)
+      await act(async () => {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Backspace',
+            bubbles: true,
+            cancelable: true,
+          }),
+        )
+      })
+      expect(grid().querySelector('.auto-card')).toBeNull()
+      Reflect.deleteProperty(document, 'elementFromPoint')
+      await hover(emptyLine())
+      await key('keydown', 'Digit2')
+      await key('keyup', 'Digit2', 500)
+      expect(
+        [...grid().querySelectorAll('[data-action-column]')].map(
+          (card) => card.textContent,
+        ),
+      ).toEqual(['ETap', '반주 스킬', '변주 스킬'])
+      expect(grid().querySelectorAll('.wire-flow')).toHaveLength(2)
+      expect(grid().querySelectorAll('.wire-transition')).toHaveLength(1)
+    },
+  )
+  it.each([
+    ['opening', 'Digit2', 'demo-b'],
+    ['opening', 'Digit3', 'demo-c'],
+    ['repeat', 'Digit2', 'demo-b'],
+    ['repeat', 'Digit3', 'demo-c'],
+  ])(
+    '%s에서 1번 라인→%s 협주는 입력→반주와 반주→변주 흐름을 모두 연결한다',
+    async (cycleId, code, destination) => {
+      await hover(emptyLine('demo-a', cycleId))
+      await key('keydown', 'KeyE')
+      await key('keyup', 'KeyE', 10)
+      await key('keydown', code)
+      await key('keyup', code, 500)
+      const cycleGrid = grid(cycleId)
+      const cards = [...cycleGrid.querySelectorAll('[data-action-column]')]
+      expect(cards).toHaveLength(3)
+      expect(
+        cards.map(
+          (card) =>
+            card.closest<HTMLElement>('[data-capture-owner]')?.dataset
+              .captureOwner,
+        ),
+      ).toEqual(['demo-a', 'demo-a', destination])
+      expect(cards[0].classList.contains('input-card')).toBe(true)
+      expect(cards[1].textContent).toBe('반주 스킬')
+      expect(cards[2].textContent).toBe('변주 스킬')
+      expect(cycleGrid.querySelectorAll('.wire-flow')).toHaveLength(2)
+      expect(cycleGrid.querySelectorAll('.wire-transition')).toHaveLength(1)
+      expect(
+        grid(cycleId === 'opening' ? 'repeat' : 'opening').querySelector(
+          '[data-action-column]',
+        ),
+      ).toBeNull()
+    },
+  )
+  it.each([10, 500])(
     '교체 자동 행동도 조작 안내 대신 스킬명 툴팁을 사용한다 (%dms)',
     async (duration) => {
       await hover(emptyLine())

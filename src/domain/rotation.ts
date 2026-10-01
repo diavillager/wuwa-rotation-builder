@@ -699,6 +699,7 @@ export function createSwitch(
   })
 }
 
+/** 과거 AutoAction 단독 삭제 데이터의 suppression 호환성을 위한 연산. */
 export function deleteAutoAction(
   rotation: Rotation,
   cycleId: CycleId,
@@ -739,6 +740,39 @@ export function deleteAutoAction(
                   : 'normalSwitchAttack',
             },
           ],
+    }
+  })
+}
+
+/** Editor의 교체 카드 삭제: 같은 교체의 행동과 Transition을 원자적으로 제거한다. */
+export function deleteSwitchForAutoAction(
+  rotation: Rotation,
+  cycleId: CycleId,
+  actionId: string,
+): Rotation {
+  return changeCycle(rotation, cycleId, (cycle) => {
+    const action = cycle.columns.find(
+      (column) => column.action.id === actionId,
+    )?.action
+    if (!action || action.type !== 'autoAction')
+      throw new Error('삭제할 AutoAction이 없습니다.')
+    const { switchId } = action
+    const columns = cycle.columns.filter(
+      (column) =>
+        column.action.type !== 'autoAction' ||
+        column.action.switchId !== switchId,
+    )
+    return {
+      ...cycle,
+      columns,
+      transitions: reanchorTransitions(
+        cycle.columns,
+        columns,
+        cycle.transitions.filter((item) => item.switchId !== switchId),
+      ),
+      suppression: cycle.suppression.filter(
+        (item) => item.switchId !== switchId,
+      ),
     }
   })
 }

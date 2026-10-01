@@ -49,7 +49,7 @@
 - [x] Transition은 열을 차지하지 않는다. Editor와 전체 정보 Export에서는 라인 이동으로 보인다. 조작 중심 Export에서만 숫자키 블록으로 펼친다. 라인 아이콘 클릭은 Transition이나 AutoAction을 만들지 않는다.
 - [x] 일반 교체는 등장 라인에 자동 일반공격, 협주 교체는 퇴장 라인에 반주 및 등장 라인에 변주 AutoAction을 만든다.
 - [x] AutoAction은 독립 열을 차지한다. 조작 정보와 stage가 없고 읽기 전용이며 삭제만 가능하다. 수정, 스킬 추가, 단수 변경, 이동은 불가하다.
-- [x] 협주 반주/변주는 동일 `switchId`의 linked pair다. 한쪽 삭제 시 양쪽 삭제하고 재생성 suppression을 기억한다. 일반교체 자동공격은 단독 삭제하며 suppression을 기억한다. suppression은 재렌더·IndexedDB 저장/로드·JSON Export/Import 후에도 유지되는 RotationProject 편집 상태다.
+- [x] 협주 반주/변주는 동일 `switchId`의 linked pair다. 한쪽 카드 삭제 시 양쪽 카드와 해당 Transition을 함께 삭제한다. 일반 교체 공격 카드 삭제 시 해당 AutoAction과 Transition을 함께 삭제한다. 해당 switchId의 suppression도 제거하며 Undo/Redo는 교체와 카드를 한 단계로 복원/재적용한다. 다른 교체와 기존 저장 데이터의 suppression은 임의로 삭제하거나 재생성하지 않으며 저장/로드 후에도 보존한다.
 - [x] 공명자 JSON의 `autoActions.normalSwitchAttack / intro / outro`는 서로 독립적으로 사람이 지정한다. 일반공격과 변주는 등장자, 반주는 퇴장자의 데이터다.
 
 ## 5. Export, 저장, Undo

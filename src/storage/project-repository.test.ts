@@ -2,7 +2,11 @@ import { IDBFactory, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createProject } from '../domain/project'
 import { createDemoRotation } from '../app/demo'
-import { deleteAutoAction, reorderParty } from '../domain/rotation'
+import {
+  deleteAutoAction,
+  deleteSwitchForAutoAction,
+  reorderParty,
+} from '../domain/rotation'
 import {
   IndexedDbProjectRepository,
   ProjectWriteQueue,
@@ -38,32 +42,39 @@ describe('IndexedDB 프로젝트 Repository', () => {
     expect(await repo.list()).toEqual([replacement])
     expect(await repo.selectedId()).toBe(replacement.id)
   })
-  it('파티 순서·Shared Timeline·교체·stage와 삭제된 자동 행동 suppression을 그대로 복원한다', async () => {
-    let rotation = createDemoRotation()
-    const auto = rotation.opening.columns.find(
-      (column) => column.action.type === 'autoAction',
-    )!
-    rotation = deleteAutoAction(rotation, 'opening', auto.action.id)
-    rotation = reorderParty(rotation, ['demo-c', 'demo-a', 'demo-b'])
-    const data = createProject(
-      'complex',
-      '복원 검증',
-      '2026-10-01T03:00:00.000Z',
-      rotation,
-    )
-    const factory = new IDBFactory()
-    await new IndexedDbProjectRepository('complex', factory).put(data)
-    const restored = (
-      await new IndexedDbProjectRepository('complex', factory).list()
-    )[0]
-    expect(restored).toEqual(data)
-    expect(restored.rotation.opening.suppression).toHaveLength(1)
-    expect(
-      restored.rotation.opening.columns.some(
-        (column) => column.action.id === auto.action.id,
-      ),
-    ).toBe(false)
-  })
+  it.each([
+    ['과거 suppression 보존', deleteAutoAction, 1],
+    ['교체 카드와 Transition 함께 삭제', deleteSwitchForAutoAction, 0],
+  ] as const)(
+    '%s 상태의 파티 순서·Shared Timeline·stage를 그대로 복원한다',
+    async (_label, remove, remaining) => {
+      let rotation = createDemoRotation()
+      const auto = rotation.opening.columns.find(
+        (column) => column.action.type === 'autoAction',
+      )!
+      rotation = remove(rotation, 'opening', auto.action.id)
+      rotation = reorderParty(rotation, ['demo-c', 'demo-a', 'demo-b'])
+      const data = createProject(
+        'complex',
+        '복원 검증',
+        '2026-10-01T03:00:00.000Z',
+        rotation,
+      )
+      const factory = new IDBFactory()
+      await new IndexedDbProjectRepository('complex', factory).put(data)
+      const restored = (
+        await new IndexedDbProjectRepository('complex', factory).list()
+      )[0]
+      expect(restored).toEqual(data)
+      expect(restored.rotation.opening.suppression).toHaveLength(remaining)
+      expect(restored.rotation.opening.transitions).toHaveLength(remaining)
+      expect(
+        restored.rotation.opening.columns.some(
+          (column) => column.action.id === auto.action.id,
+        ),
+      ).toBe(false)
+    },
+  )
   it('완료된 transaction으로 CRUD하고 다른 인스턴스에서 다시 읽는다', async () => {
     const factory = new IDBFactory()
     const repo = new IndexedDbProjectRepository('test', factory)
