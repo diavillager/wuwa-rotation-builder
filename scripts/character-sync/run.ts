@@ -127,6 +127,10 @@ export async function runSync(
       await writeJson(path.join(characterDirectory, 'encore.json'), detail)
       basic = parseDetail(detail, id)
       encore = encoreCandidates(detail, id)
+      if (!encore.some((candidate) => candidate.kind === 'skill'))
+        errors.push(
+          'Encore: 스킬 후보가 비어 있습니다. 초상화는 별도로 수집했습니다.',
+        )
     } catch (error) {
       errors.push(`Encore: ${errorMessage(error)}`)
     }

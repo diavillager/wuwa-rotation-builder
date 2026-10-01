@@ -185,7 +185,6 @@ export function encoreCandidates(value: unknown, id: string): Candidate[] {
           : {}),
       }),
     )
-  if (result.length === 1) throw new Error('Encore 스킬 후보가 비어 있습니다.')
   return mergeCandidates(result)
 }
 export function wwCandidates(

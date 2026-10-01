@@ -103,3 +103,49 @@ it('직렬화할 수 없는 저장 요청 실패는 기존 저장본을 보존�
   await expect(writeSavedReview(broken)).rejects.toThrow()
   expect(await readSavedReview()).toEqual(saved)
 })
+
+it('누락 초상화만 복구된 실행은 검수값과 순서를 보존하고 새 원본으로 연결한다', () => {
+  const saved = backup()
+  saved.characters[0].review.displayName = '직접 검수'
+  saved.characters[0].review.cardOrder = []
+  const fresh = structuredClone(saved)
+  const next = fresh.characters[0]
+  next.review.runId = next.workspace.source.target.runId = 'repaired-run'
+  next.review.draftHash = next.workspace.source.draftHash = 'repaired-hash'
+  next.workspace.source.draft.candidates.push({
+    candidateId: 'portrait',
+    kind: 'portrait',
+    resourcePath: '/Game/portrait.webp',
+    url: 'https://example.test/portrait.webp',
+    asset: 'assets/portrait.webp',
+    sources: [],
+    review: { displayName: null, visible: null },
+    download: {
+      status: 'verified',
+      width: 256,
+      height: 256,
+      sha256: 'image-hash',
+    },
+  })
+  expect(sameRoster(saved, [next.workspace.source.target])).toBe(false)
+  const merged = mergeWorkspaceBackup(fresh, saved).characters[0]
+  expect(merged.review).toEqual({
+    ...saved.characters[0].review,
+    runId: 'repaired-run',
+    draftHash: 'repaired-hash',
+  })
+  expect(merged.workspace.source.draft.candidates).toHaveLength(1)
+  next.workspace.source.currentHash = 'db-changed'
+  expect(mergeWorkspaceBackup(fresh, saved).characters[0]).toBe(
+    saved.characters[0],
+  )
+  next.workspace.source.currentHash = null
+  next.workspace.source.draft.candidates.push({
+    ...next.workspace.source.draft.candidates[0],
+    kind: 'skill',
+    candidateId: 'new-skill',
+  })
+  expect(mergeWorkspaceBackup(fresh, saved).characters[0]).toBe(
+    saved.characters[0],
+  )
+})

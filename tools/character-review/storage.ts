@@ -105,7 +105,11 @@ export function sameRoster(
   return (
     file.characters.length === targets.length &&
     targets.every((target) =>
-      file.characters.some((entry) => entry.characterId === target.characterId),
+      file.characters.some(
+        (entry) =>
+          entry.characterId === target.characterId &&
+          entry.review.runId === target.runId,
+      ),
     )
   )
 }
@@ -118,8 +122,33 @@ export function mergeWorkspaceBackup(
   )
   return {
     ...fresh,
-    characters: fresh.characters.map(
-      (entry) => previous.get(entry.characterId) ?? entry,
-    ),
+    characters: fresh.characters.map((entry) => {
+      const old = previous.get(entry.characterId)
+      if (!old) return entry
+      // 누락 초상화만 추가된 수집 복구는 기존 검수값을 그대로 이관한다.
+      // 스킬 후보/이미지 또는 앱 DB가 달라진 일반 재수집은 자동 적용하지 않는다.
+      const before = old.workspace.source
+      const after = entry.workspace.source
+      const skills = after.draft.candidates.filter((c) => c.kind === 'skill')
+      const portraitOnlyRepair =
+        !before.draft.candidates.some((c) => c.kind === 'portrait') &&
+        after.draft.candidates.some(
+          (c) => c.kind === 'portrait' && c.download.status === 'verified',
+        ) &&
+        before.currentHash === after.currentHash &&
+        skills.length === before.draft.candidates.length &&
+        before.draft.candidates.every((c) =>
+          skills.some((next) => JSON.stringify(c) === JSON.stringify(next)),
+        )
+      if (!portraitOnlyRepair) return old
+      return {
+        ...entry,
+        review: {
+          ...old.review,
+          runId: entry.review.runId,
+          draftHash: entry.review.draftHash,
+        },
+      }
+    }),
   }
 }

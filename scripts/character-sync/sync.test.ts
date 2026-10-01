@@ -239,6 +239,24 @@ describe('실제 이미지 검증', () => {
   })
 })
 describe('등록 판정과 보존', () => {
+  it('Encore 스킬 목록이 비어 있어도 초상화를 수집하고 부분 수집으로 보고한다', async () => {
+    const root = await temp()
+    const sources = await sourceFixture()
+    sources.detail = async (id) => ({ ...detail(id), Skills: [] })
+    const result = await runSync(root, sources, { character: '1102' })
+    if (result.plan) throw new Error('잘못된 결과')
+    const draft = JSON.parse(
+      await readFile(path.join(result.directory, '1102/draft.json'), 'utf8'),
+    )
+    expect(
+      draft.candidates.find((c: { kind: string }) => c.kind === 'portrait')
+        .download.status,
+    ).toBe('verified')
+    expect(result.report.results[0].status).toBe('partial')
+    expect(
+      result.report.errors.some((e) => e.message.includes('스킬 후보가 비어')),
+    ).toBe(true)
+  })
   it('여러 지정 대상을 한 실행에 모으고 실제 자산 목록 오류를 보고한다', async () => {
     const root = await temp()
     const sources = await sourceFixture()
