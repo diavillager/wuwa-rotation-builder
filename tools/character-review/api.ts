@@ -2,14 +2,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomBytes } from 'node:crypto'
 import { errorMessage, decodeWebP } from '../../scripts/character-sync/io'
 import { object } from '../../scripts/character-sync/candidates'
-import {
-  listTargets,
-  loadSource,
-  readCandidateAsset,
-  readCurrentAsset,
-} from './files'
+import { loadSource, readCandidateAsset, readCurrentAsset } from './files'
 import { ReviewRepository } from './repository'
 import type { ReviewState } from './model'
+import { listTargets, assertWorkspaceTarget } from './workspace'
+import type { ReviewExport } from './repository'
 
 const ORIGIN = 'http://127.0.0.1:5174'
 export function reviewApi(root: string) {
@@ -44,6 +41,7 @@ export function reviewApi(root: string) {
           runId: url.searchParams.get('runId') ?? '',
           characterId: url.searchParams.get('characterId') ?? '',
         }
+        await assertWorkspaceTarget(root, target)
         if (url.pathname === '/api/review/load')
           return json(200, await repository.load(target))
         if (url.pathname === '/api/review/image') {
@@ -84,21 +82,50 @@ export function reviewApi(root: string) {
           chunks.push(Buffer.from(chunk))
         }
         const body = object(JSON.parse(Buffer.concat(chunks).toString('utf8')))
-        const state = object(body.state) as unknown as ReviewState
-        if (body.revision !== null && typeof body.revision !== 'string')
-          throw new Error('검수 저장 버전이 없습니다.')
-        if (url.pathname === '/api/review/save')
-          return json(200, await repository.save(state, body.revision))
-        if (url.pathname === '/api/review/validate')
-          return json(200, await repository.validate(state))
-        if (url.pathname === '/api/review/publish') {
-          if (typeof body.token !== 'string')
-            throw new Error('검증 결과가 없습니다.')
-          return json(
-            200,
-            await repository.publish(state, body.revision, body.token),
-          )
+        if (
+          !['/api/review/validate', '/api/review/export'].includes(url.pathname)
+        )
+          return json(404, { error: '지원하지 않는 검수 요청입니다.' })
+        if (
+          !Array.isArray(body.states) ||
+          !body.states.length ||
+          body.states.length > 200
+        )
+          throw new Error('검수할 공명자 목록이 필요합니다.')
+        const states = body.states.map(
+          (value) => object(value) as unknown as ReviewState,
+        )
+        if (new Set(states.map((s) => s.characterId)).size !== states.length)
+          throw new Error('중복 공명자입니다.')
+        for (const state of states) await assertWorkspaceTarget(root, state)
+        const results = []
+        const characters: ReviewExport['characters'] = []
+        for (const state of states) {
+          const checked = await repository.validate(state)
+          results.push({
+            characterId: state.characterId,
+            displayName: state.displayName,
+            ...checked,
+          })
+          if (url.pathname === '/api/review/export' && !checked.errors.length)
+            characters.push(await repository.exportCharacter(state))
         }
+        if (url.pathname === '/api/review/validate')
+          return json(200, { results })
+        if (!characters.length)
+          throw new Error(
+            '검증을 통과한 공명자가 없습니다. 누락 항목을 확인해 주세요.',
+          )
+        // 모든 선택 대상의 원본/DB 기준을 마지막에 다시 확인한다.
+        for (const character of characters)
+          await repository.exportCharacter(character.review)
+        const file: ReviewExport = {
+          format: 'wuwa-character-review',
+          schemaVersion: 1,
+          status: 'pending-agent-validation',
+          characters,
+        }
+        return json(200, { file, results })
       }
       return json(404, { error: '지원하지 않는 검수 요청입니다.' })
     } catch (error) {

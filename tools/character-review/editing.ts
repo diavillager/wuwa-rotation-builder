@@ -81,3 +81,56 @@ export function moveReviewCard(
   items.splice(to, 0, item)
   return { ...state, [group]: items }
 }
+
+export interface AssignmentReceipt {
+  before: ReviewState
+  after: ReviewState
+  manual: string[]
+}
+export const reviewFieldKey = (
+  group: 'candidates' | 'existingSkills',
+  id: string,
+  field: string,
+) => `${group}:${id}:${field}`
+
+/** 자동으로 바뀐 필드만 복원한다. 직접 편집한 필드와 배열 순서는 유지한다. */
+export function undoEncore(
+  state: ReviewState,
+  receipt: AssignmentReceipt,
+): ReviewState {
+  const next = structuredClone(state)
+  for (const group of ['candidates', 'existingSkills'] as const) {
+    const idOf = (
+      item:
+        | ReviewState['candidates'][number]
+        | ReviewState['existingSkills'][number],
+    ) => ('skillId' in item ? item.skillId : item.candidateId)
+    for (const item of next[group]) {
+      const id = idOf(item)
+      const before = receipt.before[group].find((c) => idOf(c) === id)
+      const after = receipt.after[group].find((c) => idOf(c) === id)
+      if (!before || !after) continue
+      for (const field of ['category', 'displayName', 'decision'] as const) {
+        if (receipt.manual.includes(reviewFieldKey(group, id, field))) continue
+        const value = item as unknown as Record<string, unknown>
+        const previous = before as unknown as Record<string, unknown>
+        const assigned = after as unknown as Record<string, unknown>
+        if (
+          value[field] === assigned[field] &&
+          previous[field] !== assigned[field]
+        ) {
+          if (previous[field] === undefined) delete value[field]
+          else value[field] = previous[field]
+        }
+      }
+    }
+  }
+  for (const kind of AUTO_KINDS) {
+    if (
+      !receipt.manual.includes(`autoActions:${kind}`) &&
+      next.autoActions[kind] === receipt.after.autoActions[kind]
+    )
+      next.autoActions[kind] = receipt.before.autoActions[kind]
+  }
+  return linkCategorizedActions(next)
+}

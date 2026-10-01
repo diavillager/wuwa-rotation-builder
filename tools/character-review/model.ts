@@ -44,11 +44,13 @@ export interface ReviewState {
   displayName: string
   attribute: Element
   portraitCandidateId: string | null
+  cardOrder?: string[]
   existingSkills: {
     category?: SkillCategory
     skillId: string
     displayName: string
     visible: boolean
+    decision?: 'pending' | 'include' | 'exclude'
     candidateId: string | null
   }[]
   candidates: {
@@ -122,4 +124,48 @@ export function selectableSkills(state: ReviewState) {
         name: c.displayName,
       })),
   ]
+}
+
+export function reviewCards(state: ReviewState, source: ReviewSource) {
+  const linked = new Set<string>()
+  const existing = state.existingSkills.map((skill, index) => {
+    const candidate = source.draft.candidates.find(
+      (c) =>
+        c.kind === 'skill' &&
+        (c.candidateId === skill.candidateId ||
+          (!skill.candidateId &&
+            candidateSkillId(state.characterId, c.candidateId) ===
+              skill.skillId)),
+    )
+    if (candidate) linked.add(candidate.candidateId)
+    return {
+      key: skill.skillId,
+      group: 'existingSkills' as const,
+      index,
+      candidate,
+    }
+  })
+  const fresh = state.candidates.flatMap((c, index) =>
+    linked.has(c.candidateId)
+      ? []
+      : [
+          {
+            key: c.candidateId,
+            group: 'candidates' as const,
+            index,
+            candidate: source.draft.candidates.find(
+              (item) => item.candidateId === c.candidateId,
+            ),
+          },
+        ],
+  )
+  const cards = [...existing, ...fresh]
+  const order = state.cardOrder ?? cards.map((c) => c.key)
+  return cards.sort((a, b) => {
+    const index = (key: string) => {
+      const i = order.indexOf(key)
+      return i < 0 ? order.length : i
+    }
+    return index(a.key) - index(b.key)
+  })
 }

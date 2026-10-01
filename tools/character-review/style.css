@@ -106,7 +106,7 @@ p {
 }
 .review-layout {
   display: grid;
-  grid-template-columns: 230px minmax(380px, 1fr) 285px;
+  grid-template-columns: 280px minmax(0, 1fr);
   align-items: start;
   gap: 18px;
 }
@@ -116,14 +116,13 @@ p {
   border: 1px solid #33464e;
   border-radius: 14px;
 }
-.target-panel,
-.decision-panel {
-  position: sticky;
-  top: 20px;
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #56786f transparent;
+.review-sidebar {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.review-main {
+  min-width: 0;
 }
 .target-run {
   border-top: 1px solid #34464e;
@@ -141,7 +140,7 @@ p {
   font-weight: 400;
   color: #81979f;
 }
-.target-run button {
+.target-list button {
   width: 100%;
   display: flex;
   justify-content: space-between;
@@ -150,11 +149,11 @@ p {
   gap: 8px;
   margin-top: 6px;
 }
-.target-run button span {
+.target-list button span {
   font-size: 11px;
   color: #93adb3;
 }
-.target-run button[aria-current='page'] {
+.target-list button[aria-current='page'] {
   background: #2e5149;
   border-color: #8cc9b8;
 }
@@ -386,10 +385,10 @@ code {
 @media (max-width: 1150px) {
   .review-app {
     padding: 20px;
-    min-width: 950px;
+    min-width: 0;
   }
   .review-layout {
-    grid-template-columns: 180px minmax(340px, 1fr) 260px;
+    grid-template-columns: 230px minmax(0, 1fr);
     gap: 12px;
   }
   .review-panel {
@@ -421,4 +420,63 @@ code {
 .review-card[data-drop-target='true'] {
   outline: 2px solid #9edccf;
   outline-offset: -2px;
+}
+
+.basic-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: center;
+}
+.basic-fields label {
+  margin: 0;
+}
+.review-cards {
+  grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+}
+.decision-options {
+  display: flex;
+  gap: 18px;
+  margin: 16px 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #111c22;
+}
+.decision-options label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.decision-options input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  accent-color: #8dccb9;
+}
+.assignment-toggle {
+  width: 100%;
+  margin: 16px 0 4px;
+}
+.assignment-toggle[aria-pressed='true'] {
+  border-color: #8cc9b8;
+  background: #2e5149;
+}
+.review-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 18px;
+}
+.review-welcome {
+  grid-column: auto;
+}
+.target-list {
+  margin-top: 14px;
+}
+@media (max-width: 1150px) {
+  .basic-fields {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
 }

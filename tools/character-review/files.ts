@@ -1,4 +1,4 @@
-import { lstat, mkdir, readdir, realpath } from 'node:fs/promises'
+import { lstat, mkdir, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { validateCharacterData } from '../../src/data/characters/contract'
 import { ELEMENTS } from '../../src/app/catalog'
@@ -148,14 +148,6 @@ export async function loadSource(
   const directory = targetDirectory(root, target)
   const raw = await readInside(root, path.join(directory, 'draft.json'))
   const draft = parseDraft(JSON.parse(raw.toString('utf8')), target.characterId)
-  const carryError = await optionalFile(
-    root,
-    path.join(directory, 'carry-error.json'),
-  )
-  if (carryError)
-    draft.errors.push(
-      nonempty(object(JSON.parse(carryError.toString('utf8'))).message),
-    )
   let encore: Pick<ReviewSource, 'encoreMatches' | 'encoreErrors'> = {}
   try {
     const savedEncore = await optionalFile(
@@ -203,46 +195,6 @@ export async function loadSource(
     currentError,
   }
 }
-export async function listTargets(root: string) {
-  const result: { targets: ReviewTarget[]; errors: string[] } = {
-    targets: [],
-    errors: [],
-  }
-  const runsRoot = path.join(root, '.character-sync/runs')
-  let runs
-  try {
-    await assertInside(root, runsRoot)
-    runs = await readdir(runsRoot, { withFileTypes: true })
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return result
-    throw error
-  }
-  for (const run of runs
-    .filter((r) => r.isDirectory())
-    .sort((a, b) => b.name.localeCompare(a.name))) {
-    await assertInside(root, path.join(runsRoot, run.name))
-    const directories = await readdir(path.join(runsRoot, run.name), {
-      withFileTypes: true,
-    })
-    for (const directory of directories.filter(
-      (d) => d.isDirectory() && /^\d+$/.test(d.name),
-    )) {
-      try {
-        const source = await loadSource(root, {
-          runId: run.name,
-          characterId: directory.name,
-        })
-        result.targets.push(source.target)
-      } catch (error) {
-        result.errors.push(
-          `${run.name}/${directory.name}: ${errorMessage(error)}`,
-        )
-      }
-    }
-  }
-  return result
-}
-
 export async function readCurrentAsset(
   root: string,
   source: ReviewSource,

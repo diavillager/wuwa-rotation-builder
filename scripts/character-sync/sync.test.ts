@@ -24,9 +24,6 @@ import type { Sources } from './sources'
 import { main } from './cli'
 import type { CharacterData } from '../../src/data/characters/contract'
 import { assetCandidates, ASSET_ROOT } from './assets'
-import { ReviewRepository } from '../../tools/character-review/repository'
-import { loadSource } from '../../tools/character-review/files'
-import { carryState } from '../../tools/character-review/carry'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -265,112 +262,6 @@ describe('등록 판정과 보존', () => {
       runSync(root, sources, { characters: ['1102', '1102'] }),
     ).rejects.toThrow('중복')
   })
-  it('검수 이름·순서·분류·제외·자동 행동을 새 실행으로 보존하고 새 후보만 뒤에 추가한다', async () => {
-    const root = await temp()
-    const final = await registered(root)
-    const finalBefore = await readFile(final.json)
-    const sources = await sourceFixture()
-    const first = await runSync(root, sources, { character: '1102' })
-    if (first.plan) throw new Error('잘못된 결과')
-    const repository = new ReviewRepository(root)
-    const original = await repository.load({
-      runId: first.report.runId,
-      characterId: '1102',
-    })
-    original.state.displayName = '직접 검수한 이름'
-    original.state.existingSkills[0].displayName = '유지할 스킬명'
-    original.state.candidates.reverse()
-    original.state.candidates[0] = {
-      ...original.state.candidates[0],
-      displayName: '직접 지정',
-      category: '고유 스킬',
-      decision: 'exclude',
-    }
-    await repository.save(original.state, null)
-    const oldFile = path.join(first.directory, '1102/review.json')
-    const before = await readFile(oldFile)
-    const assetSnapshot = await sources.assets()
-    sources.assets = async () => ({
-      ...assetSnapshot,
-      paths: [...assetSnapshot.paths, `${ASSET_ROOT}SkillIconExample/New.webp`],
-    })
-    const second = await runSync(root, sources, { character: '1102' })
-    if (second.plan) throw new Error('잘못된 결과')
-    expect(second.report.errors).toEqual([])
-    expect(second.report.results[0].inheritedReview).toBe(first.report.runId)
-    const restored = await repository.load({
-      runId: second.report.runId,
-      characterId: '1102',
-    })
-    expect(restored.conflict).toBeNull()
-    expect(restored.state.candidates.slice(0, -1)).toEqual(
-      original.state.candidates,
-    )
-    expect(restored.state.candidates.at(-1)).toMatchObject({
-      decision: 'pending',
-      displayName: '',
-    })
-    expect(restored.state.existingSkills).toEqual(original.state.existingSkills)
-    expect(restored.state.autoActions).toEqual(original.state.autoActions)
-    expect(restored.state.displayName).toBe('직접 검수한 이름')
-    expect(await readFile(oldFile)).toEqual(before)
-    expect(await readFile(final.json)).toEqual(finalBefore)
-
-    const next = await loadSource(root, {
-      runId: second.report.runId,
-      characterId: '1102',
-    })
-    const saved = await repository.load({
-      runId: first.report.runId,
-      characterId: '1102',
-    })
-    const changed = structuredClone(next)
-    changed.draft.candidates.find(
-      (c) => c.candidateId === saved.source.draft.candidates[0].candidateId,
-    )!.download = { status: 'failed', error: '이미지 변경' }
-    expect(() => carryState(saved, changed)).toThrow('이미지')
-    const missing = structuredClone(next)
-    missing.draft.candidates = []
-    expect(() => carryState(saved, missing)).toThrow('누락')
-    expect(() =>
-      carryState(saved, { ...next, currentHash: 'changed' }),
-    ).toThrow('기준')
-  })
-  it('이미지가 달라지면 검수를 이전하지 않고 오류와 원본을 보존한다', async () => {
-    const root = await temp()
-    const sources = await sourceFixture()
-    const first = await runSync(root, sources, { character: '1102' })
-    if (first.plan) throw new Error('잘못된 결과')
-    const repository = new ReviewRepository(root)
-    const original = await repository.load({
-      runId: first.report.runId,
-      characterId: '1102',
-    })
-    await repository.save(original.state, null)
-    const before = await readFile(
-      path.join(first.directory, '1102/review.json'),
-    )
-    sources.download = async () =>
-      sharp({
-        create: { width: 3, height: 3, channels: 4, background: '#ff0000' },
-      })
-        .webp()
-        .toBuffer()
-    const second = await runSync(root, sources, { character: '1102' })
-    if (second.plan) throw new Error('잘못된 결과')
-    expect(second.report.results[0].status).toBe('partial')
-    const session = await repository.load({
-      runId: second.report.runId,
-      characterId: '1102',
-    })
-    expect(session.revision).toBeNull()
-    expect(
-      session.source.draft.errors.some((e) => e.includes('검수 이전 실패')),
-    ).toBe(true)
-    expect(
-      await readFile(path.join(first.directory, '1102/review.json')),
-    ).toEqual(before)
-  })
   it('전체 수집은 정상 등록을 건너뛰고 나머지 대상만 수집한다', async () => {
     const root = await temp()
     const final = await registered(root)
@@ -424,7 +315,7 @@ describe('등록 판정과 보존', () => {
     expect(first.report.errors).toEqual([])
     const draftPath = path.join(first.directory, '1102/draft.json')
     const draft = JSON.parse(await readFile(draftPath, 'utf8'))
-    expect(draft.existingReview.raw).toBe(before.toString())
+    expect(draft.existingReview).toBeUndefined()
     expect(draft.autoActions).toEqual({
       normalSwitchAttack: null,
       intro: null,

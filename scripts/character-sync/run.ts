@@ -19,7 +19,7 @@ import {
 } from './io'
 import type { Sources, WwSnapshot } from './sources'
 import { assetCandidates, type AssetSnapshot } from './assets'
-import { carryLatestReview } from '../../tools/character-review/carry'
+import { setWorkspaceTargets } from '../../tools/character-review/workspace'
 
 export type Mode =
   { all: true } | { character: string } | { characters: string[] }
@@ -55,7 +55,7 @@ export interface SyncReport {
   startedAt: string
   mode: Mode
   targets: string[]
-  registrations: ExistingRecord[]
+  registrations: Pick<ExistingRecord, 'characterId' | 'valid' | 'errors'>[]
   wwRef: string | null
   assetRef: string | null
   results: {
@@ -63,7 +63,6 @@ export interface SyncReport {
     status: 'collected' | 'partial' | 'failed'
     candidates: number
     verified: number
-    inheritedReview?: string
   }[]
   errors: { scope: string; message: string }[]
 }
@@ -88,7 +87,11 @@ export async function runSync(
     startedAt,
     mode,
     targets,
-    registrations,
+    registrations: registrations.map(({ characterId, valid, errors }) => ({
+      characterId,
+      valid,
+      errors,
+    })),
     wwRef: null,
     assetRef: null,
     results: [],
@@ -166,14 +169,11 @@ export async function runSync(
         })
       }
     }
-    const existingReview =
-      registrations.find((r) => r.characterId === id) ?? null
     await writeJson(path.join(characterDirectory, 'draft.json'), {
       schemaVersion: 1,
       reviewStatus: 'pending',
       characterId: id,
       basicCandidate: basic,
-      existingReview,
       candidates,
       autoActions: { normalSwitchAttack: null, intro: null, outro: null },
       errors,
@@ -181,26 +181,18 @@ export async function runSync(
     const verified = candidates.filter(
       (c) => c.download.status === 'verified',
     ).length
-    let inheritedReview: string | null = null
-    try {
-      inheritedReview = await carryLatestReview(repoRoot, runId, id)
-    } catch (error) {
-      const message = `검수 이전 실패: ${errorMessage(error)}`
-      errors.push(message)
-      // 초안을 바꾸면 검수 hash가 바뀌므로 별도의 진단으로 보존한다.
-      await writeJson(path.join(characterDirectory, 'carry-error.json'), {
-        message,
-      })
-    }
     report.results.push({
       characterId: id,
       status: errors.length ? (verified ? 'partial' : 'failed') : 'collected',
       candidates: candidates.length,
       verified,
-      ...(inheritedReview ? { inheritedReview } : {}),
     })
     report.errors.push(...errors.map((message) => ({ scope: id, message })))
   }
   await writeJson(path.join(directory, 'report.json'), report)
+  await setWorkspaceTargets(
+    repoRoot,
+    targets.map((characterId) => ({ runId, characterId })),
+  )
   return { plan: false as const, directory, report }
 }

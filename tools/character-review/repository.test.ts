@@ -1,5 +1,6 @@
 import {
   mkdtemp,
+  cp,
   mkdir,
   readFile,
   readdir,
@@ -13,6 +14,7 @@ import sharp from 'sharp'
 import { afterEach, describe, expect, it } from 'vitest'
 import { sha256 } from '../../scripts/character-sync/candidates'
 import { scanRegistered } from '../../scripts/character-sync/io'
+import { setWorkspaceTargets } from './workspace'
 import type { CharacterData } from '../../src/data/characters/contract'
 import { ReviewRepository } from './repository'
 import { candidateSkillId, type ReviewState } from './model'
@@ -145,195 +147,122 @@ function complete(
   }
   return next
 }
-describe('검수 저장과 최종 반영', () => {
-  it('분류·실제 이름·배치 순서를 저장·재열기·최종 반영 후 보존한다', async () => {
+describe('검수 검증과 JSON 전달', () => {
+  it('미완성 검수는 검증 오류로 남고 Export는 DB나 검수 파일을 만들지 않는다', async () => {
     const f = await fixture()
+    const state = (await f.repository.load(target)).state
+    expect((await f.repository.validate(state)).errors.length).toBeGreaterThan(
+      3,
+    )
+    await expect(f.repository.exportCharacter(state)).rejects.toThrow()
+    expect(await scanRegistered(f.root)).toEqual([])
+    expect((await readdir(f.directory)).sort()).toEqual([
+      'assets',
+      'draft.json',
+    ])
+  })
+  it('과거 review.json은 읽지 않고 매번 새 검수를 시작한다', async () => {
+    const f = await fixture()
+    await writeFile(path.join(f.directory, 'review.json'), '손상된 과거 검수')
+    const session = await f.repository.load(target)
+    expect(session.revision).toBeNull()
+    expect(
+      session.state.candidates.every(
+        (c) => c.decision === 'pending' && c.displayName === '',
+      ),
+    ).toBe(true)
+    expect(session.conflict).toBeNull()
+  })
+  it('이름·분류·통합 카드 순서를 Export에 보존하며 실제 WebP와 hash를 포함한다', async () => {
+    const f = await fixture()
+    const before = await readFile(path.join(f.directory, 'draft.json'))
     const state = complete(
       (await f.repository.load(target)).state,
       f.candidates,
     )
     const categories = ['기본 공격', '변주 스킬', '반주 스킬'] as const
-    state.candidates.forEach((candidate, i) => {
-      candidate.category = categories[i]
+    state.candidates.forEach((c, i) => {
+      c.category = categories[i]
     })
-    state.candidates.reverse()
-    const saved = await f.repository.save(state, null)
-    expect((await f.repository.load(target)).state.candidates).toEqual(
-      state.candidates,
-    )
-    const checked = await f.repository.validate(state)
-    expect(checked.errors).toEqual([])
-    const result = await f.repository.publish(
-      state,
-      saved.revision,
-      checked.token!,
-    )
-    const data = JSON.parse(
-      await readFile(f.finalFile, 'utf8'),
-    ) as CharacterData
-    expect(data.skills.map((s) => s.category)).toEqual([
+    state.cardOrder = state.candidates.map((c) => c.candidateId).reverse()
+    const result = await f.repository.exportCharacter(state)
+    expect(result.character.reviewStatus).toBe('pending-agent-validation')
+    expect(result.character.skills.map((s) => s.category)).toEqual([
       '반주 스킬',
       '변주 스킬',
       '기본 공격',
     ])
-    expect(data.skills.map((s) => s.displayName)).toEqual(
-      state.candidates.map((c) => c.displayName),
-    )
-    expect(result.session.state.candidates.map((c) => c.candidateId)).toEqual(
-      state.candidates.map((c) => c.candidateId),
-    )
-    expect(
-      (await f.repository.load(target)).state.existingSkills.map(
-        (s) => s.category,
-      ),
-    ).toEqual(data.skills.map((s) => s.category))
-    const wrong = structuredClone(result.session.state)
-    const reordered = structuredClone(result.session.state)
-    reordered.existingSkills.reverse()
-    expect((await f.repository.validate(reordered)).summary).toContain(
-      '스킬 목록 또는 표시 순서 변경',
-    )
-    wrong.autoActions.normalSwitchAttack = wrong.autoActions.intro
-    expect((await f.repository.validate(wrong)).errors.join()).toContain(
-      '기본 공격',
-    )
-  })
-  it('손상된 저장 검수를 빈 검수로 대체하거나 화면에 넘기지 않는다', async () => {
-    const f = await fixture()
-    const { state } = await f.repository.load(target)
-    const damaged = JSON.stringify({
-      schemaVersion: 1,
-      state: { ...state, candidates: [null] },
-    })
-    const file = path.join(f.directory, 'review.json')
-    await writeFile(file, damaged)
-    await expect(f.repository.load(target)).rejects.toThrow('손상')
-    expect(await readFile(file, 'utf8')).toBe(damaged)
-  })
-  it('미완성 내용도 저장·복원하지만 검증 전 반영은 차단한다', async () => {
-    const f = await fixture()
-    const session = await f.repository.load(target)
-    const state = structuredClone(session.state)
-    state.candidates[0].displayName = '검수 중 이름'
-    const saved = await f.repository.save(state, null)
-    expect(saved.state).toEqual(state)
-    expect((await new ReviewRepository(f.root).load(target)).state).toEqual(
-      state,
-    )
-    expect((await f.repository.validate(state)).errors.length).toBeGreaterThan(
-      3,
-    )
-    await expect(
-      f.repository.publish(state, saved.revision, 'forged'),
-    ).rejects.toThrow()
+    expect(result.assets).toHaveLength(1)
+    expect(Buffer.from(result.assets[0].base64, 'base64')).toEqual(f.bytes)
+    expect(result.assets[0].sha256).toBe(sha256(f.bytes))
+    expect(await readFile(path.join(f.directory, 'draft.json'))).toEqual(before)
     expect(await scanRegistered(f.root)).toEqual([])
+    expect((await readdir(f.directory)).sort()).toEqual([
+      'assets',
+      'draft.json',
+    ])
   })
-  it('수동 검수를 통과한 JSON·이미지만 반영하고 다시 열어도 공개 ID를 보존한다', async () => {
-    const f = await fixture()
-    const state = complete(
-      (await f.repository.load(target)).state,
-      f.candidates,
-    )
-    const checked = await f.repository.validate(state)
-    expect(checked.errors).toEqual([])
-    const result = await f.repository.publish(state, null, checked.token!)
-    expect(result.warning).toBeNull()
-    const final = JSON.parse(await readFile(f.finalFile, 'utf8'))
-    expect(final.autoActions).toEqual(state.autoActions)
-    expect(final.skills.map((s: { skillId: string }) => s.skillId)).toEqual(
-      state.candidates.map((c) => candidateSkillId('1102', c.candidateId)),
-    )
-    expect(await readFile(path.join(f.finalDirectory, final.portrait))).toEqual(
-      f.bytes,
-    )
-    expect((await scanRegistered(f.root))[0].valid).toBe(true)
-    expect((await f.repository.validate(result.session.state)).errors).toEqual(
-      [],
-    )
-  })
-  it('기존 스킬의 이름·아이콘 변경은 같은 ID를 유지하고 반영 전 원문을 보관한다', async () => {
+  it('기존 공개 ID를 보존하고 JSON Export가 기존 DB와 이미지를 수정하지 않는다', async () => {
     const f = await fixture(true)
     const before = await readFile(f.finalFile)
-    const session = await f.repository.load(target)
-    const state = structuredClone(session.state)
-    state.existingSkills[0].displayName = '변경한 검수 이름'
-    state.existingSkills[0].candidateId = f.candidates[1].candidateId
+    const state = (await f.repository.load(target)).state
+    state.existingSkills[0].displayName = '변경할 이름'
     state.candidates.forEach((c) => {
       c.decision = 'exclude'
     })
-    const checked = await f.repository.validate(state)
-    expect(checked.errors).toEqual([])
-    await f.repository.publish(state, null, checked.token!)
-    const final = JSON.parse(await readFile(f.finalFile, 'utf8'))
-    expect(final.skills).toHaveLength(1)
-    expect(final.skills[0]).toMatchObject({
-      skillId: '1102:public',
-      displayName: '변경한 검수 이름',
-    })
-    expect(final.autoActions).toEqual(session.source.current!.autoActions)
-    const backup = (await readdir(f.directory)).find((file) =>
-      file.startsWith('before-publish-'),
-    )!
-    expect(await readFile(path.join(f.directory, backup))).toEqual(before)
-    expect(
-      await readFile(path.join(f.finalDirectory, 'assets/original.webp')),
-    ).toEqual(f.bytes)
-  })
-  it('다른 창의 저장과 기존 공개 ID 삭제를 거부한다', async () => {
-    const f = await fixture(true)
-    const state = (await f.repository.load(target)).state
-    await f.repository.save(state, null)
-    await expect(f.repository.save(state, null)).rejects.toThrow('다른 창')
-    const broken = { ...state, existingSkills: [] }
-    expect((await f.repository.validate(broken)).errors.join()).toContain(
-      '공개 Skill ID',
-    )
-  })
-  it('검증 후 최종 파일·후보 이미지가 바뀌면 덮어쓰지 않는다', async () => {
-    const f = await fixture(true)
-    const state = complete(
-      (await f.repository.load(target)).state,
-      f.candidates,
-    )
-    const checked = await f.repository.validate(state)
-    await writeFile(path.join(f.directory, f.candidates[1].asset), 'corrupted')
-    await expect(
-      f.repository.publish(state, null, checked.token!),
-    ).rejects.toThrow('이미지가 변경')
-    await writeFile(path.join(f.directory, f.candidates[1].asset), f.bytes)
-    const other = JSON.parse(await readFile(f.finalFile, 'utf8'))
-    other.displayName = '다른 작업의 변경'
-    await writeFile(f.finalFile, JSON.stringify(other))
-    await expect(
-      f.repository.publish(state, null, checked.token!),
-    ).rejects.toThrow('최종 파일이 변경')
-    expect(JSON.parse(await readFile(f.finalFile, 'utf8')).displayName).toBe(
-      '다른 작업의 변경',
-    )
-  })
-  it('마지막 반영에 실패하면 기존 JSON과 참조 이미지를 유지한다', async () => {
-    const f = await fixture(true)
-    const before = await readFile(f.finalFile)
-    const repository = new ReviewRepository(f.root, async () => {
-      throw new Error('반영 실패 시험')
-    })
-    const state = complete((await repository.load(target)).state, f.candidates)
-    const checked = await repository.validate(state)
-    await expect(
-      repository.publish(state, null, checked.token!),
-    ).rejects.toThrow('반영 실패 시험')
+    const exported = await f.repository.exportCharacter(state)
+    expect(exported.character.skills[0].skillId).toBe('1102:public')
+    expect(exported.character.skills[0].displayName).toBe('변경할 이름')
     expect(await readFile(f.finalFile)).toEqual(before)
     expect(
       await readFile(path.join(f.finalDirectory, 'assets/original.webp')),
     ).toEqual(f.bytes)
+    expect((await readdir(f.directory)).sort()).toEqual([
+      'assets',
+      'draft.json',
+    ])
+    expect(
+      (
+        await f.repository.validate({ ...state, existingSkills: [] })
+      ).errors.join(),
+    ).toContain('공개 Skill ID')
   })
-  it('다운로드 실패를 제외한 검수에서도 실패 기록은 남고 필수 선택만 검증한다', async () => {
+  it('원본·이미지·DB 변경과 잘못된 카드 순서, 참조를 거부한다', async () => {
+    const f = await fixture(true)
+    const state = complete(
+      (await f.repository.load(target)).state,
+      f.candidates,
+    )
+    await writeFile(path.join(f.directory, f.candidates[1].asset), 'broken')
+    await expect(f.repository.exportCharacter(state)).rejects.toThrow(
+      '이미지가 변경',
+    )
+    await writeFile(path.join(f.directory, f.candidates[1].asset), f.bytes)
+    expect(
+      (await f.repository.validate({ ...state, cardOrder: [] })).errors.join(),
+    ).toContain('카드 순서')
+    expect(
+      (
+        await f.repository.validate({
+          ...state,
+          autoActions: { ...state.autoActions, intro: 'absent' },
+        })
+      ).errors.join(),
+    ).toContain('참조')
+    const final = JSON.parse(await readFile(f.finalFile, 'utf8'))
+    final.displayName = '다른 작업'
+    await writeFile(f.finalFile, JSON.stringify(final))
+    await expect(f.repository.exportCharacter(state)).rejects.toThrow(
+      '최종 파일이 변경',
+    )
+  })
+  it('실패 후보는 제외할 수 있고 실패 기록은 유지한다', async () => {
     const f = await fixture()
-    const draftFile = path.join(f.directory, 'draft.json')
-    const draft = JSON.parse(await readFile(draftFile, 'utf8'))
+    const file = path.join(f.directory, 'draft.json')
+    const draft = JSON.parse(await readFile(file, 'utf8'))
     draft.candidates[3].download = { status: 'failed', error: 'HTTP 404' }
     draft.errors = ['후보 다운로드 실패']
-    await writeFile(draftFile, JSON.stringify(draft))
+    await writeFile(file, JSON.stringify(draft))
     const state = complete(
       (await f.repository.load(target)).state,
       f.candidates,
@@ -345,14 +274,15 @@ describe('검수 저장과 최종 반영', () => {
       '후보 다운로드 실패',
     ])
     state.candidates[2].decision = 'include'
-    expect((await f.repository.validate(state)).errors.join()).toContain(
+    await expect(f.repository.exportCharacter(state)).rejects.toThrow(
       '검증된 후보 이미지',
     )
   })
 })
 describe('로컬 검수 파일 API', () => {
-  it('외부 Origin·Host·위조 토큰·경로 탈출을 거부하고 승인된 미완성 저장은 허용한다', async () => {
+  it('외부 접근·미지정 대상·기존 쓰기 API를 차단하고 검증 통과 대상만 묶어 내보낸다', async () => {
     const f = await fixture()
+    await setWorkspaceTargets(f.root, [target])
     const api = reviewApi(f.root)
     const server = createServer((request, response) => {
       void api(request, response, () => {
@@ -415,7 +345,7 @@ describe('로컬 검수 파일 API', () => {
         'Content-Type': 'application/json',
         'X-Review-Token': token,
       },
-      body: JSON.stringify({ state, revision: null }),
+      body: JSON.stringify({ states: [state] }),
     }
     expect(
       (
@@ -425,7 +355,68 @@ describe('로컬 검수 파일 API', () => {
         })
       ).status,
     ).toBe(403)
-    expect((await fetch(`${base}/save`, init)).status).toBe(200)
+    expect((await fetch(`${base}/save`, init)).status).toBe(404)
+    expect((await fetch(`${base}/publish`, init)).status).toBe(404)
+    expect((await fetch(`${base}/export`, init)).status).toBe(400)
+    expect((await fetch(`${base}/validate`, init)).status).toBe(200)
+    const completeState = complete(state, f.candidates)
+    const exported = await fetch(`${base}/export`, {
+      ...init,
+      body: JSON.stringify({ states: [completeState] }),
+    })
+    expect(exported.status).toBe(200)
+    const payload = await exported.json()
+    expect(payload.file.status).toBe('pending-agent-validation')
+    expect(payload.file.characters).toHaveLength(1)
+    expect(await scanRegistered(f.root)).toEqual([])
+    // 서로 다른 세 대상 중 두 명만 완료했을 때 한 파일에 두 명을 담는다.
+    const batchTargets = [target]
+    for (const characterId of ['1103', '1104']) {
+      const extra = { ...target, characterId }
+      const destination = path.join(path.dirname(f.directory), characterId)
+      await cp(f.directory, destination, { recursive: true })
+      const draftFile = path.join(destination, 'draft.json')
+      const draft = JSON.parse(await readFile(draftFile, 'utf8'))
+      draft.characterId = characterId
+      await writeFile(draftFile, JSON.stringify(draft))
+      batchTargets.push(extra)
+    }
+    await setWorkspaceTargets(f.root, batchTargets)
+    const second = complete(
+      (await f.repository.load(batchTargets[1])).state,
+      f.candidates,
+    )
+    second.autoActions = Object.fromEntries(
+      Object.entries(second.autoActions).map(([key, id]) => [
+        key,
+        id?.replace('1102:', '1103:'),
+      ]),
+    ) as ReviewState['autoActions']
+    const incomplete = (await f.repository.load(batchTargets[2])).state
+    const batch = await fetch(`${base}/export`, {
+      ...init,
+      body: JSON.stringify({ states: [completeState, second, incomplete] }),
+    })
+    expect(batch.status).toBe(200)
+    const batchPayload = await batch.json()
+    expect(
+      batchPayload.file.characters.map(
+        (c: { characterId: string }) => c.characterId,
+      ),
+    ).toEqual(['1102', '1103'])
+    expect(batchPayload.results[2].errors.length).toBeGreaterThan(0)
+    expect(await scanRegistered(f.root)).toEqual([])
+    const listing = await (
+      await fetch(`${base}/targets`, { headers: host })
+    ).json()
+    expect(listing.targets).toHaveLength(3)
+    expect(
+      (
+        await fetch(`${base}/load?runId=older-run&characterId=1102`, {
+          headers: host,
+        })
+      ).status,
+    ).toBe(400)
     expect(
       (await fetch(`${base}/load?runId=..&characterId=1102`, { headers: host }))
         .status,

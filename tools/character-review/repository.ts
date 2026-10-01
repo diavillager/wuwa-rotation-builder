@@ -1,6 +1,3 @@
-import { rename, unlink, writeFile } from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
-import path from 'node:path'
 import { ELEMENTS } from '../../src/app/catalog'
 import { isSkillCategory } from '../../src/data/characters/categories'
 import {
@@ -13,20 +10,13 @@ import {
   errorMessage,
   scanRegistered,
 } from '../../scripts/character-sync/io'
-import {
-  assertInside,
-  ensureDirectory,
-  loadSource,
-  optionalFile,
-  readCandidateAsset,
-  readCurrentAsset,
-  targetDirectory,
-} from './files'
+import { loadSource, readCandidateAsset, readCurrentAsset } from './files'
 import {
   AUTO_KINDS,
   AUTO_LABELS,
   candidateSkillId,
   initialReview,
+  reviewCards,
   type ReviewSession,
   type ReviewSource,
   type ReviewState,
@@ -34,7 +24,6 @@ import {
   type ReviewValidation,
 } from './model'
 
-/** 미완성 검수도 저장할 수 있지만 대상·ID·필드 형식은 항상 검증한다. */
 export function parseReview(value: unknown, source: ReviewSource): ReviewState {
   const state = object(value) as unknown as ReviewState
   if (
@@ -75,6 +64,10 @@ export function parseReview(value: unknown, source: ReviewSource): ReviewState {
       (skill.category !== undefined && !isSkillCategory(skill.category)) ||
       typeof skill.displayName !== 'string' ||
       typeof skill.visible !== 'boolean' ||
+      (skill.decision !== undefined &&
+        !['pending', 'include', 'exclude'].includes(skill.decision)) ||
+      (skill.decision !== undefined &&
+        skill.visible !== (skill.decision === 'include')) ||
       (skill.candidateId !== null &&
         !source.draft.candidates.some(
           (c) => c.kind === 'skill' && c.candidateId === skill.candidateId,
@@ -101,113 +94,37 @@ export function parseReview(value: unknown, source: ReviewSource): ReviewState {
     )
       throw new Error('후보 검수 형식이 유효하지 않습니다.')
   const auto = object(state.autoActions)
+  if (state.cardOrder !== undefined) {
+    const expected = reviewCards(
+      { ...state, cardOrder: undefined },
+      source,
+    ).map((c) => c.key)
+    if (!Array.isArray(state.cardOrder) || !sameIds(expected, state.cardOrder))
+      throw new Error('스킬 카드 순서에 누락 또는 중복이 있습니다.')
+  }
   for (const kind of AUTO_KINDS)
     if (auto[kind] !== null && typeof auto[kind] !== 'string')
       throw new Error('자동 행동 검수 형식이 유효하지 않습니다.')
   return structuredClone(state)
 }
 
-async function atomicJson(root: string, file: string, value: unknown) {
-  await ensureDirectory(root, path.dirname(file))
-  const temporary = path.join(path.dirname(file), `.review-${randomUUID()}.tmp`)
-  try {
-    await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, {
-      flag: 'wx',
-    })
-    await rename(temporary, file)
-  } finally {
-    await unlink(temporary).catch((error: NodeJS.ErrnoException) => {
-      if (error.code !== 'ENOENT') throw error
-    })
-  }
-}
 interface Prepared extends ReviewValidation {
   data: CharacterData | null
   assets: Map<string, Uint8Array>
 }
+/** 읽기와 검증만 수행한다. ExportでもDB・検수 파일을 쓰지 않는다. */
 export class ReviewRepository {
-  private pending: Promise<unknown> = Promise.resolve()
-  constructor(
-    readonly root: string,
-    private beforeCommit?: () => Promise<void>,
-  ) {}
-  private exclusive<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.pending.then(operation, operation)
-    this.pending = result.catch(() => {})
-    return result
-  }
-  private reviewPath(target: Pick<ReviewTarget, 'runId' | 'characterId'>) {
-    return path.join(targetDirectory(this.root, target), 'review.json')
-  }
+  constructor(readonly root: string) {}
   async load(
     target: Pick<ReviewTarget, 'runId' | 'characterId'>,
   ): Promise<ReviewSession> {
     const source = await loadSource(this.root, target)
-    const raw = await optionalFile(this.root, this.reviewPath(target))
-    if (!raw)
-      return {
-        source,
-        state: initialReview(source),
-        revision: null,
-        conflict: source.currentError,
-      }
-    const parsed = JSON.parse(raw.toString('utf8'))
-    const state = object(parsed).state as ReviewState
-    let conflict: string | null = source.currentError
-    try {
-      parseReview(state, source)
-    } catch (error) {
-      conflict = errorMessage(error)
+    return {
+      source,
+      state: initialReview(source),
+      revision: null,
+      conflict: source.currentError,
     }
-    // 손상된 저장 파일은 새 검수로 조용히 대체하지 않는다.
-    if (
-      !state ||
-      typeof state.displayName !== 'string' ||
-      !ELEMENTS.includes(state.attribute) ||
-      !Array.isArray(state.existingSkills) ||
-      state.existingSkills.some(
-        (s) =>
-          !s ||
-          typeof s.skillId !== 'string' ||
-          typeof s.displayName !== 'string' ||
-          typeof s.visible !== 'boolean',
-      ) ||
-      !Array.isArray(state.candidates) ||
-      state.candidates.some(
-        (c) =>
-          !c ||
-          typeof c.candidateId !== 'string' ||
-          typeof c.displayName !== 'string' ||
-          !['pending', 'include', 'exclude'].includes(c.decision),
-      ) ||
-      !state.autoActions ||
-      AUTO_KINDS.some(
-        (kind) =>
-          state.autoActions[kind] !== null &&
-          typeof state.autoActions[kind] !== 'string',
-      )
-    )
-      throw new Error('저장된 검수 파일이 손상되었습니다.')
-    return { source, state, revision: sha256(raw), conflict }
-  }
-  private async checkRevision(state: ReviewState, revision: string | null) {
-    const raw = await optionalFile(this.root, this.reviewPath(state))
-    if ((raw ? sha256(raw) : null) !== revision)
-      throw new Error(
-        '다른 창에서 검수를 저장했습니다. 새로 열어 확인해 주세요.',
-      )
-  }
-  async save(value: ReviewState, revision: string | null) {
-    return this.exclusive(async () => {
-      const source = await loadSource(this.root, value)
-      const state = parseReview(value, source)
-      await this.checkRevision(state, revision)
-      await atomicJson(this.root, this.reviewPath(state), {
-        schemaVersion: 1,
-        state,
-      })
-      return this.load(state)
-    })
   }
   private async prepare(value: ReviewState): Promise<Prepared> {
     const errors: string[] = [],
@@ -230,6 +147,7 @@ export class ReviewRepository {
         const bytes = await readCurrentAsset(this.root, source, relative)
         await decodeWebP(bytes)
         currentHashes[relative] = sha256(bytes)
+        assets.set(relative, bytes)
         return relative
       }
       let portrait = ''
@@ -248,6 +166,8 @@ export class ReviewRepository {
         state.existingSkills.map((s) => s.candidateId).filter(Boolean),
       )
       for (const skill of state.existingSkills) {
+        if (skill.decision === 'pending')
+          errors.push(`미검수 스킬: ${skill.displayName || skill.skillId}`)
         const old = source.current!.skills.find(
           (s) => s.skillId === skill.skillId,
         )!
@@ -332,7 +252,14 @@ export class ReviewRepository {
         displayName: state.displayName.trim(),
         attribute: state.attribute,
         portrait,
-        skills,
+        skills: [...skills].sort((a, b) => {
+          const order = reviewCards(state, source).map((c) =>
+            c.group === 'existingSkills'
+              ? c.key
+              : candidateSkillId(state.characterId, c.key),
+          )
+          return order.indexOf(a.skillId) - order.indexOf(b.skillId)
+        }),
         autoActions: state.autoActions,
       }
       try {
@@ -380,97 +307,41 @@ export class ReviewRepository {
     const { errors, summary, token } = await this.prepare(state)
     return { errors, summary, token }
   }
-  async publish(value: ReviewState, revision: string | null, token: string) {
-    return this.exclusive(async () => {
-      await this.checkRevision(value, revision)
-      const prepared = await this.prepare(value)
-      if (
-        !token ||
-        token !== prepared.token ||
-        prepared.errors.length ||
-        !prepared.data
-      )
-        throw new Error(
-          prepared.errors.join('\n') ||
-            '검증 후 내용이 변경되었습니다. 다시 검증해 주세요.',
-        )
-      const finalDirectory = path.join(
-        this.root,
-        'src/assets/characters',
-        value.characterId,
-      )
-      await ensureDirectory(this.root, path.join(finalDirectory, 'assets'))
-      await ensureDirectory(this.root, path.join(finalDirectory, 'data'))
-      for (const [relative, bytes] of prepared.assets) {
-        const file = path.join(finalDirectory, relative)
-        const existing = await optionalFile(this.root, file)
-        if (existing && sha256(existing) !== sha256(bytes))
-          throw new Error('동일 자산 경로에 다른 이미지가 있습니다.')
-        if (!existing) await writeFile(file, bytes, { flag: 'wx' })
-      }
-      const finalFile = path.join(
-        finalDirectory,
-        'data',
-        `${value.characterId}.json`,
-      )
-      const before = await optionalFile(this.root, finalFile)
-      if ((before ? sha256(before) : null) !== value.baseHash)
-        throw new Error('반영 중 최종 파일이 변경되었습니다.')
-      const runDirectory = targetDirectory(this.root, value)
-      await assertInside(this.root, runDirectory)
-      if (before)
-        await writeFile(
-          path.join(runDirectory, `before-publish-${randomUUID()}.json`),
-          before,
-          { flag: 'wx' },
-        )
-      // 최종 JSON은 모든 준비와 재검증이 성공한 뒤 마지막에 원자적으로 교체한다.
-      await this.beforeCommit?.()
-      const checked = await this.prepare(value)
-      if (checked.token !== token || checked.errors.length)
-        throw new Error(
-          '반영 준비 중 원본이 변경되었습니다. 다시 검증해 주세요.',
-        )
-      await atomicJson(this.root, finalFile, prepared.data)
-      const source = await loadSource(this.root, value)
-      const next = initialReview(source)
-      const linked = new Set(value.existingSkills.map((s) => s.candidateId))
-      for (const candidate of next.candidates) {
-        const previous = value.candidates.find(
-          (c) => c.candidateId === candidate.candidateId,
-        )!
-        if (
-          previous.decision !== 'pending' ||
-          linked.has(candidate.candidateId)
-        )
-          candidate.decision = 'exclude'
-        candidate.displayName = previous.displayName
-        if (previous.category) candidate.category = previous.category
-      }
-      next.candidates.sort(
-        (a, b) =>
-          value.candidates.findIndex((c) => c.candidateId === a.candidateId) -
-          value.candidates.findIndex((c) => c.candidateId === b.candidateId),
-      )
-      let warning: string | null = null
-      try {
-        await atomicJson(this.root, this.reviewPath(value), {
-          schemaVersion: 1,
-          state: next,
-        })
-      } catch (error) {
-        warning = `최종 반영은 완료했지만 검수 상태 저장에 실패했습니다: ${errorMessage(error)}`
-      }
-      const raw = await optionalFile(this.root, this.reviewPath(value))
-      return {
-        session: {
-          source,
-          state: next,
-          revision: raw ? sha256(raw) : null,
-          conflict: warning,
-        } satisfies ReviewSession,
-        warning,
-      }
-    })
+  async exportCharacter(state: ReviewState) {
+    const prepared = await this.prepare(state)
+    if (prepared.errors.length || !prepared.data)
+      throw new Error(prepared.errors.join('\n') || '검증 실패')
+    const source = await loadSource(this.root, state)
+    parseReview(state, source)
+    return {
+      characterId: state.characterId,
+      baseHash: state.baseHash,
+      character: {
+        ...prepared.data,
+        reviewStatus: 'pending-agent-validation' as const,
+      },
+      review: structuredClone(state),
+      sources: source.draft.candidates.map((c) => ({
+        candidateId: c.candidateId,
+        resourcePath: c.resourcePath,
+        sources: c.sources,
+        download: c.download,
+      })),
+      assets: [...prepared.assets].map(([assetPath, bytes]) => ({
+        path: assetPath,
+        mimeType: 'image/webp' as const,
+        sha256: sha256(bytes),
+        base64: Buffer.from(bytes).toString('base64'),
+      })),
+    }
   }
+}
+export type ExportCharacter = Awaited<
+  ReturnType<ReviewRepository['exportCharacter']>
+>
+export interface ReviewExport {
+  format: 'wuwa-character-review'
+  schemaVersion: 1
+  status: 'pending-agent-validation'
+  characters: ExportCharacter[]
 }
