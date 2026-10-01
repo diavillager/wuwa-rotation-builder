@@ -1,3 +1,12 @@
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/cormorant-garamond/CormorantGaramond-Light-Digits.ttf')
+    format('truetype');
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+
 :root {
   --timeline-line-size: calc(128px * 2 / 3);
   --input-card-size: calc(var(--timeline-line-size) - 10px);
@@ -94,6 +103,9 @@ h2 {
 .slot-index {
   align-self: flex-start;
   color: #87aaa5;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  font-variant-numeric: lining-nums tabular-nums;
   font-size: 56px;
   line-height: 76px;
   flex-shrink: 0;
@@ -101,8 +113,8 @@ h2 {
 .portrait-placeholder {
   display: grid;
   place-items: center;
-  width: 128px;
-  height: 128px;
+  width: 112px;
+  height: 112px;
   aspect-ratio: 1;
   border: 1px dashed #66817f;
   border-radius: 10px;
@@ -431,8 +443,8 @@ button {
   margin: 0;
 }
 .character-portrait {
-  width: 128px;
-  height: 128px;
+  width: 112px;
+  height: 112px;
   aspect-ratio: 1;
   object-fit: contain;
   flex-shrink: 0;
