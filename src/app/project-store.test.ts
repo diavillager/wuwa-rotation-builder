@@ -136,6 +136,7 @@ describe('프로젝트 자동저장과 관리', () => {
     await store.duplicate()
     const copy = store.snapshot().current!
     expect(copy.id).not.toBe(firstId)
+    expect(copy.name).toBe('새 로테이션 1 - 복제본')
     expect(copy.rotation.opening.columns).toHaveLength(1)
     const generation = store.snapshot().generation
     await store.rename('이름 변경')
@@ -148,6 +149,34 @@ describe('프로젝트 자동저장과 관리', () => {
     await store.open(copy.id)
     expect(store.snapshot().generation).toBe(generation + 2)
     expect(store.snapshot().current!.name).toBe('이름 변경')
+    store.dispose()
+  })
+  it('복제는 즉시 원본의 현재 이름에 표시를 덧붙이고 같은 이름도 허용한다', async () => {
+    const { store, repo } = setup()
+    await store.initialize()
+    await store.create()
+    await store.rename('로테이션 3')
+    const originalId = store.snapshot().current!.id
+    await store.duplicate()
+    expect(store.snapshot().current!.name).toBe('로테이션 3 - 복제본')
+    await store.duplicate()
+    expect(store.snapshot().current!.name).toBe('로테이션 3 - 복제본 - 복제본')
+    await store.rename('이름을 바꾼 원본')
+    await store.duplicate()
+    expect(store.snapshot().current!.name).toBe('이름을 바꾼 원본 - 복제본')
+    await store.open(originalId)
+    await store.duplicate()
+    expect(store.snapshot().current!.name).toBe('로테이션 3 - 복제본')
+    const projects = await repo.list()
+    expect(
+      projects.filter((project) => project.name === '로테이션 3 - 복제본'),
+    ).toHaveLength(2)
+    expect(projects.find((project) => project.id === originalId)!.name).toBe(
+      '로테이션 3',
+    )
+    expect(new Set(projects.map((project) => project.id)).size).toBe(
+      projects.length,
+    )
     store.dispose()
   })
   it('마지막 프로젝트 삭제 후 자동 생성하지 않고 다음 시작에서도 빈 목록을 유지한다', async () => {

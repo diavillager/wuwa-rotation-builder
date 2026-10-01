@@ -198,7 +198,7 @@ export class ProjectStore {
       const project = duplicateProject(
         current,
         this.id(),
-        nextProjectName(this.state.projects),
+        `${current.name} - 복제본`,
         this.now(),
       )
       await this.addAndOpen(project)
