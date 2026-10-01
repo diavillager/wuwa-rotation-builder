@@ -67,6 +67,8 @@
 
 ## 6. 공명자 데이터와 개발용 Skill
 
+- [x] 무기군은 Encore의 명시적인 WeaponType 정보에서 수집한다. 대검·직검·권총·권갑·증폭기만 허용하고 검수 화면에서 확인·수정하여 자동 저장·백업·Import·Export·앱 JSON에 보존한다. 구버전 누락은 허용하며 동일 ID의 로컬 원문으로 없는 필드만 보충한다. 수동 지정값과 명시적 미지정을 덮어쓰지 않는다. 파티 카드는 데이터가 있을 때 `속성 / 무기군`을 표시한다.
+
 - [x] 검수 완료 데이터의 JSON 오류·필수 이미지 누락·검증 실패는 해당 공명자만 선택 목록에서 제외하고 ID와 오류를 표시한다. 정상 공명자는 계속 사용할 수 있으며 기존 프로젝트의 저장된 이름과 블록은 유지한다.
 
 - [x] 데이터 경로: `src/assets/characters/{characterId}/data/{characterId}.json`; 이미지 경로: `src/assets/characters/{characterId}/assets/*.webp`.

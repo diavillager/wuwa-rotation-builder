@@ -114,6 +114,7 @@ describe('프로젝트 관리 화면', () => {
       characters: demoCatalog.characters.map((character) => ({
         ...character,
         assetUrl: `/verified/${character.id}.webp`,
+        ...(character.id === 'demo-a' ? { weaponType: '직검' as const } : {}),
         skills: character.skills.map((skill) => ({
           ...skill,
           assetUrl: `/verified/${skill.id}.webp`,
@@ -156,6 +157,12 @@ describe('프로젝트 관리 화면', () => {
         .dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
     const shelf = document.querySelector('.skill-list')!
+    expect(
+      document.querySelector('.party-character-info small')?.textContent,
+    ).toBe('용융 / 직검')
+    expect(
+      document.querySelectorAll('.party-character-info small')[1]?.textContent,
+    ).toBe('기류')
     expect(shelf.querySelector('img')?.getAttribute('src')).toBe(
       '/verified/demo-skill-a.webp',
     )

@@ -1,5 +1,6 @@
 import type { CharacterData } from '../../src/data/characters/contract'
 import type { Element } from '../../src/app/catalog'
+import type { WeaponType } from '../../src/data/characters/weapons'
 import type { DownloadedCandidate } from '../../scripts/character-sync/run'
 import type { SkillCategory } from '../../src/data/characters/categories'
 export const TOOLTIP_CATEGORIES = [
@@ -26,7 +27,11 @@ export interface ReviewTarget {
 export interface ReviewDraft {
   schemaVersion: 1
   characterId: string
-  basicCandidate: { displayName: string; attribute: Element }
+  basicCandidate: {
+    displayName: string
+    attribute: Element
+    weaponType?: WeaponType
+  }
   candidates: DownloadedCandidate[]
   errors: string[]
 }
@@ -53,6 +58,7 @@ export const AUTO_LABELS = {
 }
 
 export interface ReviewState {
+  weaponType?: WeaponType | null
   schemaVersion: 1
   runId: string
   characterId: string
@@ -104,6 +110,12 @@ export function initialReview(source: ReviewSource): ReviewState {
     displayName:
       current?.displayName ?? source.draft.basicCandidate.displayName,
     attribute: current?.attribute ?? source.draft.basicCandidate.attribute,
+    ...((current?.weaponType ?? source.draft.basicCandidate.weaponType)
+      ? {
+          weaponType:
+            current?.weaponType ?? source.draft.basicCandidate.weaponType,
+        }
+      : {}),
     portraitCandidateId: null,
     existingSkills:
       current?.skills.map((s) => ({

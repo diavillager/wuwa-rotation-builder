@@ -149,6 +149,78 @@ function complete(
   return next
 }
 describe('검수 검증과 JSON 전달', () => {
+  it('구버전 백업의 누락 무기군만 보충하고 수동 지정·미지정과 다른 편집은 유지한다', async () => {
+    const f = await fixture()
+    const original = complete(
+      (await f.repository.load(target)).state,
+      f.candidates,
+    )
+    original.cardOrder = [...original.candidates]
+      .reverse()
+      .map((c) => c.candidateId)
+    const backup = await f.repository.backupCharacter(original)
+    await writeFile(
+      path.join(f.directory, 'encore.json'),
+      JSON.stringify({ Id: 1102, WeaponType: 2 }),
+    )
+    expect((await f.repository.load(target)).state.weaponType).toBe('직검')
+    for (const weaponType of [undefined, '권갑', null] as const) {
+      const row = structuredClone(backup)
+      if (weaponType !== undefined) row.review.weaponType = weaponType
+      const [restored] = await f.repository.importFile({
+        format: 'wuwa-character-review-backup',
+        schemaVersion: 2,
+        characters: [row],
+      })
+      expect(restored.state).toEqual({
+        ...original,
+        weaponType: weaponType === undefined ? '직검' : weaponType,
+      })
+      const exported = await f.repository.exportCharacter(restored.state)
+      expect(exported.character.weaponType).toBe(
+        weaponType === null ? undefined : (weaponType ?? '직검'),
+      )
+      const roundTrip = await new ReviewRepository(f.root).importFile({
+        format: 'wuwa-character-review',
+        schemaVersion: 2,
+        status: 'pending-agent-validation',
+        characters: [exported],
+      })
+      expect(roundTrip[0].state).toEqual(restored.state)
+      const selected = await f.repository.prepareSelectedCharacter(
+        restored.state,
+      )
+      expect(selected?.data.weaponType).toBe(exported.character.weaponType)
+    }
+    await expect(readFile(f.finalFile)).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
+  })
+  it('구버전 Export 일치 검증 후 무기군을 보충하고 잘못된 무기군 Import는 거부한다', async () => {
+    const f = await fixture()
+    const state = complete(
+      (await f.repository.load(target)).state,
+      f.candidates,
+    )
+    const row = await f.repository.exportCharacter(state)
+    await writeFile(
+      path.join(f.directory, 'encore.json'),
+      JSON.stringify({ Id: 1102, WeaponType: 2 }),
+    )
+    const file = {
+      format: 'wuwa-character-review',
+      schemaVersion: 2,
+      status: 'pending-agent-validation',
+      characters: [row],
+    }
+    const [restored] = await f.repository.importFile(file)
+    expect(restored.state.weaponType).toBe('직검')
+    const invalid = structuredClone(file)
+    Object.assign(invalid.characters[0].review, { weaponType: '창' })
+    await expect(f.repository.importFile(invalid)).rejects.toThrow(
+      '기본 검수 정보',
+    )
+  })
   it('초상화가 없는 공명자는 선택 반영에서 제외한다', async () => {
     const f = await fixture()
     const state = (await f.repository.load(target)).state

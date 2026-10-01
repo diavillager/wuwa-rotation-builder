@@ -2,11 +2,13 @@ import { lstat, mkdir, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { validateCharacterData } from '../../src/data/characters/contract'
 import { ELEMENTS } from '../../src/app/catalog'
+import { isWeaponType } from '../../src/data/characters/weapons'
 import {
   object,
   rows,
   nonempty,
   sha256,
+  parseWeaponType,
 } from '../../scripts/character-sync/candidates'
 import { errorMessage, readInside } from '../../scripts/character-sync/io'
 import type { ReviewDraft, ReviewSource, ReviewTarget } from './model'
@@ -93,6 +95,7 @@ export function parseDraft(value: unknown, id: string): ReviewDraft {
   const basic = object(data.basicCandidate)
   if (
     !ELEMENTS.includes(basic.attribute as never) ||
+    (basic.weaponType !== undefined && !isWeaponType(basic.weaponType)) ||
     typeof basic.displayName !== 'string'
   )
     throw new Error('기본 정보 초안이 유효하지 않습니다.')
@@ -152,6 +155,8 @@ export async function loadSource(
   const directory = targetDirectory(root, target)
   const raw = await readInside(root, path.join(directory, 'draft.json'))
   const draft = parseDraft(JSON.parse(raw.toString('utf8')), target.characterId)
+  if (draft.basicCandidate.weaponType === undefined)
+    Object.assign(draft.basicCandidate, await localWeaponType(root, target))
   const encore: Pick<
     ReviewSource,
     'encoreMatches' | 'encoreErrors' | 'encoreTooltips' | 'encoreSkillSourceId'
@@ -218,6 +223,22 @@ export async function loadSource(
     currentError,
   }
 }
+/** 기존 검수값을 초기화하지 않고 같은 ID의 보관 원문에서 추가 메타데이터만 읽는다. */
+export async function localWeaponType(
+  root: string,
+  target: Pick<ReviewTarget, 'runId' | 'characterId'>,
+) {
+  const raw = await optionalFile(
+    root,
+    path.join(targetDirectory(root, target), 'encore.json'),
+  )
+  if (!raw) return {}
+  const detail = object(JSON.parse(raw.toString('utf8')))
+  if (String(detail.Id) !== target.characterId)
+    throw new Error('무기군 원문의 공명자 ID가 일치하지 않습니다.')
+  return parseWeaponType(detail.WeaponType)
+}
+
 export async function readCurrentAsset(
   root: string,
   source: ReviewSource,

@@ -893,6 +893,9 @@ export function App({
                   <strong>{characterLabel(id)}</strong>
                   <small>
                     {catalog.characters.find((item) => item.id === id)?.element}
+                    {catalog.characters.find((item) => item.id === id)
+                      ?.weaponType &&
+                      ` / ${catalog.characters.find((item) => item.id === id)!.weaponType}`}
                   </small>
                 </span>
               </button>

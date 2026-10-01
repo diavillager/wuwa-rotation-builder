@@ -4,6 +4,8 @@
 
 ## 실행과 대상 구성
 
+무기군은 Encore의 `WeaponType`에서 수집하며 기본 정보의 **무기군**에서 대검·직검·권총·권갑·증폭기를 확인·수정합니다. 기존 검수는 새로고침하면 같은 ID의 로컬 Encore 원문에서 없는 필드만 보충하고 다른 편집은 유지합니다. 수동 지정이나 명시적 미지정은 덮어쓰지 않습니다. 기존 JSON은 무기군 없이도 읽으며 소스를 찾지 못하면 미지정으로 둡니다. 새 백업/Export는 무기군을 포함하고, 앱 DB는 사용자가 파일을 에이전트에게 전달한 뒤 재검증해 갱신합니다.
+
 ```sh
 npm run character-sync -- --character 1413 --character 1211 --character 1209 --character 1207 --character 1205 --character 1206
 npm run character-review

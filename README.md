@@ -58,7 +58,7 @@ npm run build
 
 ## 공명자 검수
 
-`npm run character-review`를 실행하고 [로컬 검수 화면](http://127.0.0.1:5174/)을 엽니다. Encore와 일치하는 후보의 분류·실제 이름을 자동 배정하고(고유 스킬 기본 제외), 고정 분류로 세 자동 행동을 연결합니다. 검수 카드의 드래그 순서도 보존합니다. JSON 백업·불러오기·검증 후 내보내기를 지원하며 앱 DB 반영은 에이전트가 별도로 수행합니다. 자세한 사용법·충돌 처리·검증은 [검수 도구 안내](tools/character-review/README.md)를 참고하세요. `npm run character-review:build`로 별도 검수 화면 빌드를 확인합니다.
+`npm run character-review`를 실행하고 [로컬 검수 화면](http://127.0.0.1:5174/)을 엽니다. 공명자 기본 정보에서 Encore의 무기군을 확인·수정하고 JSON에 보존합니다. Encore와 일치하는 후보의 분류·실제 이름을 자동 배정하고(고유 스킬 기본 제외), 고정 분류로 세 자동 행동을 연결합니다. 검수 카드의 드래그 순서도 보존합니다. JSON 백업·불러오기·검증 후 내보내기를 지원하며 앱 DB 반영은 에이전트가 별도로 수행합니다. 자세한 사용법·충돌 처리·검증은 [검수 도구 안내](tools/character-review/README.md)를 참고하세요. `npm run character-review:build`로 별도 검수 화면 빌드를 확인합니다.
 
 ## UI 폰트
 

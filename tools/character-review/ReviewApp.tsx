@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ELEMENTS } from '../../src/app/catalog'
+import { WEAPON_TYPES } from '../../src/data/characters/weapons'
 import {
   SKILL_CATEGORIES,
   supportsHitCount,
@@ -883,6 +884,24 @@ export function ReviewApp() {
                       >
                         {ELEMENTS.map((element) => (
                           <option key={element}>{element}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      무기군
+                      <select
+                        value={state.weaponType ?? ''}
+                        onChange={(e) =>
+                          change((s) => ({
+                            ...s,
+                            weaponType: (e.target.value ||
+                              null) as ReviewState['weaponType'],
+                          }))
+                        }
+                      >
+                        <option value="">미지정</option>
+                        {WEAPON_TYPES.map((weapon) => (
+                          <option key={weapon}>{weapon}</option>
                         ))}
                       </select>
                     </label>

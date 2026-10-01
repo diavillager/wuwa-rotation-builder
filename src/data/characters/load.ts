@@ -88,6 +88,7 @@ export async function loadCharacterCatalog(
         id: data.characterId,
         displayName: data.displayName,
         element: data.attribute,
+        ...(data.weaponType ? { weaponType: data.weaponType } : {}),
         asset: portrait,
         assetUrl: assets[portrait],
         autoActions: data.autoActions,

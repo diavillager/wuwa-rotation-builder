@@ -231,6 +231,33 @@ async function selectCandidate() {
   await act(async () => decision('등록').click())
 }
 
+it('무기군 초기값을 표시하고 수동 변경과 명시적인 미지정을 백업에 전달한다', async () => {
+  saved.state.weaponType = '직검'
+  await render()
+  const field = [...document.querySelectorAll('label')]
+    .find((label) => label.textContent?.startsWith('무기군'))!
+    .querySelector('select')!
+  expect(field.value).toBe('직검')
+  expect([...field.options].map((option) => option.textContent)).toEqual([
+    '미지정',
+    '대검',
+    '직검',
+    '권총',
+    '권갑',
+    '증폭기',
+  ])
+  for (const value of ['대검', '']) {
+    await act(async () => {
+      field.value = value
+      field.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await click('JSON으로 백업하기')
+    expect((postedStates[0] as ReviewSession['state']).weaponType).toBe(
+      value || null,
+    )
+  }
+})
+
 it('스킬 툴팁을 검토 화면 맨 아래에서 자동 배정 없이 안전한 텍스트로 읽는다', async () => {
   saved.source.encoreTooltips = [
     {

@@ -254,7 +254,7 @@ Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와
 작업 순서는 다음과 같다.
 
 1. 현재 저장소의 등록 캐릭터를 확인하고 Encore의 현재 목록과 비교하여 미등록 대상을 찾는다. 폴더만으로 등록 완료를 판정하지 않는다. 최소한 `src/assets/characters/{id}/data/{id}.json`이 존재하고 유효하며 JSON의 `characterId`가 디렉터리 ID와 일치해야 등록된 것으로 본다.
-2. Encore에서 기본 정보, 한국어 이름, 속성, 초상화 후보를 수집한다.
+2. Encore에서 기본 정보, 한국어 이름, 속성, 무기군, 초상화 후보를 수집한다. 무기군은 명시적인 WeaponType ID와 이름으로 확인하며 대검·직검·권총·권갑·증폭기만 허용한다.
 3. Encore Character API와 WW_Data의 스킬 아이콘 후보를 합집합으로 모으고, 메타데이터에서 확인한 전용 폴더의 WW_Asset_Webp 실제 개별 이미지 목록을 추가한다. 메타데이터에 없는 파일도 미검수 후보로 포함한다. 공용 아이콘은 기존 명시적 참조를 유지하며 전용 폴더의 Atlas 합본은 제외한다.
 4. Encore api-v2 Resource에서 WebP를 다운로드할 때 HTTP 요청 성공, 응답 Content-Type이 기대하는 이미지 형식인지, 저장 파일이 실제 이미지/WebP로 유효하게 열리는지를 확인한다. 다운로드 또는 검증에 실패한 후보는 실패 사실을 기록하며, 조용히 누락하거나 성공·완료 처리하지 않는다.
    WW_Asset_Webp에서 추가 발견한 후보는 고정 commit의 원본 WebP에도 동일 검증을 적용한다. 경로와 출처 commit을 보존하고 파일명만으로 스킬 의미를 확정하지 않는다.
@@ -267,6 +267,7 @@ Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와
 
 - `characterId`가 존재하고 디렉터리 ID와 일치한다.
 - 한국어 `displayName`이 존재하고 `attribute`가 응결/용융/전도/기류/회절/인멸 중 하나다.
+- `weaponType`이 있으면 대검/직검/권총/권갑/증폭기 중 하나다. 검수 기본 정보에서 소스 초기값을 확인·수정하고 브라우저 저장·백업·Import·Export·최종 앱 JSON에 보존한다. 구버전 필드 부재는 허용하며 기존 검수에 값이 없을 때만 동일 ID의 로컬 Encore 원문에서 보충한다. 수동 지정값과 명시적인 미지정은 덮어쓰지 않는다. 앱 파티 카드에는 무기군이 있으면 `속성 / 무기군`, 없으면 속성만 표시한다. DB 갱신은 사용자가 전달한 검수 JSON의 에이전트 재검증 후에만 수행한다.
 - portrait asset이 존재한다.
 - 노출 대상으로 선택된 모든 Skill에 `displayName`과 WebP asset이 존재하며 Skill ID 중복이 없다.
 - `autoActions.normalSwitchAttack`, `autoActions.intro`, `autoActions.outro`가 각각 지정되어 있고, 세 참조가 실제 선택·등록된 Skill ID를 가리킨다.

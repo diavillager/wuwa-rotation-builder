@@ -64,6 +64,24 @@ const assetsFor = (data: CharacterData) =>
   )
 
 describe('최종 Character 계약', () => {
+  it('무기군은 catalog에 보존하고 구버전 누락은 허용하되 잘못된 값은 거부한다', async () => {
+    const data = { ...fixture(), weaponType: '직검' as const }
+    expect(validateCharacterData(data, data.characterId).weaponType).toBe(
+      '직검',
+    )
+    const result = await loadCharacterCatalog(
+      [entry(data)],
+      assetsFor(data),
+      async () => {},
+    )
+    expect(result.catalog.characters[0].weaponType).toBe('직검')
+    expect(
+      validateCharacterData(fixture(), data.characterId).weaponType,
+    ).toBeUndefined()
+    expect(() =>
+      validateCharacterData({ ...data, weaponType: '창' }, data.characterId),
+    ).toThrow('무기군')
+  })
   it('같은 기본 공격 분류가 여럿이어도 지정한 ID와 타수를 보존한다', () => {
     const data = fixture()
     data.skills[0].category = '기본 공격'

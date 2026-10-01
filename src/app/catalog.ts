@@ -1,5 +1,6 @@
 import type { CharacterId } from '../domain/rotation'
 import type { SkillCategory } from '../data/characters/categories'
+import type { WeaponType } from '../data/characters/weapons'
 
 export const ELEMENTS = [
   '응결',
@@ -24,6 +25,7 @@ export interface CatalogSkill {
 }
 
 export interface CatalogCharacter {
+  weaponType?: WeaponType
   id: CharacterId
   displayName: string
   element: Element

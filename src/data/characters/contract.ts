@@ -1,4 +1,5 @@
 import { ELEMENTS, type Element } from '../../app/catalog'
+import { isWeaponType, type WeaponType } from './weapons'
 import {
   AUTO_CATEGORIES,
   isSkillCategory,
@@ -15,6 +16,7 @@ export interface CharacterSkillData {
   asset: string
 }
 export interface CharacterData {
+  weaponType?: WeaponType
   schemaVersion: 1
   reviewStatus: 'approved'
   characterId: string
@@ -57,6 +59,8 @@ export function validateCharacterData(
   directoryId: string,
 ): CharacterData {
   const data = record(value)
+  if (data.weaponType !== undefined && !isWeaponType(data.weaponType))
+    throw new Error('지원하지 않는 무기군입니다.')
   if (data.schemaVersion !== 1)
     throw new Error('지원하지 않는 Character schemaVersion입니다.')
   if (data.reviewStatus !== 'approved')
@@ -124,6 +128,7 @@ export function validateCharacterData(
     characterId,
     displayName,
     attribute: data.attribute as Element,
+    ...(isWeaponType(data.weaponType) ? { weaponType: data.weaponType } : {}),
     portrait: asset(data.portrait),
     skills,
     autoActions,

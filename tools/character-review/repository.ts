@@ -1,4 +1,5 @@
 import { ELEMENTS } from '../../src/app/catalog'
+import { isWeaponType } from '../../src/data/characters/weapons'
 import { isDeepStrictEqual } from 'node:util'
 import {
   imageKeys,
@@ -21,7 +22,12 @@ import {
   errorMessage,
   scanRegistered,
 } from '../../scripts/character-sync/io'
-import { loadSource, readCandidateAsset, readCurrentAsset } from './files'
+import {
+  loadSource,
+  readCandidateAsset,
+  readCurrentAsset,
+  localWeaponType,
+} from './files'
 import {
   AUTO_KINDS,
   AUTO_LABELS,
@@ -51,6 +57,9 @@ export function parseReview(value: unknown, source: ReviewSource): ReviewState {
   if (
     typeof state.displayName !== 'string' ||
     !ELEMENTS.includes(state.attribute) ||
+    (state.weaponType !== undefined &&
+      state.weaponType !== null &&
+      !isWeaponType(state.weaponType)) ||
     (state.portraitCandidateId !== null &&
       !source.draft.candidates.some(
         (c) =>
@@ -263,6 +272,22 @@ export class ReviewRepository {
             throw new Error('Export 이미지가 검수 원본과 일치하지 않습니다.')
         }
       }
+      // 구버전 Export 일치 검증 뒤 새 메타데이터만 보충한다.
+      // 수동 지정값과 명시적인 null은 그대로 보존한다.
+      if (state.weaponType === undefined) {
+        let weaponType =
+          restored.source.current?.weaponType ??
+          restored.source.draft.basicCandidate.weaponType
+        if (!weaponType) {
+          weaponType = (
+            await localWeaponType(this.root, restored.source.target)
+          ).weaponType
+        }
+        if (weaponType) {
+          state.weaponType = weaponType
+          restored.source.draft.basicCandidate.weaponType ??= weaponType
+        }
+      }
       sessions.push({
         source: restored.source,
         state,
@@ -398,6 +423,8 @@ export class ReviewRepository {
         )
       if (source.current?.attribute !== state.attribute)
         summary.push(`속성: ${state.attribute}`)
+      if (source.current?.weaponType !== (state.weaponType ?? undefined))
+        summary.push(`무기군: ${state.weaponType ?? '미지정'}`)
       if (
         source.current &&
         source.current.skills.map((s) => s.skillId).join('\n') !==
@@ -421,6 +448,7 @@ export class ReviewRepository {
         characterId: state.characterId,
         displayName: state.displayName.trim(),
         attribute: state.attribute,
+        ...(state.weaponType ? { weaponType: state.weaponType } : {}),
         portrait,
         skills: [...skills].sort((a, b) => {
           const order = reviewCards(state, source).map((c) =>

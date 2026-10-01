@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto'
 import { ELEMENTS, type Element } from '../../src/app/catalog'
+import {
+  weaponTypeFromId,
+  type WeaponType,
+} from '../../src/data/characters/weapons'
 
 export const sha256 = (value: string | Uint8Array) =>
   createHash('sha256').update(value).digest('hex')
@@ -31,6 +35,7 @@ export interface Candidate {
   review: { displayName: null; visible: null }
 }
 export interface BasicCandidate {
+  weaponType?: WeaponType
   characterId: string
   displayName: string
   attribute: Element
@@ -102,6 +107,7 @@ export function parseList(value: unknown): BasicCandidate[] {
     characterId: sourceId(row.Id),
     displayName: korean(row.Name),
     attribute: attribute(object(row.Element).Name),
+    ...parseWeaponType(row.WeaponType),
     portrait: resourcePath(nonempty(row.RoleHeadIcon)),
   }))
   if (new Set(list.map((r) => r.characterId)).size !== list.length)
@@ -117,8 +123,17 @@ export function parseDetail(value: unknown, id: string): BasicCandidate {
     characterId: id,
     displayName: korean(object(row.Name).Content),
     attribute: attribute(row.ElementName),
+    ...parseWeaponType(row.WeaponType),
     portrait: resourcePath(nonempty(row.RoleHeadIconLarge)),
   }
+}
+export function parseWeaponType(value: unknown): { weaponType?: WeaponType } {
+  if (value === undefined) return {}
+  const record = typeof value === 'object' ? object(value) : null
+  const weaponType = weaponTypeFromId(record ? record.Id : value)
+  if (record && record.Name !== weaponType)
+    throw new Error('무기군 ID와 이름이 일치하지 않습니다.')
+  return { weaponType }
 }
 export function mergeCandidates(...groups: Candidate[][]): Candidate[] {
   const merged = new Map<string, Candidate>()
