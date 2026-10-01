@@ -170,6 +170,70 @@ p {
   font-size: 11px;
   color: #93adb3;
 }
+.review-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #54786f #142027;
+  scrollbar-gutter: stable;
+  padding-right: 6px;
+}
+.target-list {
+  max-height: 420px;
+}
+.attribute-group + .attribute-group {
+  margin-top: 14px;
+}
+.attribute-group summary {
+  padding: 8px 0;
+  color: #c1dfd5;
+  font-weight: 600;
+  cursor: pointer;
+}
+.attribute-group summary span {
+  color: #91aaa4;
+  font-size: 12px;
+  margin-left: 6px;
+}
+.storage-status {
+  color: #a9d4c7;
+  font-size: 12px;
+}
+.validation-list {
+  max-height: 280px;
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+.review-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.review-scroll::-webkit-scrollbar-track {
+  background: #142027;
+  border-radius: 8px;
+}
+.review-scroll::-webkit-scrollbar-thumb {
+  background: #54786f;
+  border: 2px solid #142027;
+  border-radius: 8px;
+}
+.target-list strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.target-list .review-status {
+  flex-shrink: 0;
+  border-radius: 5px;
+  padding: 3px 6px;
+  background: #26363e;
+}
+.target-list .review-status-error {
+  color: #ffc1b9;
+  background: #503132;
+}
+.target-list .review-status-passed {
+  color: #b9e8d7;
+  background: #2d5145;
+}
 .target-list button[aria-current='page'] {
   background: #2e5149;
   border-color: #8cc9b8;

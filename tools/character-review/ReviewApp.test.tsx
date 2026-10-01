@@ -3,6 +3,12 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ReviewApp } from './ReviewApp'
+import { readSavedReview, writeSavedReview } from './storage'
+vi.mock('./storage', async (original) => ({
+  ...(await original<typeof import('./storage')>()),
+  readSavedReview: vi.fn(async () => null),
+  writeSavedReview: vi.fn(async () => {}),
+}))
 import {
   initialReview,
   type ReviewSource,
@@ -57,6 +63,8 @@ const source: ReviewSource = {
   },
 }
 beforeEach(() => {
+  vi.mocked(readSavedReview).mockReset().mockResolvedValue(null)
+  vi.mocked(writeSavedReview).mockReset().mockResolvedValue()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   document.body.innerHTML = '<div id="root"></div>'
   root = createRoot(document.querySelector('#root')!)
@@ -113,13 +121,36 @@ beforeEach(() => {
         session.state = { ...session.state, characterId: id }
       } else if (action === 'import') {
         ok = !importFails
+        const file = JSON.parse(init!.body as string).file
         body = importFails
           ? { error: '손상된 백업' }
-          : { sessions: [structuredClone(saved)] }
+          : {
+              sessions: file?.characters?.[0]?.workspace
+                ? file.characters.map(
+                    (entry: {
+                      review: ReviewSession['state']
+                      workspace: { source: ReviewSource }
+                    }) => ({
+                      state: entry.review,
+                      source: entry.workspace.source,
+                      conflict: null,
+                      revision: null,
+                    }),
+                  )
+                : [structuredClone(saved)],
+            }
       } else if (action === 'backup') {
         body = {
           file: {
-            characters: [{ characterId: '1102' }, { characterId: '1103' }],
+            format: 'wuwa-character-review-backup',
+            schemaVersion: 2,
+            characters: (postedStates as ReviewSession['state'][]).map(
+              (state) => ({
+                characterId: state.characterId,
+                review: state,
+                workspace: { source: saved.source, images: [] },
+              }),
+            ),
           },
         }
       } else if (action === 'validate')
@@ -157,6 +188,7 @@ afterEach(async () => {
   await act(async () => root.unmount())
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 function button(text: string) {
   return [...document.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -288,9 +320,9 @@ it('분류 배지는 미분류일 때 숨기고 미등록 배지를 우선 표�
 it('공명자를 오가도 페이지 메모리에 편집을 유지하며 서버 저장을 요청하지 않는다', async () => {
   await render()
   await selectCandidate()
-  await click('다음 공명자ID 1103')
+  await click('다음 공명자미검증')
   expect(decision('등록').checked).toBe(false)
-  await click('검증 공명자ID 1102')
+  await click('검증 공명자미검증')
   expect(decision('등록').checked).toBe(true)
   expect(writes).toEqual([])
   await act(async () => {
@@ -501,4 +533,171 @@ it('이동 손잡이 드래그와 취소를 처리하고 Export 상태에 통합
   } finally {
     Reflect.deleteProperty(document, 'elementFromPoint')
   }
+})
+
+it('사이드바 순서와 검증 상태를 표시하고 편집한 공명자만 다시 미검증으로 돌린다', async () => {
+  await render()
+  expect(
+    [...document.querySelectorAll('.review-sidebar h2')].map(
+      (h) => h.textContent,
+    ),
+  ).toEqual(['자동 행동 연결', '검증·파일 관리', '공명자 목록'])
+  const statuses = () =>
+    [...document.querySelectorAll('.target-list .review-status')].map(
+      (s) => s.textContent,
+    )
+  expect(statuses()).toEqual(['미검증', '미검증'])
+  await click('검수 내용 검증')
+  expect(statuses()).toEqual(['오류', '미검증'])
+  expect(
+    document.querySelector('.validation-list')?.getAttribute('aria-label'),
+  ).toBe('검증 결과')
+  result = { errors: [], summary: [], token: 'valid' }
+  await click('검수 내용 검증')
+  expect(statuses()).toEqual(['통과', '미검증'])
+  await click('다음 공명자미검증')
+  await selectCandidate()
+  expect(statuses()).toEqual(['통과', '미검증'])
+  await click('검증 공명자통과')
+  await selectCandidate()
+  expect(statuses()).toEqual(['미검증', '미검증'])
+  expect(
+    document.querySelector('.target-list button')?.getAttribute('title'),
+  ).toBe('ID 1102')
+})
+it('확인된 수집 오류는 검증 버튼을 누르기 전에도 오류로 표시한다', async () => {
+  saved.source.draft.errors = ['이미지 수집 실패']
+  await render()
+  expect(
+    [...document.querySelectorAll('.review-status')].every(
+      (s) => s.textContent === '오류',
+    ),
+  ).toBe(true)
+  result = { errors: [], summary: [], token: 'valid' }
+  await click('검수 내용 검증')
+  expect(document.querySelector('.review-status')?.textContent).toBe('통과')
+})
+
+it('속성 그룹을 정해진 순서로 표시하고 열고 닫을 수 있는 목록을 제공한다', async () => {
+  saved.state.attribute = '인멸'
+  await render()
+  expect(document.querySelector('.attribute-group summary')?.textContent).toBe(
+    '인멸 2',
+  )
+  expect(
+    document.querySelector('details.attribute-group')?.hasAttribute('open'),
+  ).toBe(true)
+})
+it('검수 내용을 자동 저장하고 실패 시 편집을 보존한 채 재시도한다', async () => {
+  vi.useFakeTimers()
+  await render()
+  await selectCandidate()
+  vi.mocked(writeSavedReview).mockRejectedValueOnce(new Error('용량 부족'))
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(650)
+  })
+  expect(document.body.textContent).toContain('저장 실패')
+  expect(decision('등록').checked).toBe(true)
+  await click('저장 재시도')
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(650)
+  })
+  expect(document.body.textContent).toContain('자동 저장됨')
+  const record = vi.mocked(writeSavedReview).mock.calls.at(-1)![0]
+  expect(record.file.characters[0].review.candidates[0].decision).toBe(
+    'include',
+  )
+  expect(record.mode).toBe('workspace')
+})
+it('브라우저 복원 오류가 있으면 기존 저장본을 자동으로 덮어쓰지 않는다', async () => {
+  vi.useFakeTimers()
+  vi.mocked(readSavedReview).mockRejectedValueOnce(new Error('저장 형식 오류'))
+  await render()
+  await selectCandidate()
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(650)
+  })
+  expect(document.body.textContent).toContain('복원 실패')
+  expect(writeSavedReview).not.toHaveBeenCalled()
+  expect(decision('등록').checked).toBe(true)
+})
+
+it('다시 열면 저장한 JSON 목록·미완성 편집·선택 대상을 복원하고 미검증은 유지한다', async () => {
+  const source = structuredClone(saved.source)
+  source.target.characterId = '1209'
+  source.target.displayName = '불러온 공명자'
+  source.draft.characterId = '1209'
+  const state = {
+    ...saved.state,
+    characterId: '1209',
+    displayName: '미완성 이름',
+  }
+  state.candidates[0].displayName = '저장한 스킬명'
+  vi.mocked(readSavedReview).mockResolvedValueOnce({
+    version: 1,
+    mode: 'import',
+    activeId: '1209',
+    file: {
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [
+        {
+          characterId: '1209',
+          review: state,
+          workspace: { source, images: [] },
+        },
+      ],
+    },
+  })
+  await render()
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(1)
+  expect(document.querySelector('.target-list button')?.textContent).toContain(
+    '불러온 공명자미검증',
+  )
+  expect(
+    document.querySelector<HTMLInputElement>('[aria-label="후보 1 스킬명"]')
+      ?.value,
+  ).toBe('저장한 스킬명')
+  expect(
+    document.querySelector('.target-list button')?.getAttribute('aria-current'),
+  ).toBe('page')
+  expect(decision('등록').checked).toBe(false)
+})
+
+it('검증한 대상은 복원 후 재검증하고 검증 진행 상태도 자동 저장한다', async () => {
+  vi.useFakeTimers()
+  result = { errors: [], summary: [], token: 'valid' }
+  vi.mocked(readSavedReview).mockResolvedValueOnce({
+    version: 1,
+    mode: 'import',
+    activeId: '1102',
+    validatedIds: ['1102'],
+    file: {
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [
+        {
+          characterId: '1102',
+          review: saved.state,
+          workspace: { source: saved.source, images: [] },
+        },
+      ],
+    },
+  })
+  await render()
+  expect(writes).toContain('validate')
+  expect(document.querySelector('.review-status')?.textContent).toBe('통과')
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(650)
+  })
+  expect(
+    vi.mocked(writeSavedReview).mock.calls.at(-1)![0].validatedIds,
+  ).toEqual(['1102'])
+  await selectCandidate()
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(650)
+  })
+  expect(
+    vi.mocked(writeSavedReview).mock.calls.at(-1)![0].validatedIds,
+  ).toEqual([])
 })

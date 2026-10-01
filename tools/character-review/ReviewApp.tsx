@@ -24,6 +24,15 @@ import {
   type ReviewValidation,
 } from './model'
 import type { ReviewExport } from './repository'
+import {
+  readSavedReview,
+  writeSavedReview,
+  updateBackup,
+  sameRoster,
+  mergeWorkspaceBackup,
+  type ReviewBackup,
+  type SavedReview,
+} from './storage'
 
 type Result = ReviewValidation & { characterId: string; displayName: string }
 type Work = {
@@ -62,6 +71,13 @@ export function ReviewApp() {
   const [failure, setFailure] = useState('')
   const [notice, setNotice] = useState('')
   const [results, setResults] = useState<Result[]>([])
+  const [storageStatus, setStorageStatus] = useState('불러오는 중')
+  const [storageError, setStorageError] = useState('')
+  const [saveAttempt, setSaveAttempt] = useState(0)
+  const [readyToSave, setReadyToSave] = useState(false)
+  const backupCache = useRef<Promise<ReviewBackup> | null>(null)
+  const storageMode = useRef<SavedReview['mode']>('workspace')
+  const restoreBlocked = useRef(false)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const dragging = useRef<{ key: string; x: number; y: number } | null>(null)
   const importInput = useRef<HTMLInputElement>(null)
@@ -79,6 +95,16 @@ export function ReviewApp() {
       ),
     ])
       .then(async ([auth, listing]) => {
+        let stored: SavedReview | null = null
+        try {
+          stored = await readSavedReview()
+        } catch (error) {
+          restoreBlocked.current = true
+          if (mounted) {
+            setStorageError(`브라우저 복원 실패: ${(error as Error).message}`)
+            setStorageStatus('복원 실패')
+          }
+        }
         const loaded = await Promise.allSettled(
           listing.targets.map((t) =>
             request<ReviewSession>(`/api/review/load?${query(t)}`),
@@ -99,10 +125,90 @@ export function ReviewApp() {
               `${listing.targets[i].displayName}: ${String(result.reason)}`,
             )
         })
+        let restoredActive = ''
+        if (stored) {
+          try {
+            let file = stored.file
+            if (
+              stored.mode === 'workspace' &&
+              listing.targets.length > 0 &&
+              !sameRoster(file, listing.targets)
+            ) {
+              const fresh = await request<{ file: ReviewBackup }>(
+                '/api/review/backup',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Review-Token': auth.token,
+                  },
+                  body: JSON.stringify({ states: entries.map((w) => w.state) }),
+                },
+              )
+              file = mergeWorkspaceBackup(fresh.file, file)
+            }
+            const restored = await request<{ sessions: ReviewSession[] }>(
+              '/api/review/import',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Review-Token': auth.token,
+                },
+                body: JSON.stringify({ file }),
+              },
+            )
+            entries.splice(
+              0,
+              entries.length,
+              ...restored.sessions.map((session) => ({
+                session,
+                state: session.state,
+                baseline: JSON.stringify(session.state),
+              })),
+            )
+            backupCache.current = Promise.resolve(file)
+            storageMode.current = stored.mode
+            restoredActive = stored.activeId
+            const previouslyValidated = entries.filter((entry) =>
+              stored.validatedIds?.includes(entry.state.characterId),
+            )
+            if (previouslyValidated.length) {
+              const checked = await request<{ results: Result[] }>(
+                '/api/review/validate',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Review-Token': auth.token,
+                  },
+                  body: JSON.stringify({
+                    states: previouslyValidated.map((entry) => entry.state),
+                  }),
+                },
+              )
+              if (mounted) setResults(checked.results)
+            }
+          } catch (error) {
+            restoreBlocked.current = true
+            if (mounted) {
+              setStorageError(
+                `브라우저 복원 실패: ${(error as Error).message}. 기존 저장본은 유지합니다.`,
+              )
+              setStorageStatus('복원 실패')
+            }
+          }
+        }
+        if (!mounted) return
         setToken(auth.token)
         setWorks(entries)
+        setReadyToSave(!restoreBlocked.current)
         setErrors(issues)
-        setActiveId(entries[0]?.state.characterId ?? '')
+        setActiveId(
+          entries.some((w) => w.state.characterId === restoredActive)
+            ? restoredActive
+            : (entries[0]?.state.characterId ?? ''),
+        )
       })
       .catch((e: Error) => {
         if (mounted) setFailure(e.message)
@@ -115,14 +221,69 @@ export function ReviewApp() {
     }
   }, [])
   useEffect(() => {
-    if (!dirty) return
+    if (!dirty || storageStatus === '자동 저장됨') return
     const listener = (e: BeforeUnloadEvent) => {
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', listener)
     return () => window.removeEventListener('beforeunload', listener)
-  }, [dirty])
+  }, [dirty, storageStatus])
+  useEffect(() => {
+    if (!readyToSave || !works.length || !token) return
+    let cancelled = false
+    setStorageStatus('저장 중')
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          if (!backupCache.current) {
+            backupCache.current = request<{ file: ReviewBackup }>(
+              '/api/review/backup',
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Review-Token': token,
+                },
+                body: JSON.stringify({ states: works.map((w) => w.state) }),
+              },
+            ).then((response) => response.file)
+            // 실패한 준비 요청은 다음 저장에서 재시도한다.
+            const pending = backupCache.current
+            void pending.catch(() => {
+              if (backupCache.current === pending) backupCache.current = null
+            })
+          }
+          const original = await backupCache.current
+          if (cancelled) return
+          const file = updateBackup(
+            original,
+            works.map((w) => w.state),
+          )
+          await writeSavedReview({
+            version: 1,
+            mode: storageMode.current,
+            activeId,
+            validatedIds: results.map((result) => result.characterId),
+            file,
+          })
+          if (!cancelled) {
+            setStorageStatus('자동 저장됨')
+            setStorageError('')
+          }
+        } catch (error) {
+          if (!cancelled) {
+            setStorageStatus('저장 실패')
+            setStorageError((error as Error).message)
+          }
+        }
+      })()
+    }, 600)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [works, activeId, results, token, readyToSave, saveAttempt])
   const change = (
     edit: (s: ReviewState) => ReviewState,
     touched: string[] = [],
@@ -259,6 +420,10 @@ export function ReviewApp() {
           body: JSON.stringify({ file: value }),
         },
       )
+      backupCache.current = null
+      storageMode.current = 'import'
+      restoreBlocked.current = false
+      setReadyToSave(true)
       setWorks(
         response.sessions.map((session) => ({
           session,
@@ -358,31 +523,6 @@ export function ReviewApp() {
       </div>
       <div className="review-layout">
         <aside className="review-sidebar">
-          <nav className="review-panel target-panel" aria-label="검수 대상">
-            <p className="eyebrow">REVIEW TARGETS</p>
-            <h2>검수 대상</h2>
-            <p className="muted">지정한 공명자 {works.length}명</p>
-            <div className="target-list">
-              {works.map((w) => (
-                <button
-                  key={w.state.characterId}
-                  disabled={busy}
-                  aria-current={
-                    w.state.characterId === activeId ? 'page' : undefined
-                  }
-                  onClick={() => setActiveId(w.state.characterId)}
-                >
-                  <strong>{w.session.source.target.displayName}</strong>
-                  <span>ID {w.state.characterId}</span>
-                </button>
-              ))}
-            </div>
-            {errors.map((e, i) => (
-              <p key={i} className="error">
-                {e}
-              </p>
-            ))}
-          </nav>
           {state && source && active && (
             <section className="review-panel decision-panel">
               <fieldset disabled={blocked}>
@@ -450,12 +590,24 @@ export function ReviewApp() {
             </section>
           )}
           <section className="review-panel export-panel">
-            <p className="eyebrow">VALIDATE & EXPORT</p>
-            <h2>검증 및 내보내기</h2>
+            <p className="eyebrow">VALIDATION & FILES</p>
+            <h2>검증·파일 관리</h2>
             <p className="muted">
               검증을 통과한 공명자를 한 파일로 내보냅니다. 편집 내용은 이
-              페이지에서만 유지됩니다.
+              브라우저에 자동 저장됩니다.
             </p>
+            <p className="storage-status" role="status">
+              브라우저 저장: {storageStatus}
+            </p>
+            {storageError && <p className="error">{storageError}</p>}
+            {storageStatus === '저장 실패' && (
+              <button
+                disabled={busy}
+                onClick={() => setSaveAttempt((n) => n + 1)}
+              >
+                저장 재시도
+              </button>
+            )}
             <div className="review-actions">
               <button
                 disabled={busy || !works.length}
@@ -496,22 +648,98 @@ export function ReviewApp() {
                 JSON으로 내보내기
               </button>
             </div>
-            {results.map((result) => (
-              <div className="validation-results" key={result.characterId}>
-                <h3>
-                  {result.displayName} ·{' '}
-                  {result.errors.length
-                    ? `${result.errors.length}개 확인 필요`
-                    : '검증 통과'}
-                </h3>
-                {result.errors.map((e, i) => (
-                  <p className="error" key={i}>
-                    {result.characterId === activeId ? humanError(e) : e}
-                  </p>
+            {results.length > 0 && (
+              <div
+                className="validation-list review-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="검증 결과"
+              >
+                {results.map((result) => (
+                  <div className="validation-results" key={result.characterId}>
+                    <h3>
+                      {result.displayName} ·{' '}
+                      {result.errors.length
+                        ? `${result.errors.length}개 확인 필요`
+                        : '검증 통과'}
+                    </h3>
+                    {result.errors.map((e, i) => (
+                      <p className="error" key={i}>
+                        {result.characterId === activeId ? humanError(e) : e}
+                      </p>
+                    ))}
+                  </div>
                 ))}
               </div>
-            ))}
+            )}
           </section>
+          <nav className="review-panel target-panel" aria-label="공명자 목록">
+            <p className="eyebrow">RESONATORS</p>
+            <h2>공명자 목록</h2>
+            <p className="muted">지정한 공명자 {works.length}명</p>
+            <div
+              className="target-list review-scroll"
+              tabIndex={0}
+              aria-label="공명자 목록 스크롤"
+            >
+              {ELEMENTS.map((element) => {
+                const group = works.filter((w) => w.state.attribute === element)
+                if (!group.length) return null
+                return (
+                  <details className="attribute-group" key={element} open>
+                    <summary>
+                      {element} <span>{group.length}</span>
+                    </summary>
+                    {group.map((w) => {
+                      const result = results.find(
+                        (r) => r.characterId === w.state.characterId,
+                      )
+                      const hasSourceError =
+                        !!w.session.conflict ||
+                        w.session.source.draft.errors.length > 0
+                      const status = result
+                        ? result.errors.length
+                          ? 'error'
+                          : 'passed'
+                        : hasSourceError
+                          ? 'error'
+                          : 'pending'
+                      const label = {
+                        pending: '미검증',
+                        error: '오류',
+                        passed: '통과',
+                      }[status]
+                      return (
+                        <button
+                          key={w.state.characterId}
+                          disabled={busy}
+                          title={`ID ${w.state.characterId}`}
+                          aria-current={
+                            w.state.characterId === activeId
+                              ? 'page'
+                              : undefined
+                          }
+                          onClick={() => setActiveId(w.state.characterId)}
+                        >
+                          <strong>{w.session.source.target.displayName}</strong>
+                          <span
+                            className={`review-status review-status-${status}`}
+                          >
+                            {label}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </details>
+                )
+              })}
+            </div>
+            {errors.map((e, i) => (
+              <p key={i} className="error">
+                {e}
+              </p>
+            ))}
+          </nav>
         </aside>
         {state && source && active ? (
           <main className="review-main">
