@@ -351,6 +351,68 @@ button {
   align-items: center;
   gap: 8px;
 }
+.project-panel {
+  margin-bottom: 24px;
+  padding: 18px 22px;
+  border: 1px solid #303941;
+  border-radius: 14px;
+  background: #171d24;
+}
+.project-controls,
+.project-name,
+.project-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.project-controls label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #9ecbc4;
+  font-size: 13px;
+}
+.project-controls select,
+.project-controls input,
+.project-panel button {
+  padding: 8px 12px;
+  border: 1px solid #52626a;
+  border-radius: 8px;
+  background: #293941;
+  color: #e4eeee;
+  font: inherit;
+}
+.project-controls select {
+  min-width: 210px;
+  max-width: 300px;
+}
+.project-name {
+  margin-left: auto;
+}
+.project-name input {
+  width: 200px;
+}
+.project-panel button {
+  cursor: pointer;
+}
+.project-panel button:disabled,
+.project-controls select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.project-panel button:hover:not(:disabled) {
+  background: #35544d;
+}
+.project-save-state {
+  margin-top: 10px;
+  color: #9db2b5;
+  font-size: 12px;
+}
+.project-error {
+  margin-top: 10px;
+  color: #f0b9ae;
+}
 .cycle-tools button {
   border: 1px solid #52626a;
   border-radius: 8px;
