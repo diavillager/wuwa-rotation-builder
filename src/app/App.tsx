@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
 } from 'react'
 import {
   createEditorHistory,
@@ -54,6 +55,7 @@ import { attachCaptureEvents } from './input-events'
 import { applyCapturedInput } from './input-command'
 import { attachDragScroll } from './drag-scroll'
 import { usePartySelectorScroll } from './use-party-selector-scroll'
+import type { ProjectReferences } from '../domain/project'
 
 type DragItem =
   | { kind: 'party'; id: string }
@@ -92,22 +94,70 @@ function replacementNotice(before: Rotation, after: Rotation) {
   return `공명자 교체로 두 사이클의 관련 행동 ${removedActions}개와 교체 ${removedSwitches}개가 정리되었습니다.`
 }
 
-export function App() {
+export interface AppProps {
+  initialRotation?: Rotation
+  catalogOverride?: CharacterCatalog
+  projectControls?: ReactNode
+  headerControls?: ReactNode
+  references?: ProjectReferences
+  onRotationChange?: (rotation: Rotation) => void
+  locked?: boolean
+  hideEditor?: boolean
+  embedded?: boolean
+}
+
+export function App({
+  initialRotation,
+  catalogOverride,
+  projectControls,
+  headerControls,
+  references,
+  onRotationChange,
+  locked = false,
+  hideEditor = false,
+  embedded = false,
+}: AppProps = {}) {
   const demo = demoEnabled()
-  const catalog: CharacterCatalog = demo ? demoCatalog : emptyCatalog
+  const catalog: CharacterCatalog =
+    catalogOverride ?? (demo ? demoCatalog : emptyCatalog)
+  const characterLabel = (id: string) => {
+    if (catalog.characters.some((character) => character.id === id))
+      return characterName(catalog, id)
+    const snapshot = references?.characters.find((ref) => ref.id === id)
+    return snapshot
+      ? `${snapshot.displayName} (데이터 누락)`
+      : characterName(catalog, id)
+  }
+  const skillLabel = (id: string) => {
+    if (
+      catalog.characters.some((character) =>
+        character.skills.some((skill) => skill.id === id),
+      )
+    )
+      return skillName(catalog, id)
+    const snapshot = references?.skills.find((ref) => ref.id === id)
+    return snapshot
+      ? `${snapshot.displayName} (데이터 누락)`
+      : skillName(catalog, id)
+  }
   const [editor, setEditor] = useState(() =>
     createEditorHistory(
-      demo
-        ? new URLSearchParams(window.location.search).get('demo') ===
-          'continuity'
-          ? createContinuityDemoRotation()
-          : new URLSearchParams(window.location.search).get('demo') === 'input'
-            ? createInputDemoRotation()
-            : createDemoRotation()
-        : createRotation(['slot-one', 'slot-two', 'slot-three']),
+      initialRotation ??
+        (demo
+          ? new URLSearchParams(window.location.search).get('demo') ===
+            'continuity'
+            ? createContinuityDemoRotation()
+            : new URLSearchParams(window.location.search).get('demo') ===
+                'input'
+              ? createInputDemoRotation()
+              : createDemoRotation()
+          : createRotation(['slot-one', 'slot-two', 'slot-three'])),
     ),
   )
   const rotation = editor.rotation
+  useLayoutEffect(() => {
+    onRotationChange?.(rotation)
+  }, [rotation, onRotationChange])
   const setRotation = useCallback((next: Rotation) => {
     setEditor((current) => recordRotationEdit(current, next))
   }, [])
@@ -163,10 +213,14 @@ export function App() {
     liveRef.current = {
       rotation,
       blocked:
-        selectingSlot !== null || pendingReplacement !== null || drag !== null,
+        locked ||
+        hideEditor ||
+        selectingSlot !== null ||
+        pendingReplacement !== null ||
+        drag !== null,
     }
     if (liveRef.current.blocked) captureRef.current?.cancel()
-  }, [rotation, selectingSlot, pendingReplacement, drag])
+  }, [rotation, selectingSlot, pendingReplacement, drag, locked, hideEditor])
 
   useLayoutEffect(() => {
     const target = revealColumnRef.current
@@ -277,6 +331,7 @@ export function App() {
   }
 
   const run = (command: (current: Rotation) => Rotation) => {
+    if (locked || hideEditor) return
     captureRef.current?.cancel()
     try {
       setRotation(command(rotation))
@@ -287,7 +342,13 @@ export function App() {
   }
 
   const restoreCycle = (cycleId: CycleId, direction: 'undo' | 'redo') => {
-    if (selectingSlot !== null || pendingReplacement !== null || drag !== null)
+    if (
+      locked ||
+      hideEditor ||
+      selectingSlot !== null ||
+      pendingReplacement !== null ||
+      drag !== null
+    )
       return
     captureRef.current?.cancel()
     revealColumnRef.current = null
@@ -474,7 +535,7 @@ export function App() {
           }}
           title="휠로 단수 변경 · Backspace로 삭제"
         >
-          {skillName(catalog, skill.skillRef)}
+          {skillLabel(skill.skillRef)}
           {skill.stage > 0 && <small>{skill.stage}단</small>}
         </span>
       ))}
@@ -508,6 +569,7 @@ export function App() {
               aria-label={`${title} 실행 취소`}
               title="실행 취소"
               disabled={
+                locked ||
                 editor.histories[cycleId].past.length === 0 ||
                 drag !== null ||
                 pendingReplacement !== null ||
@@ -522,6 +584,7 @@ export function App() {
               aria-label={`${title} 다시 실행`}
               title="다시 실행"
               disabled={
+                locked ||
                 editor.histories[cycleId].future.length === 0 ||
                 drag !== null ||
                 pendingReplacement !== null ||
@@ -569,7 +632,7 @@ export function App() {
                   }}
                 >
                   <span className="line-number">0{lineIndex + 1}</span>
-                  {characterName(catalog, id)}
+                  {characterLabel(id)}
                 </button>
                 {view.columns.map((column, index) => (
                   <div
@@ -618,7 +681,7 @@ export function App() {
                                 ? '변주'
                                 : '교체 공격'}
                           </small>
-                          {skillName(catalog, column.action.skillRef)}
+                          {skillLabel(column.action.skillRef)}
                         </div>
                       ))}
                   </div>
@@ -680,225 +743,243 @@ export function App() {
     (item) => item.id === activeId,
   )
   return (
-    <main className="app-shell" ref={shellRef}>
-      <header className="page-heading">
-        <div>
-          <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
-          <h1>WUWA Rotation Builder</h1>
-        </div>
-        <span className="foundation-badge">
-          {demo ? '개발 검증 데이터' : 'Editor'}
-        </span>
-      </header>
-      {notice && (
-        <div className="editor-notice" role="status">
-          {notice}
-        </div>
-      )}
-      <section className="party-panel" aria-label="파티 편성">
-        <div className="section-heading">
+    <main
+      className={embedded ? 'workspace-editor' : 'app-shell'}
+      ref={shellRef}
+    >
+      {!embedded && (
+        <header className="page-heading">
           <div>
-            <span className="eyebrow">PARTY SETUP</span>
-            <h2>파티 편성</h2>
+            <span className="eyebrow">
+              WUTHERING WAVES · ROTATION WORKSPACE
+            </span>
+            <h1>WUWA Rotation Builder</h1>
           </div>
-          <p>슬롯 클릭으로 공명자 선택 · 드래그로 순서 변경</p>
+          {headerControls}
+        </header>
+      )}
+      {projectControls}
+      <div
+        hidden={hideEditor}
+        ref={(element) => {
+          if (locked) element?.setAttribute('inert', '')
+          else element?.removeAttribute('inert')
+        }}
+      >
+        {notice && (
+          <div className="editor-notice" role="status">
+            {notice}
+          </div>
+        )}
+        <section className="party-panel" aria-label="파티 편성">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">PARTY SETUP</span>
+              <h2>파티 편성</h2>
+            </div>
+            <p>슬롯 클릭으로 공명자 선택 · 드래그로 순서 변경</p>
+          </div>
+          <div className="party-grid">
+            {rotation.party.map((id, index) => (
+              <button
+                className="party-slot"
+                key={id}
+                draggable
+                onClick={() => {
+                  if (selectingSlot !== index) prepareOpen()
+                  setSelectedElement(ELEMENTS[0])
+                  setSelectingSlot(selectingSlot === index ? null : index)
+                }}
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = 'move'
+                  setDrag({ kind: 'party', id })
+                }}
+                onDragEnd={() => setDrag(null)}
+                onDragOver={(event) => {
+                  if (drag?.kind === 'party') event.preventDefault()
+                }}
+                onDrop={(event) => {
+                  if (drag?.kind === 'party') {
+                    event.preventDefault()
+                    dropParty(index)
+                  }
+                }}
+              >
+                <span className="slot-index">0{index + 1}</span>
+                <span className="portrait-placeholder" aria-hidden="true">
+                  ◇
+                </span>
+                <span>
+                  <strong>{characterLabel(id)}</strong>
+                  <small>슬롯 {index + 1}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+          {selectingSlot !== null && (
+            <div className="character-selector" aria-label="공명자 선택">
+              <div className="selector-heading">
+                <strong>슬롯 {selectingSlot + 1} 공명자 선택</strong>
+                <div
+                  className="element-tabs"
+                  role="group"
+                  aria-label="속성 선택"
+                >
+                  {ELEMENTS.map((element) => (
+                    <button
+                      key={element}
+                      type="button"
+                      className={selectedElement === element ? 'selected' : ''}
+                      aria-pressed={selectedElement === element}
+                      onClick={() => setSelectedElement(element)}
+                    >
+                      {element}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setSelectingSlot(null)}>닫기</button>
+              </div>
+              <div className="character-options" aria-live="polite">
+                {visibleCharacters.length === 0 ? (
+                  <p>
+                    {catalog.characters.length === 0
+                      ? '검수된 공명자 데이터가 아직 없습니다.'
+                      : `${selectedElement} 공명자가 없습니다.`}
+                  </p>
+                ) : (
+                  visibleCharacters.map((item) => (
+                    <button
+                      key={item.id}
+                      disabled={
+                        rotation.party.includes(item.id) &&
+                        rotation.party[selectingSlot] !== item.id
+                      }
+                      onClick={() => {
+                        const slotIndex = selectingSlot as 0 | 1 | 2
+                        const formerId = rotation.party[slotIndex]
+                        if (
+                          item.id !== formerId &&
+                          hasCharacterCycleContent(rotation, formerId)
+                        ) {
+                          setPendingReplacement({
+                            slotIndex,
+                            formerId,
+                            replacementId: item.id,
+                          })
+                        } else applyReplacement(slotIndex, item.id)
+                      }}
+                    >
+                      {item.displayName}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+        <div className="workspace-grid" hidden={selectingSlot !== null}>
+          <aside className="skills-panel" aria-label="공명자 스킬">
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">RESONATOR SKILLS</span>
+                <h2>공명자 스킬</h2>
+              </div>
+            </div>
+            <p className="skills-context">
+              {focusedCycle === 'opening' ? '개막' : '반복'} ·{' '}
+              {characterLabel(activeId)}
+            </p>
+            {activeCharacter ? (
+              <div className="skill-list">
+                {activeCharacter.skills.map((skill) => (
+                  <div
+                    className="catalog-skill"
+                    key={skill.id}
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'copy'
+                      setDrag({ kind: 'catalogSkill', ref: skill.id })
+                    }}
+                    onDragEnd={() => setDrag(null)}
+                  >
+                    {skill.displayName}
+                    <small>InputBlock으로 드래그</small>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="skills-empty">
+                <div className="empty-symbol">◇</div>
+                <strong>검수된 스킬 데이터 대기 중</strong>
+                <p>현재 편집 라인의 공명자 스킬이 이곳에 표시됩니다.</p>
+              </div>
+            )}
+          </aside>
+          <div className="cycles">
+            {renderCycle('opening')}
+            {renderCycle('repeat')}
+          </div>
         </div>
-        <div className="party-grid">
-          {rotation.party.map((id, index) => (
-            <button
-              className="party-slot"
-              key={id}
-              draggable
-              onClick={() => {
-                if (selectingSlot !== index) prepareOpen()
-                setSelectedElement(ELEMENTS[0])
-                setSelectingSlot(selectingSlot === index ? null : index)
-              }}
-              onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = 'move'
-                setDrag({ kind: 'party', id })
-              }}
-              onDragEnd={() => setDrag(null)}
-              onDragOver={(event) => {
-                if (drag?.kind === 'party') event.preventDefault()
-              }}
-              onDrop={(event) => {
-                if (drag?.kind === 'party') {
+        <footer hidden={selectingSlot !== null}>
+          공명자 항목: 연속 입력 · 배치 영역: 커서 라인 편집 · 200ms Hold ·
+          숫자키로 교체
+        </footer>
+        {pendingReplacement && (
+          <div className="confirm-backdrop">
+            <div
+              className="confirm-dialog"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="replacement-confirm-title"
+              aria-describedby="replacement-confirm-description"
+              onKeyDown={(event) => {
+                if (event.key !== 'Tab') return
+                const buttons = event.currentTarget.querySelectorAll('button')
+                if (event.shiftKey && document.activeElement === buttons[0]) {
                   event.preventDefault()
-                  dropParty(index)
+                  buttons[buttons.length - 1].focus()
+                } else if (
+                  !event.shiftKey &&
+                  document.activeElement === buttons[buttons.length - 1]
+                ) {
+                  event.preventDefault()
+                  buttons[0].focus()
                 }
               }}
             >
-              <span className="slot-index">0{index + 1}</span>
-              <span className="portrait-placeholder" aria-hidden="true">
-                ◇
-              </span>
-              <span>
-                <strong>{characterName(catalog, id)}</strong>
-                <small>슬롯 {index + 1}</small>
-              </span>
-            </button>
-          ))}
-        </div>
-        {selectingSlot !== null && (
-          <div className="character-selector" aria-label="공명자 선택">
-            <div className="selector-heading">
-              <strong>슬롯 {selectingSlot + 1} 공명자 선택</strong>
-              <div className="element-tabs" role="group" aria-label="속성 선택">
-                {ELEMENTS.map((element) => (
-                  <button
-                    key={element}
-                    type="button"
-                    className={selectedElement === element ? 'selected' : ''}
-                    aria-pressed={selectedElement === element}
-                    onClick={() => setSelectedElement(element)}
-                  >
-                    {element}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setSelectingSlot(null)}>닫기</button>
-            </div>
-            <div className="character-options" aria-live="polite">
-              {visibleCharacters.length === 0 ? (
-                <p>
-                  {catalog.characters.length === 0
-                    ? '검수된 공명자 데이터가 아직 없습니다.'
-                    : `${selectedElement} 공명자가 없습니다.`}
-                </p>
-              ) : (
-                visibleCharacters.map((item) => (
-                  <button
-                    key={item.id}
-                    disabled={
-                      rotation.party.includes(item.id) &&
-                      rotation.party[selectingSlot] !== item.id
+              <h2 id="replacement-confirm-title">
+                공명자를 변경하면 사이클이 초기화됩니다.
+              </h2>
+              <p id="replacement-confirm-description">
+                기존 공명자와 연결된 행동·교체가 개막 및 반복 사이클에서
+                정리됩니다. 두 사이클의 실행 취소·다시 실행 기록도 초기화됩니다.
+              </p>
+              <div className="confirm-actions">
+                <button autoFocus onClick={() => setPendingReplacement(null)}>
+                  취소
+                </button>
+                <button
+                  className="confirm-submit"
+                  onClick={() => {
+                    if (
+                      rotation.party[pendingReplacement.slotIndex] ===
+                      pendingReplacement.formerId
+                    ) {
+                      applyReplacement(
+                        pendingReplacement.slotIndex,
+                        pendingReplacement.replacementId,
+                      )
                     }
-                    onClick={() => {
-                      const slotIndex = selectingSlot as 0 | 1 | 2
-                      const formerId = rotation.party[slotIndex]
-                      if (
-                        item.id !== formerId &&
-                        hasCharacterCycleContent(rotation, formerId)
-                      ) {
-                        setPendingReplacement({
-                          slotIndex,
-                          formerId,
-                          replacementId: item.id,
-                        })
-                      } else applyReplacement(slotIndex, item.id)
-                    }}
-                  >
-                    {item.displayName}
-                  </button>
-                ))
-              )}
+                    setPendingReplacement(null)
+                  }}
+                >
+                  공명자 변경
+                </button>
+              </div>
             </div>
           </div>
         )}
-      </section>
-      <div className="workspace-grid" hidden={selectingSlot !== null}>
-        <aside className="skills-panel" aria-label="공명자 스킬">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">RESONATOR SKILLS</span>
-              <h2>공명자 스킬</h2>
-            </div>
-          </div>
-          <p className="skills-context">
-            {focusedCycle === 'opening' ? '개막' : '반복'} ·{' '}
-            {characterName(catalog, activeId)}
-          </p>
-          {activeCharacter ? (
-            <div className="skill-list">
-              {activeCharacter.skills.map((skill) => (
-                <div
-                  className="catalog-skill"
-                  key={skill.id}
-                  draggable
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = 'copy'
-                    setDrag({ kind: 'catalogSkill', ref: skill.id })
-                  }}
-                  onDragEnd={() => setDrag(null)}
-                >
-                  {skill.displayName}
-                  <small>InputBlock으로 드래그</small>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="skills-empty">
-              <div className="empty-symbol">◇</div>
-              <strong>검수된 스킬 데이터 대기 중</strong>
-              <p>현재 편집 라인의 공명자 스킬이 이곳에 표시됩니다.</p>
-            </div>
-          )}
-        </aside>
-        <div className="cycles">
-          {renderCycle('opening')}
-          {renderCycle('repeat')}
-        </div>
       </div>
-      <footer hidden={selectingSlot !== null}>
-        공명자 항목: 연속 입력 · 배치 영역: 커서 라인 편집 · 200ms Hold ·
-        숫자키로 교체
-      </footer>
-      {pendingReplacement && (
-        <div className="confirm-backdrop">
-          <div
-            className="confirm-dialog"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="replacement-confirm-title"
-            aria-describedby="replacement-confirm-description"
-            onKeyDown={(event) => {
-              if (event.key !== 'Tab') return
-              const buttons = event.currentTarget.querySelectorAll('button')
-              if (event.shiftKey && document.activeElement === buttons[0]) {
-                event.preventDefault()
-                buttons[buttons.length - 1].focus()
-              } else if (
-                !event.shiftKey &&
-                document.activeElement === buttons[buttons.length - 1]
-              ) {
-                event.preventDefault()
-                buttons[0].focus()
-              }
-            }}
-          >
-            <h2 id="replacement-confirm-title">
-              공명자를 변경하면 사이클이 초기화됩니다.
-            </h2>
-            <p id="replacement-confirm-description">
-              기존 공명자와 연결된 행동·교체가 개막 및 반복 사이클에서
-              정리됩니다. 두 사이클의 실행 취소·다시 실행 기록도 초기화됩니다.
-            </p>
-            <div className="confirm-actions">
-              <button autoFocus onClick={() => setPendingReplacement(null)}>
-                취소
-              </button>
-              <button
-                className="confirm-submit"
-                onClick={() => {
-                  if (
-                    rotation.party[pendingReplacement.slotIndex] ===
-                    pendingReplacement.formerId
-                  ) {
-                    applyReplacement(
-                      pendingReplacement.slotIndex,
-                      pendingReplacement.replacementId,
-                    )
-                  }
-                  setPendingReplacement(null)
-                }}
-              >
-                공명자 변경
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }
