@@ -61,15 +61,22 @@ export function assignEncore(
       candidate.decision =
         match.category === '고유 스킬' ? 'exclude' : 'include'
   }
+  return linkCategorizedActions(next)
+}
+
+export function sortReviewCardsByCategory(
+  state: ReviewState,
+  source: ReviewSource,
+): ReviewState {
   // 현재 표시 순서를 기준으로 안정 정렬하여 같은 분류의 수동 배치를 보존한다.
   const categoryRank = (card: ReturnType<typeof reviewCards>[number]) => {
-    const category = next[card.group][card.index].category
+    const category = state[card.group][card.index].category
     return category ? SKILL_CATEGORIES.indexOf(category) + 1 : 0
   }
-  next.cardOrder = reviewCards(next, source)
+  const cardOrder = reviewCards(state, source)
     .sort((a, b) => categoryRank(a) - categoryRank(b))
     .map((card) => card.key)
-  return linkCategorizedActions(next)
+  return { ...state, cardOrder }
 }
 
 export function moveReviewCard(

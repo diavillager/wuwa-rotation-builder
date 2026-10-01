@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { matchEncore } from './encore'
 import {
   assignEncore,
+  sortReviewCardsByCategory,
   linkCategorizedActions,
   moveReviewCard,
   undoEncore,
@@ -75,7 +76,7 @@ function fixture() {
   return { source, state: initialReview(source) }
 }
 describe('명시적인 Encore 의미와 검수 순서', () => {
-  it('자동 배정은 전체 분류 순으로 안정 정렬하고 해제해도 정렬을 유지한다', () => {
+  it('자동 배정은 순서를 바꾸지 않고 별도 분류 정렬은 해제 후에도 유지한다', () => {
     const { source } = fixture()
     const categories: (SkillCategory | undefined)[] = [
       '고유 스킬',
@@ -112,15 +113,18 @@ describe('명시적인 Encore 의미와 검수 순서', () => {
     )
     const before = structuredClone(state)
     const assigned = assignEncore(state, source)
-    expect(assigned.cardOrder).toEqual(
+    expect(assigned.cardOrder).toEqual(state.cardOrder)
+    const sorted = sortReviewCardsByCategory(assigned, source)
+    expect(sorted.cardOrder).toEqual(
       [2, 9, 1, 5, 3, 6, 8, 4, 7, 0].map((i) => `candidate-${i}`),
     )
-    const undone = undoEncore(assigned, {
+    expect({ ...sorted, cardOrder: assigned.cardOrder }).toEqual(assigned)
+    const undone = undoEncore(sorted, {
       before: state,
       after: assigned,
       manual: [],
     })
-    expect(undone.cardOrder).toEqual(assigned.cardOrder)
+    expect(undone.cardOrder).toEqual(sorted.cardOrder)
     expect(undone.candidates).toEqual(state.candidates)
     expect(state).toEqual(before)
   })

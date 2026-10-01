@@ -485,9 +485,13 @@ code {
   flex-shrink: 0;
   accent-color: #8dccb9;
 }
-.assignment-toggle {
+.sort-cards {
   width: 100%;
   margin: 16px 0 4px;
+}
+.assignment-toggle {
+  width: 100%;
+  margin: 4px 0;
 }
 .assignment-toggle[aria-pressed='true'] {
   border-color: #8cc9b8;

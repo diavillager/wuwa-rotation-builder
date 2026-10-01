@@ -252,6 +252,37 @@ it('공명자를 오가도 페이지 메모리에 편집을 유지하며 서버 
   await render()
   expect(decision('등록').checked).toBe(false)
 })
+it('자동 배정과 별도 정렬 버튼을 분리하고 해제해도 정렬 순서를 유지한다', async () => {
+  saved.source.draft.candidates.push({
+    ...saved.source.draft.candidates[0],
+    candidateId: 'candidate-two',
+  })
+  saved.source.encoreMatches = {
+    'candidate-one': {
+      category: '고유 스킬',
+      displayName: '고유 이름',
+      skillId: '101',
+    },
+  }
+  saved.state = initialReview(saved.source)
+  await render()
+  const order = () =>
+    [...document.querySelectorAll<HTMLElement>('[data-review-key]')].map(
+      (c) => c.dataset.reviewKey,
+    )
+  const buttons = [...document.querySelectorAll('.decision-panel button')]
+  expect(buttons.map((b) => b.textContent)).toEqual([
+    '분류순 정렬',
+    'Encore 자동 배정',
+  ])
+  await click('Encore 자동 배정')
+  expect(order()).toEqual(['candidate-one', 'candidate-two'])
+  await click('분류순 정렬')
+  expect(order()).toEqual(['candidate-two', 'candidate-one'])
+  expect(document.querySelector('.category-badge')).toBeNull()
+  await click('Encore 자동 배정 해제')
+  expect(order()).toEqual(['candidate-two', 'candidate-one'])
+})
 it('자동 배정 해제는 직접 수정한 값만 유지하고 자동 필드를 초기화한다', async () => {
   saved.source.encoreMatches = {
     'candidate-one': {

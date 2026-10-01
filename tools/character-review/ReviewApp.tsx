@@ -6,6 +6,7 @@ import {
 } from '../../src/data/characters/categories'
 import {
   assignEncore,
+  sortReviewCardsByCategory,
   linkCategorizedActions,
   undoEncore,
   reviewFieldKey,
@@ -322,6 +323,14 @@ export function ReviewApp() {
                   <br />
                   변주 스킬 → 변주 · 반주 스킬 → 반주
                 </p>
+                <button
+                  className="sort-cards"
+                  onClick={() =>
+                    change((s) => sortReviewCardsByCategory(s, source))
+                  }
+                >
+                  분류순 정렬
+                </button>
                 <button
                   className="assignment-toggle"
                   aria-pressed={!!active.receipt}
