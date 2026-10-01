@@ -42,13 +42,37 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
     setName(currentName)
   }, [currentId, currentName])
   const disabled = state.loading || state.busy || confirmDelete
+  const saveLabel = state.loading
+    ? '불러오는 중…'
+    : state.status === 'saving'
+      ? '저장 중…'
+      : state.status === 'dirty'
+        ? '저장 대기'
+        : state.status === 'error'
+          ? '저장 실패'
+          : state.current
+            ? '저장됨'
+            : '미선택'
   const toolbar = (
     <section className="project-panel" aria-label="프로젝트 관리">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">PROJECT MANAGEMENT</span>
+          <h2>프로젝트 관리</h2>
+        </div>
+        <span
+          className="status project-save-state"
+          role="status"
+          aria-live="polite"
+        >
+          {saveLabel}
+        </span>
+      </div>
       <div className="project-controls">
         <label>
-          프로젝트
           <select
             aria-label="프로젝트 선택"
+            title={currentName || '프로젝트 선택'}
             value={state.current?.id ?? ''}
             disabled={disabled || (!!state.error && !state.current)}
             onChange={(event) => {
@@ -83,39 +107,32 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
         >
           삭제
         </button>
-        {state.current && (
-          <form
-            className="project-name"
-            onSubmit={(event) => {
-              event.preventDefault()
-              void store.rename(name)
-            }}
-          >
-            <input
-              aria-label="프로젝트 이름"
-              value={name}
-              disabled={disabled}
-              onChange={(event) => setName(event.target.value)}
-            />
-            <button disabled={disabled || name.trim() === state.current.name}>
-              이름 변경
-            </button>
-          </form>
-        )}
+        <div className="project-export-slot" aria-hidden="true" />
       </div>
-      <div className="project-save-state" role="status" aria-live="polite">
-        {state.loading
-          ? '프로젝트 불러오는 중…'
-          : state.status === 'saving'
-            ? '저장 중…'
-            : state.status === 'dirty'
-              ? '저장 대기'
-              : state.status === 'error'
-                ? '저장 실패'
-                : state.current
-                  ? '저장됨'
-                  : '새 프로젝트를 만들거나 목록에서 선택해 주세요.'}
-      </div>
+      {state.current && (
+        <form
+          className="project-name"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void store.rename(name)
+          }}
+        >
+          <input
+            aria-label="프로젝트 이름"
+            value={name}
+            disabled={disabled}
+            onChange={(event) => setName(event.target.value)}
+          />
+          <button disabled={disabled || name.trim() === state.current.name}>
+            이름 변경
+          </button>
+        </form>
+      )}
+      {!state.current && !state.loading && (
+        <p className="project-empty">
+          새 프로젝트를 만들거나 목록에서 선택해 주세요.
+        </p>
+      )}
       {state.error && (
         <div className="project-error" role="alert">
           {state.error}

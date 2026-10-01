@@ -355,16 +355,23 @@ button {
   margin-bottom: 24px;
   padding: 18px 22px;
   border: 1px solid #303941;
-  border-radius: 14px;
+  border-radius: 18px;
   background: #171d24;
 }
 .project-controls,
-.project-name,
 .project-error {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
+}
+.project-controls {
+  margin-top: 20px;
+  flex-wrap: nowrap;
+}
+.project-export-slot {
+  margin-left: auto;
+  min-width: 100px;
 }
 .project-controls label {
   display: flex;
@@ -372,9 +379,11 @@ button {
   gap: 10px;
   color: #9ecbc4;
   font-size: 13px;
+  flex: 0 0 280px;
+  min-width: 0;
 }
 .project-controls select,
-.project-controls input,
+.project-name input,
 .project-panel button {
   padding: 8px 12px;
   border: 1px solid #52626a;
@@ -384,17 +393,26 @@ button {
   font: inherit;
 }
 .project-controls select {
-  min-width: 210px;
-  max-width: 300px;
+  width: 280px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .project-name {
-  margin-left: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 12px;
 }
 .project-name input {
-  width: 200px;
+  width: 100%;
+  min-width: 0;
 }
 .project-panel button {
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .project-panel button:disabled,
 .project-controls select:disabled {
@@ -404,8 +422,8 @@ button {
 .project-panel button:hover:not(:disabled) {
   background: #35544d;
 }
-.project-save-state {
-  margin-top: 10px;
+.project-empty {
+  margin-top: 16px;
   color: #9db2b5;
   font-size: 12px;
 }
