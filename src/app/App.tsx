@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type DragEvent,
 } from 'react'
 import {
   createEditorHistory,
@@ -54,6 +55,7 @@ import { TimelineWires } from './TimelineWires'
 import { attachCaptureEvents } from './input-events'
 import { applyCapturedInput } from './input-command'
 import { attachDragScroll } from './drag-scroll'
+import { showDragPreview } from './drag-preview'
 import { usePartySelectorScroll } from './use-party-selector-scroll'
 import type { ProjectReferences } from '../domain/project'
 
@@ -187,6 +189,26 @@ export function App({
   const [selectedElement, setSelectedElement] = useState<Element>(ELEMENTS[0])
   const [notice, setNotice] = useState('')
   const [drag, setDrag] = useState<DragItem | null>(null)
+  const dragPreviewRef = useRef<(() => void) | null>(null)
+  const clearDragPreview = useCallback(() => {
+    dragPreviewRef.current?.()
+    dragPreviewRef.current = null
+  }, [])
+  const beginDragPreview = (event: DragEvent<HTMLElement>) => {
+    clearDragPreview()
+    dragPreviewRef.current = showDragPreview(
+      event.currentTarget,
+      event.dataTransfer,
+      {
+        x: event.clientX,
+        y: event.clientY,
+      },
+    )
+  }
+  useEffect(() => clearDragPreview, [clearDragPreview])
+  useEffect(() => {
+    if (!drag) clearDragPreview()
+  }, [drag, clearDragPreview])
   const pointerRef = useRef<{ x: number; y: number } | null>(null)
   const visibleCharacters = charactersByElement(catalog, selectedElement)
   const captureRef = useRef<ReturnType<typeof attachCaptureEvents> | null>(null)
@@ -489,6 +511,7 @@ export function App({
       aria-label={`${action.input} 입력, 연결 스킬 ${action.skills.length}개`}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'move'
+        beginDragPreview(event)
         setDrag({ kind: 'input', cycleId, columnId })
       }}
       onDragEnd={() => setDrag(null)}
@@ -521,6 +544,7 @@ export function App({
             if (action.skills.length < 2) return
             event.stopPropagation()
             event.dataTransfer.effectAllowed = 'move'
+            beginDragPreview(event)
             setDrag({
               kind: 'linkedSkill',
               cycleId,
@@ -564,7 +588,7 @@ export function App({
     const cycle = rotation[cycleId]
     const view = projectCycle(rotation, cycle)
     const title = cycleId === 'opening' ? '개막 사이클' : '반복 사이클'
-    const tracks = `148px ${view.columns.map(() => 'max-content').join(' ')} minmax(150px, 1fr)`
+    const tracks = `var(--timeline-line-size) ${view.columns.map(() => 'max-content').join(' ')} minmax(150px, 1fr)`
     return (
       <section
         className={`cycle-panel ${focusedCycle === cycleId ? 'focused-cycle' : ''}`}
@@ -633,6 +657,8 @@ export function App({
                   className={`line-label ${cycle.activeCharacterId === id ? 'active-line' : ''}`}
                   data-row-owner={id}
                   data-capture-owner={id}
+                  aria-label={`슬롯 ${lineIndex + 1} ${characterLabel(id)}`}
+                  title={characterLabel(id)}
                   draggable
                   onDragStart={(event) => {
                     event.dataTransfer.effectAllowed = 'move'
@@ -650,7 +676,25 @@ export function App({
                   }}
                 >
                   <span className="line-number">0{lineIndex + 1}</span>
-                  {characterLabel(id)}
+                  {catalog.characters.find((item) => item.id === id)
+                    ?.assetUrl ? (
+                    <img
+                      className="line-portrait"
+                      src={
+                        catalog.characters.find((item) => item.id === id)!
+                          .assetUrl
+                      }
+                      alt=""
+                      draggable={false}
+                    />
+                  ) : (
+                    <span
+                      className="line-portrait-placeholder"
+                      aria-hidden="true"
+                    >
+                      ◇
+                    </span>
+                  )}
                 </button>
                 {view.columns.map((column, index) => (
                   <div
@@ -923,10 +967,6 @@ export function App({
                 <h2>공명자 스킬</h2>
               </div>
             </div>
-            <p className="skills-context">
-              {focusedCycle === 'opening' ? '개막' : '반복'} ·{' '}
-              {characterLabel(activeId)}
-            </p>
             {activeCharacter ? (
               <div className="skill-list">
                 {activeCharacter.skills
@@ -940,25 +980,7 @@ export function App({
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = 'copy'
                         event.dataTransfer.setData('text/plain', skill.id)
-                        const card = event.currentTarget
-                        const bounds = card.getBoundingClientRect()
-                        event.dataTransfer.setDragImage(
-                          card,
-                          Math.max(
-                            0,
-                            Math.min(
-                              bounds.width,
-                              (event.clientX ?? bounds.left) - bounds.left,
-                            ),
-                          ),
-                          Math.max(
-                            0,
-                            Math.min(
-                              bounds.height,
-                              (event.clientY ?? bounds.top) - bounds.top,
-                            ),
-                          ),
-                        )
+                        beginDragPreview(event)
                         setDrag({ kind: 'catalogSkill', ref: skill.id })
                       }}
                       onDragEnd={() => setDrag(null)}
@@ -974,10 +996,12 @@ export function App({
                       <span className="catalog-skill-copy">
                         {skill.category && (
                           <span className="catalog-skill-category">
-                            [{skill.category}]
+                            {skill.category}
                           </span>
-                        )}{' '}
-                        <span>{skill.displayName}</span>
+                        )}
+                        <span className="catalog-skill-name">
+                          {skill.displayName}
+                        </span>
                       </span>
                     </div>
                   ))}

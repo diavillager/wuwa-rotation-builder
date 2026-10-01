@@ -92,7 +92,12 @@ describe('App 실제 입력 연결', () => {
       Object.defineProperty(event, 'dataTransfer', { value: transfer })
       card.dispatchEvent(event)
     })
-    expect(transfer.setDragImage).toHaveBeenCalledWith(card, 30, 35)
+    expect(transfer.setDragImage.mock.calls[0][0]).toBeInstanceOf(
+      HTMLCanvasElement,
+    )
+    expect(
+      document.querySelector<HTMLElement>('.drag-preview')!.style.transform,
+    ).toBe('translate3d(10px, 20px, 0)')
     expect(transfer.setData).toHaveBeenCalledWith('text/plain', 'demo-skill-a')
     expect(transfer.effectAllowed).toBe('copy')
     await act(async () =>
@@ -118,6 +123,14 @@ describe('App 실제 입력 연결', () => {
     expect(card.textContent).not.toContain('InputBlock으로 드래그')
     expect(card.getAttribute('title')).toBe(skill.displayName)
     expect(card.querySelector('img')?.getAttribute('src')).toBe(skill.assetUrl)
+    const line = grid().querySelector('.line-label')!
+    expect(line.querySelector('img')?.getAttribute('src')).toBe(
+      character.assetUrl,
+    )
+    expect(line.getAttribute('aria-label')).toContain(character.displayName)
+    expect(line.getAttribute('title')).toBe(character.displayName)
+    expect(line.textContent).not.toContain(character.displayName)
+    expect(document.querySelector('.skills-context')).toBeNull()
     await hover(emptyLine())
     await key('keydown', 'KeyE')
     await key('keyup', 'KeyE', 10)
@@ -273,7 +286,7 @@ describe('App 실제 입력 연결', () => {
     await clickHistory('opening', 'undo')
     await clickHistory('opening', 'redo')
     expect(
-      grid().querySelectorAll('[data-row-owner]')[2].textContent,
+      grid().querySelectorAll('[data-row-owner]')[2].getAttribute('aria-label'),
     ).toContain('데모 공명자 A')
     expect(
       grid().querySelector('.input-card')?.parentElement?.dataset.captureOwner,
@@ -433,7 +446,7 @@ describe('App 실제 입력 연결', () => {
       await act(async () => {
         const event = new Event('dragstart', { bubbles: true })
         Object.defineProperty(event, 'dataTransfer', {
-          value: { effectAllowed: '' },
+          value: { effectAllowed: '', setDragImage: vi.fn() },
         })
         card.dispatchEvent(event)
       })
@@ -727,8 +740,8 @@ describe('App 실제 입력 연결', () => {
     expect(
       grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
     ).toBe('demo-b')
-    expect(document.querySelector('.skills-context')?.textContent).toContain(
-      '데모 공명자 B',
+    expect(document.querySelector('.skill-list')?.textContent).toContain(
+      '데모 스킬 B',
     )
     await act(async () =>
       grid()
@@ -1132,8 +1145,8 @@ describe('App 실제 입력 연결', () => {
     expect(
       grid('repeat').querySelectorAll('.input-card, .auto-card'),
     ).toHaveLength(0)
-    expect(document.querySelector('.skills-context')?.textContent).toContain(
-      '데모 공명자 B',
+    expect(document.querySelector('.skill-list')?.textContent).toContain(
+      '데모 스킬 B',
     )
   })
 
