@@ -126,7 +126,7 @@ h2 {
 }
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 496px;
+  grid-template-columns: minmax(0, 1fr) 400px;
   grid-template-areas: 'cycles skills';
   gap: 22px;
 }
@@ -385,11 +385,11 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 148px;
+  gap: 4px;
+  height: 136px;
   border: 1px solid #63887f;
   border-radius: 9px;
-  padding: 10px;
+  padding: 6px;
   background: #263b39;
   cursor: grab;
   font-size: 14px;
@@ -664,7 +664,7 @@ button {
   background: #202c34;
 }
 .timeline-grid {
-  --timeline-line-size: 128px;
+  --timeline-line-size: calc(128px * 2 / 3);
   display: grid;
   grid-auto-rows: var(--timeline-line-size);
   position: relative;
@@ -706,14 +706,14 @@ button {
   width: var(--timeline-line-size);
   height: var(--timeline-line-size);
   min-height: 0;
-  padding: 12px;
+  padding: 8px;
   justify-content: center;
 }
 .line-label .line-number {
   position: absolute;
-  left: 8px;
-  top: 8px;
-  font-size: 12px;
+  left: 5px;
+  top: 5px;
+  font-size: 10px;
   z-index: 1;
 }
 .line-portrait {
@@ -723,7 +723,7 @@ button {
   pointer-events: none;
 }
 .line-portrait-placeholder {
-  font-size: 42px;
+  font-size: 28px;
   color: #9cc5be;
   pointer-events: none;
 }
@@ -745,7 +745,7 @@ button {
 }
 .timeline-cell {
   min-height: 0;
-  padding: 7px;
+  padding: 5px;
   display: flex;
   align-items: center;
   background: transparent;
@@ -758,10 +758,10 @@ button {
   z-index: 2;
   display: flex;
   align-items: stretch;
-  gap: 4px;
+  gap: 3px;
   max-width: none;
-  height: calc(var(--timeline-line-size, 128px) - 14px);
-  padding: 4px;
+  height: calc(var(--timeline-line-size, 85.3333px) - 10px);
+  padding: 3px;
   border: 1px solid #6c9e96;
   border-radius: 8px;
   background: #283c3e;
@@ -771,9 +771,9 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-width: 36px;
+  min-width: 28px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 12px;
 }
 .input-key small,
 .auto-card small {
@@ -792,16 +792,21 @@ button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 4px;
-  min-width: 75px;
+  padding: 3px;
+  min-width: 60px;
   border-radius: 5px;
   background: #3b6158;
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1.2;
   cursor: grab;
   white-space: nowrap;
 }
 .linked-skill small {
   color: #d6eadc;
+}
+.linked-skill .skill-icon {
+  width: 28px;
+  height: 28px;
 }
 .drag-preview {
   position: fixed;
