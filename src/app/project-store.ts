@@ -259,7 +259,8 @@ export class ProjectStore {
       const replacement = remaining.length
         ? undefined
         : this.newProject(remaining)
-      const next = replacement ?? remaining[Math.max(0, index - 1)]
+      const next =
+        replacement ?? remaining[Math.min(index, remaining.length - 1)]
       await this.writes.deleteAndSelect(current.id, next.id, replacement)
       this.saved = next
       this.publish({

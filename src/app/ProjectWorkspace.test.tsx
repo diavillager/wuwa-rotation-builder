@@ -105,6 +105,81 @@ async function select(id: string) {
 }
 
 describe('프로젝트 관리 화면', () => {
+  it('클릭은 선택창을 유지하고 전환 중 더블클릭은 선택 완료 후 닫는다', async () => {
+    await render()
+    await click('새 프로젝트')
+    await waitFor(() =>
+      expect(button('프로젝트 선택').dataset.projectId).toBeDefined(),
+    )
+    const first = (await repo.list())[0]
+    await click('새 프로젝트')
+    await waitFor(() =>
+      expect(button('프로젝트 선택').dataset.projectId).not.toBe(first.id),
+    )
+    await waitFor(() => expect(button('프로젝트 선택').disabled).toBe(false))
+    const secondId = button('프로젝트 선택').dataset.projectId
+    const actualSelect = repo.select.bind(repo)
+    let finish!: () => void
+    vi.spyOn(repo, 'select').mockImplementation(async (id) => {
+      await new Promise<void>((resolve) => {
+        finish = resolve
+      })
+      await actualSelect(id)
+    })
+    const option = document.querySelector<HTMLButtonElement>(
+      `.project-dropdown-list [data-project-id="${first.id}"]`,
+    )!
+    await act(async () => option.click())
+    expect(option.disabled).toBe(false)
+    expect(option.isConnected).toBe(true)
+    expect(button('프로젝트 선택').dataset.projectId).toBe(secondId)
+    await act(async () => {
+      option.click()
+      option.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
+    await act(async () => finish())
+    await waitFor(() =>
+      expect(document.querySelector('.project-dropdown')).toBeNull(),
+    )
+    expect(button('프로젝트 선택').dataset.projectId).toBe(first.id)
+    expect(await repo.selectedId()).toBe(first.id)
+    await openPicker()
+    const currentOption = document.querySelector<HTMLButtonElement>(
+      `.project-dropdown-list [data-project-id="${first.id}"]`,
+    )!
+    await act(async () => currentOption.click())
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
+  })
+  it('더블클릭 전환에 실패하면 기존 프로젝트와 선택창을 유지한다', async () => {
+    await render()
+    await click('새 프로젝트')
+    await waitFor(() =>
+      expect(button('프로젝트 선택').dataset.projectId).toBeDefined(),
+    )
+    const first = (await repo.list())[0]
+    await click('새 프로젝트')
+    await waitFor(() =>
+      expect(button('프로젝트 선택').dataset.projectId).not.toBe(first.id),
+    )
+    await waitFor(() => expect(button('프로젝트 선택').disabled).toBe(false))
+    const currentId = button('프로젝트 선택').dataset.projectId
+    vi.spyOn(repo, 'select').mockRejectedValue(new Error('선택 실패'))
+    await act(async () => {
+      const option = document.querySelector<HTMLButtonElement>(
+        `.project-dropdown-list [data-project-id="${first.id}"]`,
+      )!
+      option.click()
+      option.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+    })
+    await waitFor(() =>
+      expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+        '선택 실패',
+      ),
+    )
+    expect(document.querySelector('.project-dropdown')).not.toBeNull()
+    expect(button('프로젝트 선택').dataset.projectId).toBe(currentId)
+  })
   it('선택창을 열어도 편집 필드를 유지하고 Escape와 외부 클릭으로만 닫는다', async () => {
     await render()
     await click('새 프로젝트')

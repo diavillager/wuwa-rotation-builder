@@ -204,7 +204,7 @@ describe('프로젝트 자동저장과 관리', () => {
     store.dispose()
     next.dispose()
   })
-  it('중간 항목 삭제는 바로 위를 선택하고 첫 항목 삭제는 바로 아래를 선택한다', async () => {
+  it('삭제 후 바로 아래를 선택하고 아래가 없으면 바로 위를 선택한다', async () => {
     const { store, repo } = setup()
     await store.initialize()
     await store.create()
@@ -215,15 +215,15 @@ describe('프로젝트 자동저장과 관리', () => {
     const third = store.snapshot().current!
     await store.open(second.id)
     await store.deleteCurrent()
-    expect(store.snapshot().current!.id).toBe(first.id)
-    expect(await repo.selectedId()).toBe(first.id)
+    expect(store.snapshot().current!.id).toBe(third.id)
+    expect(await repo.selectedId()).toBe(third.id)
     expect(store.snapshot().projects.map((p) => p.id)).toEqual([
       first.id,
       third.id,
     ])
     await store.deleteCurrent()
-    expect(store.snapshot().current!.id).toBe(third.id)
-    expect(await repo.selectedId()).toBe(third.id)
+    expect(store.snapshot().current!.id).toBe(first.id)
+    expect(await repo.selectedId()).toBe(first.id)
     store.dispose()
   })
   it('삭제와 대체 생성의 실패는 현재 내용과 선택을 보존한다', async () => {

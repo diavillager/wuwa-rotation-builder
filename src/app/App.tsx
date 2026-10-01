@@ -103,6 +103,7 @@ export interface AppProps {
   onRotationChange?: (rotation: Rotation) => void
   locked?: boolean
   hideEditor?: boolean
+  embedded?: boolean
 }
 
 export function App({
@@ -114,6 +115,7 @@ export function App({
   onRotationChange,
   locked = false,
   hideEditor = false,
+  embedded = false,
 }: AppProps = {}) {
   const demo = demoEnabled()
   const catalog: CharacterCatalog =
@@ -741,14 +743,21 @@ export function App({
     (item) => item.id === activeId,
   )
   return (
-    <main className="app-shell" ref={shellRef}>
-      <header className="page-heading">
-        <div>
-          <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
-          <h1>WUWA Rotation Builder</h1>
-        </div>
-        {headerControls}
-      </header>
+    <main
+      className={embedded ? 'workspace-editor' : 'app-shell'}
+      ref={shellRef}
+    >
+      {!embedded && (
+        <header className="page-heading">
+          <div>
+            <span className="eyebrow">
+              WUTHERING WAVES · ROTATION WORKSPACE
+            </span>
+            <h1>WUWA Rotation Builder</h1>
+          </div>
+          {headerControls}
+        </header>
+      )}
       {projectControls}
       <div
         hidden={hideEditor}

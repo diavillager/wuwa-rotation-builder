@@ -39,6 +39,7 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const headerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const selectionRef = useRef<Promise<void> | null>(null)
   const currentName = state.current?.name ?? ''
   const currentId = state.current?.id
   useEffect(() => {
@@ -58,6 +59,17 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
     document.addEventListener('pointerdown', outside)
     return () => document.removeEventListener('pointerdown', outside)
   }, [pickerOpen, confirmDelete])
+  const selectProject = async (id: string, close = false) => {
+    if (!store.snapshot().busy) selectionRef.current = store.open(id)
+    const pending = selectionRef.current
+    await pending
+    if (selectionRef.current === pending) selectionRef.current = null
+    const latest = store.snapshot()
+    if (close && latest.current?.id === id && !latest.error) {
+      setPickerOpen(false)
+      triggerRef.current?.focus()
+    }
+  }
   const disabled = state.loading || state.busy || confirmDelete
   const saveLabel = state.loading
     ? '불러오는 중…'
@@ -157,8 +169,13 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
                 data-project-id={project.id}
                 aria-pressed={currentId === project.id}
                 title={project.name}
-                disabled={disabled || (!!state.error && !state.current)}
-                onClick={() => void store.open(project.id)}
+                disabled={
+                  state.loading ||
+                  confirmDelete ||
+                  (!!state.error && !state.current)
+                }
+                onClick={() => void selectProject(project.id)}
+                onDoubleClick={() => void selectProject(project.id, true)}
               >
                 <span aria-hidden="true">
                   {currentId === project.id ? '✓' : ''}
@@ -258,15 +275,24 @@ export function ProjectWorkspace({ repository, catalog }: WorkspaceProps = {}) {
     </>
   )
   return (
-    <App
-      key={state.generation}
-      initialRotation={state.current?.rotation ?? emptyRotation}
-      catalogOverride={activeCatalog}
-      references={state.current?.references}
-      headerControls={headerControls}
-      projectControls={notices}
-      onRotationChange={store.updateRotation}
-      locked={state.loading || !state.current || state.busy || confirmDelete}
-    />
+    <div className="app-shell">
+      <header className="page-heading">
+        <div>
+          <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
+          <h1>WUWA Rotation Builder</h1>
+        </div>
+        {headerControls}
+      </header>
+      {notices}
+      <App
+        embedded
+        key={state.generation}
+        initialRotation={state.current?.rotation ?? emptyRotation}
+        catalogOverride={activeCatalog}
+        references={state.current?.references}
+        onRotationChange={store.updateRotation}
+        locked={state.loading || !state.current || state.busy || confirmDelete}
+      />
+    </div>
   )
 }
