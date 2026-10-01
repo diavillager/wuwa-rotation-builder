@@ -97,6 +97,7 @@ export async function loadCharacterCatalog(
           .map((skill) => ({
             id: skill.skillId,
             displayName: skill.displayName,
+            ...(skill.category ? { category: skill.category } : {}),
             visible: skill.visible,
             asset: characterAssetId(data.characterId, skill.asset),
             assetUrl: visible.some((item) => item.asset === skill.asset)

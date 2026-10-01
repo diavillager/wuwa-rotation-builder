@@ -1,4 +1,5 @@
 import type { CharacterId } from '../domain/rotation'
+import type { SkillCategory } from '../data/characters/categories'
 
 export const ELEMENTS = [
   '응결',
@@ -13,6 +14,7 @@ export type Element = (typeof ELEMENTS)[number]
 
 export interface CatalogSkill {
   id: string
+  category?: SkillCategory
   displayName: string
   /** 저장 snapshot에는 안정적인 asset ID만 넣고 배포별 URL은 저장하지 않는다. */
   asset?: string

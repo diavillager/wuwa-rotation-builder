@@ -396,3 +396,29 @@ code {
     padding: 16px;
   }
 }
+
+.card-move {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.card-move button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.card-move button:first-child {
+  margin-right: auto;
+  cursor: grab;
+}
+.card-move button:active {
+  cursor: grabbing;
+}
+
+.card-move button:first-child {
+  touch-action: none;
+  user-select: none;
+}
+.review-card[data-drop-target='true'] {
+  outline: 2px solid #9edccf;
+  outline-offset: -2px;
+}

@@ -10,6 +10,7 @@ import {
 } from '../../scripts/character-sync/candidates'
 import { errorMessage, readInside } from '../../scripts/character-sync/io'
 import type { ReviewDraft, ReviewSource, ReviewTarget } from './model'
+import { matchEncore } from './encore'
 
 export function assertTarget(
   target: Pick<ReviewTarget, 'runId' | 'characterId'>,
@@ -147,6 +148,18 @@ export async function loadSource(
   const directory = targetDirectory(root, target)
   const raw = await readInside(root, path.join(directory, 'draft.json'))
   const draft = parseDraft(JSON.parse(raw.toString('utf8')), target.characterId)
+  let encore: Pick<ReviewSource, 'encoreMatches' | 'encoreErrors'> = {}
+  try {
+    const savedEncore = await optionalFile(
+      root,
+      path.join(directory, 'encore.json'),
+    )
+    if (savedEncore)
+      encore = matchEncore(JSON.parse(savedEncore.toString('utf8')), draft)
+    else encore.encoreErrors = ['Encore 원본이 없어 자동 배정할 수 없습니다.']
+  } catch (error) {
+    encore.encoreErrors = [`Encore 대조 오류: ${errorMessage(error)}`]
+  }
   const currentRaw = await optionalFile(
     root,
     path.join(
@@ -170,6 +183,7 @@ export async function loadSource(
     }
   }
   return {
+    ...encore,
     target: {
       ...target,
       displayName: current?.displayName ?? draft.basicCandidate.displayName,

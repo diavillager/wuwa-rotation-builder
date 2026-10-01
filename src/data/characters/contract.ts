@@ -1,7 +1,13 @@
 import { ELEMENTS, type Element } from '../../app/catalog'
+import {
+  AUTO_CATEGORIES,
+  isSkillCategory,
+  type SkillCategory,
+} from './categories'
 
 export interface CharacterSkillData {
   skillId: string
+  category?: SkillCategory
   displayName: string
   visible: boolean
   asset: string
@@ -73,8 +79,11 @@ export function validateCharacterData(
     if (typeof skill.displayName !== 'string')
       throw new Error('스킬 이름은 문자열이어야 합니다.')
     if (skill.visible) text(skill.displayName, '노출 스킬 이름')
+    if (skill.category !== undefined && !isSkillCategory(skill.category))
+      throw new Error('지원하지 않는 스킬 분류입니다.')
     return {
       skillId,
+      ...(isSkillCategory(skill.category) ? { category: skill.category } : {}),
       displayName: skill.displayName,
       visible: skill.visible,
       asset: asset(skill.asset),
@@ -86,6 +95,15 @@ export function validateCharacterData(
     const id = identifier(auto[kind], `${kind} 참조`)
     if (!skills.some((skill) => skill.skillId === id && skill.visible))
       throw new Error(`${kind}는 노출·등록된 스킬 ID를 참조해야 합니다.`)
+    if (skills.some((s) => s.category !== undefined)) {
+      const matches = skills.filter(
+        (s) => s.visible && s.category === AUTO_CATEGORIES[kind],
+      )
+      if (matches.length !== 1 || matches[0].skillId !== id)
+        throw new Error(
+          `${kind}: 노출된 ${AUTO_CATEGORIES[kind]} 하나에 연결해야 합니다.`,
+        )
+    }
     autoActions[kind] = id
   }
   return {

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ELEMENTS } from '../../src/app/catalog'
 import {
+  SKILL_CATEGORIES,
+  type SkillCategory,
+} from '../../src/data/characters/categories'
+import { assignEncore, linkCategorizedActions, moveReviewCard } from './editing'
+import {
   AUTO_KINDS,
   AUTO_LABELS,
   selectableSkills,
@@ -93,6 +98,13 @@ function Modal({
   )
 }
 export function ReviewApp() {
+  const dragging = useRef<{
+    group: 'existingSkills' | 'candidates'
+    index: number
+    x: number
+    y: number
+  } | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [targets, setTargets] = useState<ReviewTarget[]>([])
   const [listErrors, setListErrors] = useState<string[]>([])
   const [session, setSession] = useState<ReviewSession | null>(null)
@@ -144,7 +156,9 @@ export function ReviewApp() {
     return () => window.removeEventListener('beforeunload', listener)
   }, [dirty])
   const change = (edit: (current: ReviewState) => ReviewState) => {
-    setState((current) => (current ? edit(current) : current))
+    setState((current) =>
+      current ? linkCategorizedActions(edit(current)) : current,
+    )
     setValidation(null)
     setNotice('')
     setFailure('')
@@ -238,6 +252,131 @@ export function ReviewApp() {
       setBusy(false)
     }
   }
+  const cardMove = (
+    group: 'existingSkills' | 'candidates',
+    index: number,
+    label: string,
+  ) => (
+    <div className="card-move">
+      <button
+        type="button"
+        aria-label={`${label} 이동 손잡이`}
+        onPointerDown={(e) => {
+          if (e.button !== 0 || blocked || session?.conflict) return
+          e.preventDefault()
+          dragging.current = { group, index, x: e.clientX, y: e.clientY }
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          if (!dragging.current) return
+          const target = document
+            .elementFromPoint(e.clientX, e.clientY)
+            ?.closest<HTMLElement>('[data-review-group]')
+          setDropTarget(
+            target?.dataset.reviewGroup === group
+              ? `${group}:${target.dataset.reviewIndex}`
+              : null,
+          )
+        }}
+        onPointerUp={(e) => {
+          const from = dragging.current
+          dragging.current = null
+          setDropTarget(null)
+          if (e.currentTarget.hasPointerCapture(e.pointerId))
+            e.currentTarget.releasePointerCapture(e.pointerId)
+          if (
+            !from ||
+            blocked ||
+            session?.conflict ||
+            Math.hypot(e.clientX - from.x, e.clientY - from.y) < 4
+          )
+            return
+          const target = document
+            .elementFromPoint(e.clientX, e.clientY)
+            ?.closest<HTMLElement>('[data-review-group]')
+          if (target?.dataset.reviewGroup === group)
+            change((s) =>
+              moveReviewCard(
+                s,
+                group,
+                from.index,
+                Number(target.dataset.reviewIndex),
+              ),
+            )
+        }}
+        onPointerCancel={() => {
+          dragging.current = null
+          setDropTarget(null)
+        }}
+        onLostPointerCapture={() => {
+          dragging.current = null
+          setDropTarget(null)
+        }}
+      >
+        ⠿ 이동
+      </button>
+      <button
+        type="button"
+        aria-label={`${label} 앞으로`}
+        disabled={index === 0}
+        onClick={() =>
+          change((s) => moveReviewCard(s, group, index, index - 1))
+        }
+      >
+        ←
+      </button>
+      <button
+        type="button"
+        aria-label={`${label} 뒤로`}
+        disabled={index === (state?.[group].length ?? 0) - 1}
+        onClick={() =>
+          change((s) => moveReviewCard(s, group, index, index + 1))
+        }
+      >
+        →
+      </button>
+    </div>
+  )
+  const dropProps = (
+    group: 'existingSkills' | 'candidates',
+    index: number,
+  ) => ({
+    'data-review-group': group,
+    'data-review-index': index,
+    'data-drop-target': dropTarget === `${group}:${index}`,
+  })
+  const categoryField = (
+    group: 'existingSkills' | 'candidates',
+    index: number,
+    category: SkillCategory | undefined,
+    label: string,
+  ) => (
+    <label>
+      {label} 분류
+      <select
+        value={category ?? ''}
+        onChange={(e) =>
+          change((s) => ({
+            ...s,
+            [group]: s[group].map((item, i) =>
+              i === index
+                ? {
+                    ...item,
+                    category: (e.target.value || undefined) as
+                      SkillCategory | undefined,
+                  }
+                : item,
+            ),
+          }))
+        }
+      >
+        <option value="">미분류</option>
+        {SKILL_CATEGORIES.map((c) => (
+          <option key={c}>{c}</option>
+        ))}
+      </select>
+    </label>
+  )
   const active = session?.source.target
   const candidates = session?.source.draft.candidates ?? []
   const skillCandidates = candidates.filter((c) => c.kind === 'skill')
@@ -249,7 +388,7 @@ export function ReviewApp() {
   const options = state ? selectableSkills(state) : []
   const conflict = session?.conflict
   const humanError = (error: string) =>
-    skillCandidates.reduce(
+    (state?.candidates ?? []).reduce(
       (message, c, i) => message.replaceAll(c.candidateId, `후보 ${i + 1}`),
       error,
     )
@@ -432,7 +571,22 @@ export function ReviewApp() {
                           (s) => s.skillId === skill.skillId,
                         )
                         return (
-                          <article key={skill.skillId} className="review-card">
+                          <article
+                            key={skill.skillId}
+                            className="review-card"
+                            {...dropProps('existingSkills', index)}
+                          >
+                            {cardMove(
+                              'existingSkills',
+                              index,
+                              `기존 스킬 ${index + 1}`,
+                            )}
+                            {categoryField(
+                              'existingSkills',
+                              index,
+                              skill.category,
+                              `기존 스킬 ${index + 1}`,
+                            )}
                             <div className="card-top">
                               <div className="icon-preview">
                                 {old && (
@@ -551,8 +705,8 @@ export function ReviewApp() {
                     <span className="status-badge">미검수 {remaining}</span>
                   </div>
                   <p className="muted">
-                    출처의 이름은 참고 자료입니다. 노출할 스킬 이름을 직접
-                    입력해 주세요.
+                    분류와 실제 스킬명을 따로 저장합니다. 카드의 이동 손잡이
+                    또는 화살표로 순서를 바꿀 수 있습니다.
                   </p>
                   <div className="review-cards">
                     {state.candidates.map((review, index) => {
@@ -567,7 +721,15 @@ export function ReviewApp() {
                         <article
                           className={`review-card ${review.decision === 'exclude' ? 'excluded' : ''}`}
                           key={review.candidateId}
+                          {...dropProps('candidates', index)}
                         >
+                          {cardMove('candidates', index, `후보 ${index + 1}`)}
+                          {categoryField(
+                            'candidates',
+                            index,
+                            review.category,
+                            `후보 ${index + 1}`,
+                          )}
                           <div className="card-top">
                             <div className="icon-preview">
                               {candidate.download.status === 'verified' ? (
@@ -640,7 +802,6 @@ export function ReviewApp() {
                           <label>
                             후보 {index + 1} 표시 이름
                             <input
-                              disabled={review.decision !== 'include'}
                               value={review.displayName}
                               placeholder="사람이 검수한 이름"
                               onChange={(e) =>
@@ -687,11 +848,27 @@ export function ReviewApp() {
                 <legend className="sr-only">자동 행동과 검수 조작</legend>
                 <p className="eyebrow">AUTO ACTIONS</p>
                 <h2>자동 행동 지정</h2>
-                <p className="muted">각 역할을 독립적으로 선택합니다.</p>
+                <p className="muted">
+                  기본 공격 → 일반 교체 공격 · 변주 스킬 → 변주 · 반주 스킬 →
+                  반주. 분류가 없거나 중복이면 지정되지 않습니다.
+                </p>
+                <button
+                  type="button"
+                  disabled={
+                    !Object.keys(session.source.encoreMatches ?? {}).length
+                  }
+                  onClick={() => change((s) => assignEncore(s, session.source))}
+                >
+                  Encore 자동 배정
+                </button>
                 {AUTO_KINDS.map((kind) => (
                   <label key={kind}>
                     {AUTO_LABELS[kind]}
                     <select
+                      disabled={[
+                        ...state.existingSkills,
+                        ...state.candidates,
+                      ].some((s) => !!s.category)}
                       value={state.autoActions[kind] ?? ''}
                       onChange={(e) =>
                         change((s) => ({
@@ -728,6 +905,11 @@ export function ReviewApp() {
                 미완성 검수도 저장할 수 있습니다. 최종 반영은 앱용 데이터 파일을
                 갱신합니다.
               </p>
+              {session.source.encoreErrors?.map((error, i) => (
+                <p className="error" key={`encore-${i}`}>
+                  {humanError(error)}
+                </p>
+              ))}
               {conflict && (
                 <p role="alert" className="error">
                   {conflict}

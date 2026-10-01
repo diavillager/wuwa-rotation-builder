@@ -181,7 +181,7 @@ Transition 자체는 시간축 열을 차지하지 않는다. 기본 Editor 및 
 
 ### 10.2 자동 행동
 
-일반 교체 시 등장 공명자의 `normalSwitchAttack` AutoAction을 등장 라인에 만든다. 협주 교체 시 퇴장 공명자의 `outro`를 퇴장 라인에, 등장 공명자의 `intro`를 등장 라인에 만든다. 각 AutoAction은 독립된 전역 열을 차지한다. `normalSwitchAttack`, `intro`, `outro`는 공명자 JSON에서 각각 독립적으로 사람이 검수해 지정한다.
+일반 교체 시 등장 공명자의 `normalSwitchAttack` AutoAction을 등장 라인에 만든다. 협주 교체 시 퇴장 공명자의 `outro`를 퇴장 라인에, 등장 공명자의 `intro`를 등장 라인에 만든다. 각 AutoAction은 독립된 전역 열을 차지한다. `normalSwitchAttack`, `intro`, `outro`는 공명자 JSON의 독립 참조이며, 검수 보완 규칙에 따라 기본 공격·변주 스킬·반주 스킬에 각각 연결하고 최종 검수한다.
 
 AutoAction은 입력 정보가 없으며 읽기 전용이다. 사용자는 삭제할 수 있지만 스킬 연결·stage 변경·내용 수정·드래그 이동은 할 수 없다. 협주의 outro/intro는 같은 `switchId`의 한 쌍이다. 어느 하나를 삭제해도 둘 다 삭제하고 해당 교체에 대한 재생성 suppression을 기억한다. 일반 교체의 자동 일반공격은 독립적으로 삭제하고 suppression을 기억한다. 교체 자체의 Undo/Redo는 자동 행동 생성/삭제 및 suppression을 한 편집 단위로 복원해야 한다.
 
@@ -241,7 +241,7 @@ Undo/Redo는 현재 열린 로테이션의 사이클 편집에만 적용하며 �
 
 검수 완료 데이터에 JSON 오류·필수 이미지 누락·검증 실패가 있으면 해당 공명자만 선택 목록에서 제외하고 ID와 오류를 표시한다. 정상 공명자는 계속 사용한다. 기존 프로젝트는 정확한 ID의 현재 데이터 또는 최소 snapshot을 사용하고 저장된 이름·블록을 보존하며 다른 공명자나 스킬로 자동 대체하지 않는다.
 
-공명자별 데이터는 `src/assets/characters/{characterId}/data/{characterId}.json`, WebP 자산은 `src/assets/characters/{characterId}/assets/*.webp`에 둔다. UI용 스킬 `displayName`과 사용 여부는 사람이 검수한다. `autoActions.normalSwitchAttack`, `autoActions.intro`, `autoActions.outro`도 각각 독립적으로 사람이 지정한다. 원본 파일명은 UI에 노출하지 않는다.
+공명자별 데이터는 `src/assets/characters/{characterId}/data/{characterId}.json`, WebP 자산은 `src/assets/characters/{characterId}/assets/*.webp`에 둔다. UI용 스킬 `displayName`과 사용 여부는 사람이 검수한다. `autoActions.normalSwitchAttack`, `autoActions.intro`, `autoActions.outro`는 아래 검수 보완 규칙에 따라 각각 기본 공격·변주 스킬·반주 스킬에 연결한다. 원본 파일명은 UI에 노출하지 않는다.
 
 Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와 WW_Data의 합집합 후보 수집 및 Encore api-v2 Resource의 WebP 조회를 확인했다. 이 spike는 후보 수집·이미지 조회의 기술 검증이며 **스킬의 의미가 자동으로 검증되었다는 뜻은 아니다**. 출시 전 외부 데이터·이미지의 라이선스 및 게임 IP 재배포 문제를 별도 재확인한다.
 
@@ -327,3 +327,11 @@ Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와
 - 로컬 검수 UI는 원본 후보와 현재 검수 값을 나란히 보여줘 재동기화에서 변경 범위를 확인하기 쉽게 한다.
 
 이 권장사항은 구현 방식의 제안이며 확정 제품 동작이나 특정 라이브러리 선택을 뜻하지 않는다.
+
+### 검수 자동 배정·순서 보완 (2026-10-01 확정)
+
+Encore의 명시적 `SkillType`·`SkillName`과 동일한 정규화 아이콘 경로를 대조하여 분류와 실제 이름을 자동 배정한다. 스킬 분류 `category`와 실제 스킬명 `displayName`은 별도로 저장한다. 고유 스킬은 자동 분류하되 신규 등록 기본값은 제외한다. 동일 아이콘의 의미가 여러 개면 임의로 선택하지 않는다. 파일명만으로 의미를 확정하지 않는 원칙과 최종 반영 전 검수 절차는 유지한다.
+
+자동 행동 연결 규칙은 일반 교체 공격=기본 공격, 변주=변주 스킬, 반주=반주 스킬이다. 해당 노출 분류가 없거나 여러 개면 오류로 표시한다. 분류가 없던 기존 데이터는 기존 ID와 매핑을 유지하며 검수 과정에서 갱신한다.
+
+검수 화면에서 기존 스킬과 후보 카드의 배치 순서를 바꿀 수 있고, 검수 저장·재열기 및 최종 반영 후에도 목록별 순서를 유지한다. Rotation의 Timeline 순서에는 영향을 주지 않는다.

@@ -1,6 +1,7 @@
 import type { CharacterData } from '../../src/data/characters/contract'
 import type { Element } from '../../src/app/catalog'
 import type { DownloadedCandidate } from '../../scripts/character-sync/run'
+import type { SkillCategory } from '../../src/data/characters/categories'
 
 export interface ReviewTarget {
   runId: string
@@ -15,6 +16,11 @@ export interface ReviewDraft {
   errors: string[]
 }
 export interface ReviewSource {
+  encoreMatches?: Record<
+    string,
+    { category: SkillCategory; displayName: string; skillId: string }
+  >
+  encoreErrors?: string[]
   target: ReviewTarget
   draft: ReviewDraft
   draftHash: string
@@ -39,12 +45,14 @@ export interface ReviewState {
   attribute: Element
   portraitCandidateId: string | null
   existingSkills: {
+    category?: SkillCategory
     skillId: string
     displayName: string
     visible: boolean
     candidateId: string | null
   }[]
   candidates: {
+    category?: SkillCategory
     candidateId: string
     displayName: string
     decision: 'pending' | 'include' | 'exclude'
@@ -79,6 +87,7 @@ export function initialReview(source: ReviewSource): ReviewState {
     existingSkills:
       current?.skills.map((s) => ({
         skillId: s.skillId,
+        ...(s.category ? { category: s.category } : {}),
         displayName: s.displayName,
         visible: s.visible,
         candidateId: null,

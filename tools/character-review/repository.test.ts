@@ -146,6 +146,58 @@ function complete(
   return next
 }
 describe('검수 저장과 최종 반영', () => {
+  it('분류·실제 이름·배치 순서를 저장·재열기·최종 반영 후 보존한다', async () => {
+    const f = await fixture()
+    const state = complete(
+      (await f.repository.load(target)).state,
+      f.candidates,
+    )
+    const categories = ['기본 공격', '변주 스킬', '반주 스킬'] as const
+    state.candidates.forEach((candidate, i) => {
+      candidate.category = categories[i]
+    })
+    state.candidates.reverse()
+    const saved = await f.repository.save(state, null)
+    expect((await f.repository.load(target)).state.candidates).toEqual(
+      state.candidates,
+    )
+    const checked = await f.repository.validate(state)
+    expect(checked.errors).toEqual([])
+    const result = await f.repository.publish(
+      state,
+      saved.revision,
+      checked.token!,
+    )
+    const data = JSON.parse(
+      await readFile(f.finalFile, 'utf8'),
+    ) as CharacterData
+    expect(data.skills.map((s) => s.category)).toEqual([
+      '반주 스킬',
+      '변주 스킬',
+      '기본 공격',
+    ])
+    expect(data.skills.map((s) => s.displayName)).toEqual(
+      state.candidates.map((c) => c.displayName),
+    )
+    expect(result.session.state.candidates.map((c) => c.candidateId)).toEqual(
+      state.candidates.map((c) => c.candidateId),
+    )
+    expect(
+      (await f.repository.load(target)).state.existingSkills.map(
+        (s) => s.category,
+      ),
+    ).toEqual(data.skills.map((s) => s.category))
+    const wrong = structuredClone(result.session.state)
+    const reordered = structuredClone(result.session.state)
+    reordered.existingSkills.reverse()
+    expect((await f.repository.validate(reordered)).summary).toContain(
+      '스킬 목록 또는 표시 순서 변경',
+    )
+    wrong.autoActions.normalSwitchAttack = wrong.autoActions.intro
+    expect((await f.repository.validate(wrong)).errors.join()).toContain(
+      '기본 공격',
+    )
+  })
   it('손상된 저장 검수를 빈 검수로 대체하거나 화면에 넘기지 않는다', async () => {
     const f = await fixture()
     const { state } = await f.repository.load(target)

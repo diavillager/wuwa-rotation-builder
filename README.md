@@ -58,7 +58,7 @@ npm run build
 
 ## 공명자 검수
 
-`npm run character-review`를 실행하고 [로컬 검수 화면](http://127.0.0.1:5174/)을 엽니다. 수집된 아이콘의 이름·노출·세 자동 행동을 직접 지정하며, 검수 저장과 앱용 최종 반영을 구분합니다. 자세한 사용법·충돌 처리·검증은 [검수 도구 안내](tools/character-review/README.md)를 참고하세요. `npm run character-review:build`로 별도 검수 화면 빌드를 확인합니다.
+`npm run character-review`를 실행하고 [로컬 검수 화면](http://127.0.0.1:5174/)을 엽니다. Encore와 일치하는 후보의 분류·실제 이름을 자동 배정하고(고유 스킬 기본 제외), 고정 분류로 세 자동 행동을 연결합니다. 검수 카드의 드래그·앞뒤 이동 순서도 저장합니다. 검수 저장과 앱용 최종 반영을 구분합니다. 자세한 사용법·충돌 처리·검증은 [검수 도구 안내](tools/character-review/README.md)를 참고하세요. `npm run character-review:build`로 별도 검수 화면 빌드를 확인합니다.
 
 ## 문서
 
@@ -74,6 +74,7 @@ npm run build
 - [사이클별 Undo/Redo spec](specs/2026-10-01-000-cycle-undo-redo.md): 독립 편집 이력과 파티 변경 처리
 - [프로젝트 저장·관리 spec](specs/2026-10-01-001-project-storage.md): IndexedDB 자동저장·복원과 관리 UX
 - [공명자 데이터 파이프라인 spec](specs/2026-10-01-002-character-data-pipeline.md): 데이터 계약·동기화·검수와 공통 UI 아이콘 수집 단계
+- [검수 자동 배정·정렬 spec](specs/2026-10-01-003-review-assignment-and-order.md): Encore 대조·분류/이름 분리·배치 저장
 - [AGENTS.md](AGENTS.md): 저장소 작업 지침
 
 `specs/`는 기능별 구현 계획을 담으며 체크리스트나 PRD를 대체하지 않습니다.

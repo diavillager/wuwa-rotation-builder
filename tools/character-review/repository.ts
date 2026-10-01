@@ -2,6 +2,7 @@ import { rename, unlink, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import { ELEMENTS } from '../../src/app/catalog'
+import { isSkillCategory } from '../../src/data/characters/categories'
 import {
   validateCharacterData,
   type CharacterData,
@@ -71,6 +72,7 @@ export function parseReview(value: unknown, source: ReviewSource): ReviewState {
     throw new Error('기존 공개 Skill ID를 삭제하거나 변경할 수 없습니다.')
   for (const skill of state.existingSkills) {
     if (
+      (skill.category !== undefined && !isSkillCategory(skill.category)) ||
       typeof skill.displayName !== 'string' ||
       typeof skill.visible !== 'boolean' ||
       (skill.candidateId !== null &&
@@ -92,6 +94,8 @@ export function parseReview(value: unknown, source: ReviewSource): ReviewState {
     throw new Error('검수 후보가 누락되거나 추가되었습니다.')
   for (const candidate of state.candidates)
     if (
+      (candidate.category !== undefined &&
+        !isSkillCategory(candidate.category)) ||
       typeof candidate.displayName !== 'string' ||
       !['pending', 'include', 'exclude'].includes(candidate.decision)
     )
@@ -258,17 +262,19 @@ export class ReviewRepository {
         }
         skills.push({
           skillId: skill.skillId,
+          ...(skill.category ? { category: skill.category } : {}),
           displayName: skill.displayName.trim(),
           visible: skill.visible,
           asset,
         })
         if (
+          skill.category !== old.category ||
           skill.displayName.trim() !== old.displayName ||
           skill.visible !== old.visible ||
           asset !== old.asset
         )
           summary.push(
-            `기존 스킬 변경: ${old.displayName || old.skillId} → ${skill.displayName.trim() || '(이름 없음)'} · ${skill.visible ? '노출' : '비노출'}${asset !== old.asset ? ' · 아이콘 변경' : ''}`,
+            `기존 스킬 변경: ${old.displayName || old.skillId} → ${skill.displayName.trim() || '(이름 없음)'} · ${skill.category ?? '미분류'} · ${skill.visible ? '노출' : '비노출'}${asset !== old.asset ? ' · 아이콘 변경' : ''}`,
           )
       }
       for (const candidate of state.candidates) {
@@ -282,6 +288,7 @@ export class ReviewRepository {
           const asset = await candidateAsset(candidate.candidateId)
           skills.push({
             skillId: candidateSkillId(state.characterId, candidate.candidateId),
+            ...(candidate.category ? { category: candidate.category } : {}),
             displayName: candidate.displayName.trim(),
             visible: true,
             asset,
@@ -301,6 +308,12 @@ export class ReviewRepository {
         )
       if (source.current?.attribute !== state.attribute)
         summary.push(`속성: ${state.attribute}`)
+      if (
+        source.current &&
+        source.current.skills.map((s) => s.skillId).join('\n') !==
+          skills.map((s) => s.skillId).join('\n')
+      )
+        summary.push('스킬 목록 또는 표시 순서 변경')
       if (source.current?.portrait !== portrait) summary.push('초상화 변경')
       for (const kind of AUTO_KINDS) {
         if (!state.autoActions[kind])
@@ -432,7 +445,13 @@ export class ReviewRepository {
         )
           candidate.decision = 'exclude'
         candidate.displayName = previous.displayName
+        if (previous.category) candidate.category = previous.category
       }
+      next.candidates.sort(
+        (a, b) =>
+          value.candidates.findIndex((c) => c.candidateId === a.candidateId) -
+          value.candidates.findIndex((c) => c.candidateId === b.candidateId),
+      )
       let warning: string | null = null
       try {
         await atomicJson(this.root, this.reviewPath(value), {
