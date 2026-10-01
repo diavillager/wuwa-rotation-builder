@@ -79,8 +79,10 @@ h2 {
 .party-slot {
   display: flex;
   align-items: center;
-  gap: 16px;
-  min-height: 112px;
+  justify-content: flex-start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 152px;
   padding: 16px;
   background: #202932;
   border: 1px solid #34414b;
@@ -89,36 +91,47 @@ h2 {
 .slot-index {
   align-self: flex-start;
   color: #87aaa5;
-  font-size: 12px;
+  font-size: 18px;
+  flex-shrink: 0;
 }
 .portrait-placeholder {
   display: grid;
   place-items: center;
-  width: 66px;
-  height: 72px;
+  width: clamp(72px, 6vw, 96px);
+  height: auto;
+  aspect-ratio: 4 / 5;
   border: 1px dashed #66817f;
   border-radius: 10px;
   background: #293941;
   color: #9cc5be;
-  font-size: 27px;
+  font-size: 40px;
 }
 .party-slot strong,
 .party-slot small {
   display: block;
 }
 .party-slot strong {
-  font-size: 15px;
+  font-size: clamp(16px, 1.4vw, 20px);
+  line-height: 1.4;
+}
+.party-character-info {
+  min-width: 0;
+  max-width: 160px;
+  overflow-wrap: anywhere;
 }
 .party-slot small {
   color: #84949c;
   margin-top: 8px;
+  font-size: 14px;
 }
 .workspace-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 30%) minmax(0, 70%);
+  grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
+  grid-template-areas: 'cycles skills';
   gap: 22px;
 }
 .skills-panel {
+  grid-area: skills;
   padding: 24px;
   min-height: 500px;
 }
@@ -147,6 +160,7 @@ h2 {
   color: #839199;
 }
 .cycles {
+  grid-area: cycles;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -193,7 +207,7 @@ button {
   border-color: #83bfb4;
 }
 .portrait-placeholder {
-  flex: 0 0 66px;
+  flex-shrink: 0;
 }
 .editor-notice {
   padding: 12px 16px;
@@ -354,21 +368,38 @@ button {
   margin-top: 18px;
 }
 .catalog-skill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   border: 1px solid #63887f;
   border-radius: 9px;
   padding: 12px;
   background: #263b39;
   cursor: grab;
-  font-size: 13px;
+  font-size: 14px;
+  user-select: none;
 }
-.catalog-skill small {
-  display: block;
-  color: #93afa7;
-  margin-top: 5px;
+.catalog-skill:active {
+  cursor: grabbing;
+}
+.catalog-skill-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.catalog-skill-category {
+  color: #a8d6cb;
+  font-weight: 700;
+}
+.catalog-skill .skill-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0;
 }
 .character-portrait {
-  width: 52px;
-  height: 64px;
+  width: clamp(72px, 6vw, 96px);
+  height: auto;
+  aspect-ratio: 4 / 5;
   object-fit: contain;
   flex-shrink: 0;
   pointer-events: none;

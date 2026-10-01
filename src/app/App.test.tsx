@@ -60,7 +60,7 @@ async function dragDrop(source: Element, target: Element) {
   await act(async () => {
     const start = new Event('dragstart', { bubbles: true, cancelable: true })
     Object.defineProperty(start, 'dataTransfer', {
-      value: { effectAllowed: '' },
+      value: { effectAllowed: '', setData: vi.fn(), setDragImage: vi.fn() },
     })
     source.dispatchEvent(start)
   })
@@ -70,6 +70,39 @@ async function dragDrop(source: Element, target: Element) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('진열 스킬 전체 카드를 잡은 위치에 드래그 이미지로 연결한다', async () => {
+    const card = document.querySelector<HTMLElement>('.catalog-skill')!
+    vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({
+      left: 10,
+      top: 20,
+      width: 300,
+      height: 80,
+    } as DOMRect)
+    const transfer = {
+      effectAllowed: '',
+      setData: vi.fn(),
+      setDragImage: vi.fn(),
+    }
+    await act(async () => {
+      const event = new MouseEvent('dragstart', {
+        bubbles: true,
+        clientX: 40,
+        clientY: 55,
+      })
+      Object.defineProperty(event, 'dataTransfer', { value: transfer })
+      card.dispatchEvent(event)
+    })
+    expect(transfer.setDragImage).toHaveBeenCalledWith(card, 30, 35)
+    expect(transfer.setData).toHaveBeenCalledWith('text/plain', 'demo-skill-a')
+    expect(transfer.effectAllowed).toBe('copy')
+    await act(async () =>
+      card.dispatchEvent(new Event('dragend', { bubbles: true })),
+    )
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+  })
   it('파티 선택에는 초상화와 이름, 스킬 진열에는 아이콘과 분류를 표시한다', async () => {
     const catalog = structuredClone(demoCatalog)
     const character = catalog.characters[0]
@@ -81,6 +114,8 @@ describe('App 실제 입력 연결', () => {
     await act(async () => root.render(<App catalogOverride={catalog} />))
     const card = document.querySelector('.catalog-skill')!
     expect(card.textContent).toContain('기본 공격')
+    expect(card.textContent).toContain(skill.displayName)
+    expect(card.textContent).not.toContain('InputBlock으로 드래그')
     expect(card.getAttribute('title')).toBe(skill.displayName)
     expect(card.querySelector('img')?.getAttribute('src')).toBe(skill.assetUrl)
     await hover(emptyLine())

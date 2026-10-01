@@ -839,7 +839,7 @@ export function App({
                     ◇
                   </span>
                 )}
-                <span>
+                <span className="party-character-info">
                   <strong>{characterLabel(id)}</strong>
                   <small>슬롯 {index + 1}</small>
                 </span>
@@ -939,6 +939,26 @@ export function App({
                       draggable
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = 'copy'
+                        event.dataTransfer.setData('text/plain', skill.id)
+                        const card = event.currentTarget
+                        const bounds = card.getBoundingClientRect()
+                        event.dataTransfer.setDragImage(
+                          card,
+                          Math.max(
+                            0,
+                            Math.min(
+                              bounds.width,
+                              (event.clientX ?? bounds.left) - bounds.left,
+                            ),
+                          ),
+                          Math.max(
+                            0,
+                            Math.min(
+                              bounds.height,
+                              (event.clientY ?? bounds.top) - bounds.top,
+                            ),
+                          ),
+                        )
                         setDrag({ kind: 'catalogSkill', ref: skill.id })
                       }}
                       onDragEnd={() => setDrag(null)}
@@ -951,8 +971,14 @@ export function App({
                           draggable={false}
                         />
                       )}
-                      {skill.category ?? skill.displayName}
-                      <small>InputBlock으로 드래그</small>
+                      <span className="catalog-skill-copy">
+                        {skill.category && (
+                          <span className="catalog-skill-category">
+                            [{skill.category}]
+                          </span>
+                        )}{' '}
+                        <span>{skill.displayName}</span>
+                      </span>
                     </div>
                   ))}
               </div>
