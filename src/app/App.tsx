@@ -503,6 +503,7 @@ export function App() {
             <button
               type="button"
               aria-label={`${title} 실행 취소`}
+              title="실행 취소"
               disabled={
                 editor.histories[cycleId].past.length === 0 ||
                 drag !== null ||
@@ -511,11 +512,12 @@ export function App() {
               }
               onClick={() => restoreCycle(cycleId, 'undo')}
             >
-              ↶ 실행 취소
+              <span aria-hidden="true">↶</span>
             </button>
             <button
               type="button"
               aria-label={`${title} 다시 실행`}
+              title="다시 실행"
               disabled={
                 editor.histories[cycleId].future.length === 0 ||
                 drag !== null ||
@@ -524,7 +526,7 @@ export function App() {
               }
               onClick={() => restoreCycle(cycleId, 'redo')}
             >
-              ↷ 다시 실행
+              <span aria-hidden="true">↷</span>
             </button>
             <span className="status">
               {focusedCycle === cycleId ? '편집 중' : 'Cycle'}

@@ -39,6 +39,30 @@ const insert = (
   })
 
 describe('사이클별 편집 이력', () => {
+  it('A→B→C 편집 후 A/C/B 재정렬해도 마지막 편집 C부터 되돌린다', () => {
+    let state = initial()
+    for (const owner of ['a', 'b', 'c']) {
+      state = recordRotationEdit(
+        state,
+        setActiveCharacter(state.rotation, 'opening', owner),
+      )
+      state = recordRotationEdit(state, insert(state.rotation, `${owner}1`))
+    }
+    state = recordRotationEdit(
+      state,
+      reorderParty(state.rotation, ['a', 'c', 'b']),
+    )
+    state = undoCycle(state, 'opening')
+    expect(state.rotation.party).toEqual(['a', 'c', 'b'])
+    expect(
+      state.rotation.opening.columns.map((column) => column.action.id),
+    ).toEqual(['a1', 'b1'])
+    state = undoCycle(state, 'opening')
+    expect(
+      state.rotation.opening.columns.map((column) => column.action.id),
+    ).toEqual(['a1'])
+  })
+
   it('두 사이클은 독립적으로 복원하며 새 편집은 해당 Cycle의 Redo만 지운다', () => {
     let state = initial()
     expect(undoCycle(state, 'opening')).toBe(state)
