@@ -31,6 +31,13 @@ afterEach(async () => {
 })
 const grid = (cycleId = 'opening') =>
   document.querySelector(`[data-capture-cycle="${cycleId}"]`)!
+const historyButton = (cycleId: string, direction: 'undo' | 'redo') =>
+  document.querySelector<HTMLButtonElement>(
+    `[aria-label="${cycleId === 'opening' ? '개막' : '반복'} 사이클 ${direction === 'undo' ? '실행 취소' : '다시 실행'}"]`,
+  )!
+async function clickHistory(cycleId: string, direction: 'undo' | 'redo') {
+  await act(async () => historyButton(cycleId, direction).click())
+}
 const emptyLine = (ownerId = 'demo-a', cycleId = 'opening') =>
   grid(cycleId).querySelector(`[data-capture-owner="${ownerId}"].end-cell`)!
 async function hover(element: Element) {
@@ -62,6 +69,198 @@ async function dragDrop(source: Element, target: Element) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it('Cycle 제목 옆 버튼은 해당 사이클만 복원하고 hover는 Redo를 지우지 않는다', async () => {
+    for (const id of ['opening', 'repeat']) {
+      expect(historyButton(id, 'undo').disabled).toBe(true)
+      expect(historyButton(id, 'redo').disabled).toBe(true)
+      expect(
+        historyButton(id, 'undo').closest('.section-heading'),
+      ).not.toBeNull()
+    }
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await hover(emptyLine('demo-b', 'repeat'))
+    await key('keydown', 'KeyR')
+    await key('keyup', 'KeyR', 10)
+    await clickHistory('opening', 'undo')
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(0)
+    expect(grid('repeat').querySelector('.input-card')?.textContent).toContain(
+      'RTap',
+    )
+    expect(historyButton('opening', 'undo').disabled).toBe(true)
+    expect(historyButton('opening', 'redo').disabled).toBe(false)
+    await hover(emptyLine('demo-c'))
+    expect(historyButton('opening', 'redo').disabled).toBe(false)
+    await clickHistory('repeat', 'undo')
+    await hover(emptyLine('demo-c'))
+    await key('keydown', 'KeyF')
+    await key('keyup', 'KeyF', 10)
+    expect(historyButton('opening', 'redo').disabled).toBe(true)
+    expect(historyButton('repeat', 'redo').disabled).toBe(false)
+    await clickHistory('repeat', 'redo')
+    expect(
+      grid('repeat').querySelector('.input-card')?.parentElement?.dataset
+        .captureOwner,
+    ).toBe('demo-b')
+    await clickHistory('opening', 'undo')
+    expect(
+      grid().querySelector('.active-line')?.getAttribute('data-row-owner'),
+    ).toBe('demo-c')
+  })
+
+  it('Undo 버튼의 마우스 동작은 입력을 생성하지 않고 미확정 입력을 취소한다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await key('keydown', 'KeyQ')
+    await act(async () => {
+      const button = historyButton('opening', 'undo')
+      button.dispatchEvent(
+        new MouseEvent('mousedown', { button: 0, bubbles: true }),
+      )
+      button.dispatchEvent(
+        new MouseEvent('mouseup', { button: 0, bubbles: true }),
+      )
+      button.click()
+    })
+    await key('keyup', 'KeyQ', 100)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(0)
+    await clickHistory('opening', 'redo')
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+    expect(grid().querySelector('.input-card')?.textContent).toContain('ETap')
+  })
+
+  it('협주 생성과 pair 삭제를 한 단계씩 복원하고 다른 Cycle 내용은 유지한다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await key('keydown', 'Digit2')
+    await key('keyup', 'Digit2', 200)
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
+    await clickHistory('opening', 'undo')
+    expect(grid().querySelectorAll('.auto-card,.wire-transition')).toHaveLength(
+      0,
+    )
+    await clickHistory('opening', 'redo')
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
+    Object.defineProperty(document, 'elementFromPoint', {
+      configurable: true,
+      value: () => grid().querySelector('.auto-card'),
+    })
+    await hover(grid().querySelector('.auto-card')!)
+    await act(async () =>
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        }),
+      ),
+    )
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(0)
+    await clickHistory('opening', 'undo')
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(2)
+    await clickHistory('opening', 'redo')
+    expect(grid().querySelectorAll('.auto-card')).toHaveLength(0)
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(1)
+    expect(
+      grid('repeat').querySelectorAll('.input-card,.auto-card'),
+    ).toHaveLength(0)
+  })
+
+  it('스킬 연결 Undo는 입력을 남기고 Redo로 같은 스킬을 복원한다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    let card = grid().querySelector('.input-card')!
+    await dragDrop(document.querySelector('.catalog-skill')!, card)
+    const skillId = card
+      .querySelector('.linked-skill')
+      ?.getAttribute('data-skill-id')
+    expect(skillId).toBeTruthy()
+    await clickHistory('opening', 'undo')
+    card = grid().querySelector('.input-card')!
+    expect(card.querySelectorAll('.linked-skill')).toHaveLength(0)
+    await clickHistory('opening', 'redo')
+    expect(
+      grid().querySelector('.linked-skill')?.getAttribute('data-skill-id'),
+    ).toBe(skillId)
+  })
+
+  it('파티 재정렬·같은 공명자 선택·변경 취소는 이력을 유지하며 실제 변경은 두 이력을 비운다', async () => {
+    await hover(emptyLine())
+    await key('keydown', 'KeyE')
+    await key('keyup', 'KeyE', 10)
+    await hover(emptyLine('demo-b', 'repeat'))
+    await key('keydown', 'KeyR')
+    await key('keyup', 'KeyR', 10)
+    await clickHistory('repeat', 'undo')
+    const slots = document.querySelectorAll('.party-slot')
+    await dragDrop(slots[0], slots[2])
+    expect(historyButton('opening', 'undo').disabled).toBe(false)
+    expect(historyButton('repeat', 'redo').disabled).toBe(false)
+    await clickHistory('opening', 'undo')
+    await clickHistory('opening', 'redo')
+    expect(
+      grid().querySelectorAll('[data-row-owner]')[2].textContent,
+    ).toContain('데모 공명자 A')
+    expect(
+      grid().querySelector('.input-card')?.parentElement?.dataset.captureOwner,
+    ).toBe('demo-a')
+    await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('.party-slot')[2].click(),
+    )
+    const findCharacter = (name: string) =>
+      [
+        ...document.querySelectorAll<HTMLButtonElement>(
+          '.character-options button',
+        ),
+      ].find((button) => button.textContent?.includes(name))!
+    await act(async () =>
+      document
+        .querySelectorAll<HTMLButtonElement>('.element-tabs button')[1]
+        .click(),
+    )
+    await act(async () => findCharacter('데모 공명자 A').click())
+    expect(historyButton('opening', 'undo').disabled).toBe(false)
+    expect(historyButton('repeat', 'redo').disabled).toBe(false)
+    await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('.party-slot')[2].click(),
+    )
+    await act(async () => findCharacter('데모 공명자 E').click())
+    expect(
+      document.querySelector('#replacement-confirm-description')?.textContent,
+    ).toContain('두 사이클의 실행 취소·다시 실행 기록도 초기화됩니다.')
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('.confirm-actions button')!
+        .click(),
+    )
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('.selector-heading > button')!
+        .click(),
+    )
+    expect(historyButton('opening', 'undo').disabled).toBe(false)
+    expect(historyButton('repeat', 'redo').disabled).toBe(false)
+    await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('.party-slot')[2].click(),
+    )
+    await act(async () => findCharacter('데모 공명자 E').click())
+    await act(async () =>
+      document.querySelector<HTMLButtonElement>('.confirm-submit')!.click(),
+    )
+    for (const id of ['opening', 'repeat']) {
+      expect(historyButton(id, 'undo').disabled).toBe(true)
+      expect(historyButton(id, 'redo').disabled).toBe(true)
+    }
+    expect(document.querySelectorAll('.party-slot')[2].textContent).toContain(
+      '데모 공명자 E',
+    )
+    expect(grid().querySelectorAll('.input-card')).toHaveLength(0)
+  })
+
   it('파티 선택창을 열 때 페이지 높이와 클릭 당시 스크롤을 보존하고 닫기·선택 완료 때 해제한다', async () => {
     const shell = document.querySelector<HTMLElement>('.app-shell')!
     vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
