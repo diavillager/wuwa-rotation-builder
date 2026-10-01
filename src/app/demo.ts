@@ -62,19 +62,49 @@ export const demoCatalog: CharacterCatalog = {
       id: 'demo-d',
       displayName: '데모 공명자 D',
       element: '회절',
-      skills: [{ id: 'demo-skill-d', displayName: '데모 스킬 D' }],
+      autoActions: {
+        normalSwitchAttack: 'demo-d-normal',
+        intro: 'demo-d-intro',
+        outro: 'demo-d-outro',
+      },
+      skills: [
+        { id: 'demo-skill-d', displayName: '데모 스킬 D' },
+        { id: 'demo-d-normal', displayName: '데모 D 교체 공격' },
+        { id: 'demo-d-intro', displayName: '데모 D 변주' },
+        { id: 'demo-d-outro', displayName: '데모 D 반주' },
+      ],
     },
     {
       id: 'demo-e',
       displayName: '데모 공명자 E',
       element: '응결',
-      skills: [{ id: 'demo-skill-e', displayName: '데모 스킬 E' }],
+      autoActions: {
+        normalSwitchAttack: 'demo-e-normal',
+        intro: 'demo-e-intro',
+        outro: 'demo-e-outro',
+      },
+      skills: [
+        { id: 'demo-skill-e', displayName: '데모 스킬 E' },
+        { id: 'demo-e-normal', displayName: '데모 E 교체 공격' },
+        { id: 'demo-e-intro', displayName: '데모 E 변주' },
+        { id: 'demo-e-outro', displayName: '데모 E 반주' },
+      ],
     },
     {
       id: 'demo-f',
       displayName: '데모 공명자 F',
       element: '인멸',
-      skills: [{ id: 'demo-skill-f', displayName: '데모 스킬 F' }],
+      autoActions: {
+        normalSwitchAttack: 'demo-f-normal',
+        intro: 'demo-f-intro',
+        outro: 'demo-f-outro',
+      },
+      skills: [
+        { id: 'demo-skill-f', displayName: '데모 스킬 F' },
+        { id: 'demo-f-normal', displayName: '데모 F 교체 공격' },
+        { id: 'demo-f-intro', displayName: '데모 F 변주' },
+        { id: 'demo-f-outro', displayName: '데모 F 반주' },
+      ],
     },
   ],
 }

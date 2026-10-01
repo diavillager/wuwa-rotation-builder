@@ -406,11 +406,91 @@ export function transitionKey(
   return String(index + 1) as '1' | '2' | '3'
 }
 
+function latestLineTransition(
+  cycle: Cycle,
+  ownerId: CharacterId,
+): Transition | undefined {
+  return cycle.transitions
+    .filter((item) => item.fromId === ownerId || item.toId === ownerId)
+    .map((item, order) => ({
+      item,
+      order,
+      boundary:
+        item.afterColumnId === null
+          ? 0
+          : cycle.columns.findIndex(
+              (column) => column.id === item.afterColumnId,
+            ) + 1,
+    }))
+    .sort((a, b) => a.boundary - b.boundary || a.order - b.order)
+    .at(-1)?.item
+}
+
+function inputInsertionIndex(
+  cycle: Cycle,
+  ownerId: CharacterId,
+  afterColumnId?: string,
+): number {
+  const latestTransition = latestLineTransition(cycle, ownerId)
+  const outgoing =
+    latestTransition?.fromId === ownerId ? latestTransition : undefined
+  let index: number
+  if (afterColumnId !== undefined) {
+    const target = cycle.columns.findIndex(
+      (column) => column.id === afterColumnId,
+    )
+    if (target < 0 || cycle.columns[target].action.type !== 'input')
+      throw new Error('삽입 대상 InputBlock이 없습니다.')
+    index = target + 1
+  } else if (outgoing) {
+    const outroIndex = cycle.columns.findIndex(
+      (column) =>
+        column.action.type === 'autoAction' &&
+        column.action.switchId === outgoing.switchId &&
+        column.action.kind === 'outro',
+    )
+    index =
+      outroIndex >= 0
+        ? outroIndex
+        : outgoing.afterColumnId === null
+          ? 0
+          : cycle.columns.findIndex(
+              (column) => column.id === outgoing.afterColumnId,
+            ) + 1
+  } else {
+    const lastOwned = cycle.columns
+      .map((column) => column.ownerId)
+      .lastIndexOf(ownerId)
+    const arrivalBoundary =
+      latestTransition?.toId === ownerId
+        ? latestTransition.afterColumnId === null
+          ? 0
+          : cycle.columns.findIndex(
+              (column) => column.id === latestTransition.afterColumnId,
+            ) + 1
+        : 0
+    index =
+      lastOwned < 0 && !latestTransition
+        ? cycle.columns.length
+        : Math.max(arrivalBoundary, lastOwned + 1)
+  }
+  return index
+}
+
+export function inputInsertionBoundary(cycle: Cycle): string | null {
+  return (
+    cycle.columns[inputInsertionIndex(cycle, cycle.activeCharacterId) - 1]
+      ?.id ?? null
+  )
+}
+
 export function insertInput(
   rotation: Rotation,
   cycleId: CycleId,
   columnId: string,
   action: InputBlock,
+  afterColumnId?: string,
+  atTimelineEnd = false,
 ): Rotation {
   return changeCycle(rotation, cycleId, (cycle) => {
     requireUniqueColumn(cycle, columnId, action.id)
@@ -420,57 +500,22 @@ export function insertInput(
     )
       throw new Error('유효한 직접 입력만 삽입할 수 있습니다.')
     const ownerId = cycle.activeCharacterId
-    const latestTransition = [...cycle.transitions]
-      .reverse()
-      .find((item) => item.fromId === ownerId || item.toId === ownerId)
-    const outgoing =
-      latestTransition?.fromId === ownerId ? latestTransition : undefined
-    let index: number
-    if (outgoing) {
-      const outroIndex = cycle.columns.findIndex(
-        (column) =>
-          column.action.type === 'autoAction' &&
-          column.action.switchId === outgoing.switchId &&
-          column.action.kind === 'outro',
-      )
-      index =
-        outroIndex >= 0
-          ? outroIndex
-          : outgoing.afterColumnId === null
-            ? 0
-            : cycle.columns.findIndex(
-                (column) => column.id === outgoing.afterColumnId,
-              ) + 1
-    } else {
-      const lastOwned = cycle.columns
-        .map((column) => column.ownerId)
-        .lastIndexOf(ownerId)
-      const arrivalBoundary =
-        latestTransition?.toId === ownerId
-          ? latestTransition.afterColumnId === null
-            ? 0
-            : cycle.columns.findIndex(
-                (column) => column.id === latestTransition.afterColumnId,
-              ) + 1
-          : 0
-      index =
-        lastOwned < 0 && !latestTransition
-          ? cycle.columns.length
-          : Math.max(arrivalBoundary, lastOwned + 1)
-    }
+    const index = atTimelineEnd
+      ? cycle.columns.length
+      : inputInsertionIndex(cycle, ownerId, afterColumnId)
     const column: TimelineColumn = {
       id: columnId,
       ownerId,
       action: { ...action, skills: [...action.skills] },
     }
     const transitions = cycle.transitions.map((item) =>
-      item === outgoing &&
-      outgoing &&
+      !atTimelineEnd &&
+      item.fromId === ownerId &&
       index ===
-        (outgoing.afterColumnId === null
+        (item.afterColumnId === null
           ? 0
           : cycle.columns.findIndex(
-              (candidate) => candidate.id === outgoing.afterColumnId,
+              (candidate) => candidate.id === item.afterColumnId,
             ) + 1)
         ? { ...item, afterColumnId: columnId }
         : item,
@@ -506,13 +551,26 @@ export function reorderInput(
     if (index === targetIndex) return cycle
     const columns = [...cycle.columns]
     const [column] = columns.splice(index, 1)
-    columns.splice(targetIndex, 0, column)
     const previousColumnId = cycle.columns[index - 1]?.id ?? null
-    const transitions = cycle.transitions.map((item) =>
+    const detached = cycle.transitions.map((item) =>
       item.afterColumnId === columnId
         ? { ...item, afterColumnId: previousColumnId }
         : item,
     )
+    // 원래 교체 경계에 같은 소유자의 입력을 넣으면 생성 시와 같이
+    // 그 입력 뒤로 기존 경계를 잇는다. 다른 위치의 교체는 추론하지 않는다.
+    const transitions = detached.map((item) => {
+      const boundary =
+        item.afterColumnId === null
+          ? 0
+          : columns.findIndex(
+              (candidate) => candidate.id === item.afterColumnId,
+            ) + 1
+      return item.fromId === column.ownerId && boundary === targetIndex
+        ? { ...item, afterColumnId: columnId }
+        : item
+    })
+    columns.splice(targetIndex, 0, column)
     return { ...cycle, columns, transitions }
   })
 }
@@ -543,6 +601,8 @@ export interface SwitchCommand {
   switchId: string
   kind: 'normal' | 'concerto'
   toId: CharacterId
+  /** 지정한 열 뒤에 삽입하며, 생략하면 기존 전역 끝 삽입을 사용한다. */
+  afterColumnId?: string | null
   /** 사람이 검수한 공명자 데이터의 Skill ID를 명시적으로 전달한다. */
   normalSwitchAttack?: { columnId: string; actionId: string; skillRef: string }
   outro?: { columnId: string; actionId: string; skillRef: string }
@@ -585,7 +645,17 @@ export function createSwitch(
               ownerId: command.toId,
             },
           ]
-    const columns = [...cycle.columns]
+    const insertionIndex =
+      command.afterColumnId === undefined
+        ? cycle.columns.length
+        : command.afterColumnId === null
+          ? 0
+          : cycle.columns.findIndex(
+              (column) => column.id === command.afterColumnId,
+            ) + 1
+    if (command.afterColumnId != null && insertionIndex === 0)
+      throw new Error('교체 삽입 대상 열이 없습니다.')
+    const columns = [...cycle.columns.slice(0, insertionIndex)]
     for (const spec of specs) {
       if (!spec.ref?.skillRef)
         throw new Error('검수된 자동 행동 Skill 참조가 필요합니다.')
@@ -609,7 +679,8 @@ export function createSwitch(
     const anchor =
       command.kind === 'concerto'
         ? specs[0].ref!.columnId
-        : (cycle.columns.at(-1)?.id ?? null)
+        : (cycle.columns[insertionIndex - 1]?.id ?? null)
+    columns.push(...cycle.columns.slice(insertionIndex))
     return {
       ...cycle,
       activeCharacterId: command.toId,

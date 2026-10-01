@@ -5,16 +5,19 @@ import {
   keyboardControl,
   mouseControl,
   type CapturedInput,
+  type CaptureTarget,
 } from './input-capture'
 
 export interface CaptureEventsOptions {
   blocked: () => boolean
   commit: (inputs: CapturedInput[]) => void
   now?: () => number
+  activate?: (cycleId: CycleId, ownerId: string) => void
+  activeOwner?: (cycleId: CycleId) => string
 }
 
 const UI_SELECTOR =
-  '.input-card, .auto-card, .line-label, button, input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="dialog"], [role="alertdialog"]'
+  '.auto-card, .line-label, button, input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="dialog"], [role="alertdialog"]'
 
 /** 브라우저 이벤트와 순수 입력 판정 사이의 어댑터. */
 export function attachCaptureEvents(
@@ -24,10 +27,11 @@ export function attachCaptureEvents(
   const win = doc.defaultView!
   const capture = new InputCapture()
   const now = options.now ?? (() => win.performance.now())
-  let cycleId: CycleId | null = null
+  let captureTarget: CaptureTarget | null = null
   let point: { x: number; y: number } | null = null
   let rmbContext = false
   let holdTimer: number | undefined
+  let pointerLabelKey: string | null = null
   const clearHoldTimer = () => {
     if (holdTimer !== undefined) win.clearTimeout(holdTimer)
     holdTimer = undefined
@@ -38,9 +42,9 @@ export function attachCaptureEvents(
   }
   const start = (
     control: Parameters<InputCapture['press']>[0],
-    id: CycleId,
+    target: CaptureTarget,
   ) => {
-    const accepted = capture.press(control, { cycleId: id }, now())
+    const accepted = capture.press(control, target, now())
     if (accepted)
       holdTimer = win.setTimeout(() => {
         holdTimer = undefined
@@ -62,9 +66,10 @@ export function attachCaptureEvents(
     target: EventTarget | null,
     x: number,
     y: number,
-  ): CycleId | null => {
-    if (!(target instanceof win.Element) || target.closest(UI_SELECTOR))
-      return null
+  ): CaptureTarget | null => {
+    if (!(target instanceof win.Element)) return null
+    const label = target.closest('.line-label')
+    if (!label && target.closest(UI_SELECTOR)) return null
     const grid = target.closest<HTMLElement>('[data-capture-cycle]')
     if (!grid) return null
     const scroll = grid.closest<HTMLElement>('.timeline-scroll')
@@ -78,15 +83,56 @@ export function attachCaptureEvents(
         return null
     }
     const id = grid.dataset.captureCycle
-    return id === 'opening' || id === 'repeat' ? id : null
+    if (id !== 'opening' && id !== 'repeat') return null
+    const rowOwner = target.closest<HTMLElement>('[data-capture-owner]')
+      ?.dataset.captureOwner
+    if (!rowOwner) return null
+    const ownerId = label ? (options.activeOwner?.(id) ?? rowOwner) : rowOwner
+    const afterColumnId =
+      target.closest<HTMLElement>('.input-card')?.dataset.actionColumn
+    return {
+      cycleId: id,
+      ...(ownerId ? { ownerId } : {}),
+      ...(afterColumnId ? { afterColumnId } : {}),
+      ...(label ? { atTimelineEnd: true } : {}),
+    }
   }
   const update = (target: EventTarget | null, x: number, y: number) => {
+    const row =
+      target instanceof win.Element
+        ? target.closest<HTMLElement>('[data-capture-owner]')
+        : null
+    const id = row?.closest<HTMLElement>('[data-capture-cycle]')?.dataset
+      .captureCycle
+    const labelKey =
+      target instanceof win.Element &&
+      target.closest('.line-label') &&
+      row?.dataset.captureOwner &&
+      (id === 'opening' || id === 'repeat')
+        ? `${id}:${row.dataset.captureOwner}`
+        : null
+    if (
+      !options.blocked() &&
+      !typing() &&
+      row?.dataset.captureOwner &&
+      (id === 'opening' || id === 'repeat')
+    ) {
+      if (!labelKey || pointerLabelKey !== labelKey)
+        options.activate?.(id, row.dataset.captureOwner)
+    }
+    pointerLabelKey = options.blocked() || typing() ? null : labelKey
     const next = targetCycle(target, x, y)
-    if (next !== cycleId || options.blocked() || typing()) {
+    if (
+      next?.cycleId !== captureTarget?.cycleId ||
+      next?.ownerId !== captureTarget?.ownerId ||
+      !next ||
+      options.blocked() ||
+      typing()
+    ) {
       cancelPending()
       rmbContext = false
     }
-    cycleId = next
+    captureTarget = next
     point = { x, y }
   }
   const refresh = () => {
@@ -97,7 +143,7 @@ export function attachCaptureEvents(
       rmbContext = false
       return null
     }
-    return cycleId
+    return captureTarget
   }
   const onMove = (event: MouseEvent) =>
     update(event.target, event.clientX, event.clientY)
@@ -138,7 +184,12 @@ export function attachCaptureEvents(
     const id = refresh()
     if (!control || !id || event.ctrlKey || event.altKey || event.metaKey)
       return
-    event.preventDefault()
+    if (!(
+      event.target instanceof win.Element &&
+      event.target.closest('.input-card, .line-label') &&
+      control === 'LMB'
+    ))
+      event.preventDefault()
     const accepted = start(control, id)
     if (control === 'RMB') rmbContext = accepted
   }
@@ -163,9 +214,18 @@ export function attachCaptureEvents(
   }
   function reset() {
     cancelPending()
-    cycleId = null
+    captureTarget = null
     point = null
     rmbContext = false
+    pointerLabelKey = null
+  }
+  const onFocusIn = (event: FocusEvent) => {
+    if (
+      event.target instanceof win.Element &&
+      event.target.closest('.line-label, .input-card')
+    )
+      return
+    reset()
   }
   const onVisibility = () => {
     if (doc.hidden) hardReset()
@@ -184,7 +244,7 @@ export function attachCaptureEvents(
     ['keydown', onKeyDown],
     ['keyup', onKeyUp],
     ['dragstart', reset],
-    ['focusin', reset],
+    ['focusin', onFocusIn],
     ['visibilitychange', onVisibility],
   ] as const
   for (const [name, listener] of listeners)

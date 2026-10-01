@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 function fixture() {
-  document.body.innerHTML = `<div class="timeline-scroll"><div data-capture-cycle="opening"><div id="empty"></div><div class="input-card" id="block"></div><button id="line">A</button></div></div><div data-capture-cycle="repeat" id="repeat"></div><div id="outside"></div><input id="text" />`
+  document.body.innerHTML = `<div class="timeline-scroll"><div data-capture-cycle="opening"><div data-capture-owner="demo-a"><div id="empty"></div><div class="auto-card" id="block"></div></div><button id="line">A</button></div></div><div data-capture-cycle="repeat" data-capture-owner="demo-a" id="repeat"></div><div id="outside"></div><input id="text" />`
   let rotation = createRotation(['demo-a', 'demo-b', 'demo-c'])
   let time = 0
   let sequence = 0
@@ -67,6 +67,41 @@ function fixture() {
 }
 
 describe('브라우저 이벤트와 Rotation 통합', () => {
+  it('블록 내부 LMB는 drag 시작을 허용하고 dragstart에서 입력을 취소한다', () => {
+    const f = fixture()
+    f.move('#empty')
+    f.key('keydown', 'KeyE', 0)
+    f.key('keyup', 'KeyE', 10)
+    const row = document.querySelector('[data-capture-owner="demo-a"]')!
+    const block = document.createElement('div')
+    block.className = 'input-card'
+    block.dataset.actionColumn = f.state().opening.columns[0].id
+    block.innerHTML = '<span class="linked-skill">skill</span>'
+    row.append(block)
+    const skill = block.firstElementChild!
+    const down = new MouseEvent('mousedown', {
+      button: 0,
+      bubbles: true,
+      cancelable: true,
+    })
+    skill.dispatchEvent(down)
+    expect(down.defaultPrevented).toBe(false)
+    block.dispatchEvent(new Event('dragstart', { bubbles: true }))
+    skill.dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true }))
+    expect(f.state().opening.columns).toHaveLength(1)
+    f.setTime(20)
+    skill.dispatchEvent(
+      new MouseEvent('mousedown', { button: 0, bubbles: true }),
+    )
+    f.setTime(30)
+    skill.dispatchEvent(new MouseEvent('mouseup', { button: 0, bubbles: true }))
+    expect(f.state().opening.columns).toHaveLength(2)
+    expect(f.state().opening.columns[1].action).toMatchObject({
+      input: 'LMB',
+      gesture: 'tap',
+      skills: [],
+    })
+  })
   it('200ms 타이머에서 F Hold를 만들고 추가 입력과 release 중복을 막는다', () => {
     vi.useFakeTimers()
     const f = fixture()
@@ -144,7 +179,7 @@ describe('브라우저 이벤트와 Rotation 통합', () => {
       'autoAction',
       'autoAction',
     ])
-    expect(f.state().opening.activeCharacterId).toBe('demo-b')
+    expect(f.state().opening.activeCharacterId).toBe('demo-a')
     expect(f.state().opening.transitions[0].kind).toBe('concerto')
     f.move('#repeat')
     f.key('keydown', 'KeyR', 1000)

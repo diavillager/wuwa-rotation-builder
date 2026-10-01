@@ -40,6 +40,8 @@ import {
 import { TimelineWires } from './TimelineWires'
 import { attachCaptureEvents } from './input-events'
 import { applyCapturedInput } from './input-command'
+import { attachDragScroll } from './drag-scroll'
+import { usePartySelectorScroll } from './use-party-selector-scroll'
 
 type DragItem =
   | { kind: 'party'; id: string }
@@ -92,6 +94,7 @@ export function App() {
   )
   const [focusedCycle, setFocusedCycle] = useState<CycleId>('opening')
   const [selectingSlot, setSelectingSlot] = useState<number | null>(null)
+  const { shellRef, prepareOpen } = usePartySelectorScroll(selectingSlot)
   const [pendingReplacement, setPendingReplacement] =
     useState<PendingReplacement | null>(null)
   const [selectedElement, setSelectedElement] = useState<Element>(ELEMENTS[0])
@@ -105,6 +108,38 @@ export function App() {
     null,
   )
   const liveRef = useRef({ rotation, blocked: false })
+  useEffect(() => {
+    if (!drag || drag.kind === 'party') return
+    return attachDragScroll(document, (target) => {
+      if (!(target instanceof Element) || target.closest('.line-label'))
+        return null
+      const cell = target.closest<HTMLElement>('[data-capture-owner]')
+      const cycleId = cell?.closest<HTMLElement>('[data-capture-cycle]')
+        ?.dataset.captureCycle
+      const ownerId = cell?.dataset.captureOwner
+      if ((cycleId !== 'opening' && cycleId !== 'repeat') || !ownerId)
+        return null
+      const state = liveRef.current.rotation
+      if (drag.kind === 'input') {
+        if (!canDropInput(state, drag, cycleId, ownerId)) return null
+      } else if (drag.kind === 'catalogSkill') {
+        if (
+          cycleId !== focusedCycle ||
+          ownerId !== state[cycleId].activeCharacterId
+        )
+          return null
+      } else {
+        if (
+          drag.cycleId !== cycleId ||
+          state[cycleId].columns.find(
+            (column) => column.action.id === drag.actionId,
+          )?.ownerId !== ownerId
+        )
+          return null
+      }
+      return timelineRefs.current[cycleId] ?? null
+    })
+  }, [drag, focusedCycle])
   useLayoutEffect(() => {
     liveRef.current = {
       rotation,
@@ -152,6 +187,20 @@ export function App() {
   useEffect(() => {
     const adapter = attachCaptureEvents(document, {
       blocked: () => liveRef.current.blocked,
+      activeOwner: (cycleId) =>
+        liveRef.current.rotation[cycleId].activeCharacterId,
+      activate: (cycleId, ownerId) => {
+        if (liveRef.current.rotation[cycleId].activeCharacterId !== ownerId) {
+          const next = setActiveCharacter(
+            liveRef.current.rotation,
+            cycleId,
+            ownerId,
+          )
+          liveRef.current.rotation = next
+          setRotation(next)
+        }
+        setFocusedCycle(cycleId)
+      },
       commit: (inputs) => {
         for (const input of inputs) {
           try {
@@ -279,15 +328,17 @@ export function App() {
         return
       }
       const ref = drag.ref
-      run((state) =>
-        addSkill(
+      run((state) => {
+        const next = addSkill(
           state,
           cycleId,
           actionId,
           { id: crypto.randomUUID(), skillRef: ref, stage: 0 },
           targetIndex,
-        ),
-      )
+        )
+        revealColumnRef.current = { cycleId, columnId: target.id }
+        return next
+      })
     } else if (
       drag?.kind === 'linkedSkill' &&
       drag.cycleId === cycleId &&
@@ -400,7 +451,7 @@ export function App() {
     const cycle = rotation[cycleId]
     const view = projectCycle(rotation, cycle)
     const title = cycleId === 'opening' ? '개막 사이클' : '반복 사이클'
-    const tracks = `148px ${view.columns.map(() => 'max-content').join(' ')} 150px`
+    const tracks = `148px ${view.columns.map(() => 'max-content').join(' ')} minmax(150px, 1fr)`
     return (
       <section
         className={`cycle-panel ${focusedCycle === cycleId ? 'focused-cycle' : ''}`}
@@ -436,10 +487,7 @@ export function App() {
                 <button
                   className={`line-label ${cycle.activeCharacterId === id ? 'active-line' : ''}`}
                   data-row-owner={id}
-                  onClick={() => {
-                    setFocusedCycle(cycleId)
-                    run((state) => setActiveCharacter(state, cycleId, id))
-                  }}
+                  data-capture-owner={id}
                   draggable
                   onDragStart={(event) => {
                     event.dataTransfer.effectAllowed = 'move'
@@ -464,6 +512,7 @@ export function App() {
                     className="timeline-cell"
                     key={column.id}
                     data-column-cell={column.id}
+                    data-capture-owner={id}
                     onDragOver={(event) => {
                       if (
                         canDropInput(
@@ -512,6 +561,7 @@ export function App() {
                 ))}
                 <div
                   className="timeline-cell end-cell"
+                  data-capture-owner={id}
                   onDragOver={(event) => {
                     if (
                       canDropInput(
@@ -566,7 +616,7 @@ export function App() {
     (item) => item.id === activeId,
   )
   return (
-    <main className="app-shell">
+    <main className="app-shell" ref={shellRef}>
       <header className="page-heading">
         <div>
           <span className="eyebrow">WUTHERING WAVES · ROTATION WORKSPACE</span>
@@ -596,6 +646,7 @@ export function App() {
               key={id}
               draggable
               onClick={() => {
+                if (selectingSlot !== index) prepareOpen()
                 setSelectedElement(ELEMENTS[0])
                 setSelectingSlot(selectingSlot === index ? null : index)
               }}
@@ -726,7 +777,8 @@ export function App() {
         </div>
       </div>
       <footer hidden={selectingSlot !== null}>
-        빈 사이클 영역에서 입력 · 200ms 후 Hold 생성 · 숫자키로 교체
+        공명자 항목: 연속 입력 · 배치 영역: 커서 라인 편집 · 200ms Hold ·
+        숫자키로 교체
       </footer>
       {pendingReplacement && (
         <div className="confirm-backdrop">

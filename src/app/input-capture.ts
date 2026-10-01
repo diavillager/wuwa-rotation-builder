@@ -4,6 +4,9 @@ export type CaptureControl = InputControl | '1' | '2' | '3'
 export const HOLD_MS = 200
 export interface CaptureTarget {
   cycleId: CycleId
+  ownerId?: string
+  afterColumnId?: string
+  atTimelineEnd?: boolean
 }
 export interface CapturedInput {
   control: CaptureControl
