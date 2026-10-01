@@ -10,6 +10,7 @@ npm run character-sync -- --all --plan           미등록/손상 대상 확인
 npm run character-sync -- --all                  대상 전체 후보 수집
 npm run character-sync -- --character <ID>       지정 공명자 재수집
 npm run character-sync -- --character <ID> --ww-ref <40자리 SHA>
+npm run character-sync -- --character <ID> --character <ID> --asset-ref <40자리 SHA>
 npm run characters:validate                       로컬 최종 데이터·이미지 검증
 결과: .character-sync/runs/<실행 ID>/report.json 및 <ID>/draft.json
 종료 코드: 0=수집/검증 성공(검수·등록 완료 아님), 1=부분/전체 실패, 2=인자 오류`
@@ -21,10 +22,11 @@ export async function main(args: string[]) {
       args,
       options: {
         all: { type: 'boolean' },
-        character: { type: 'string' },
+        character: { type: 'string', multiple: true },
         plan: { type: 'boolean' },
         validate: { type: 'boolean' },
         'ww-ref': { type: 'string' },
+        'asset-ref': { type: 'string' },
         help: { type: 'boolean' },
       },
       allowPositionals: false,
@@ -40,12 +42,19 @@ export async function main(args: string[]) {
       1
     )
       throw new Error('--all, --character, --validate 중 하나를 지정하세요.')
-    if (values.validate && (values.plan || values['ww-ref']))
-      throw new Error('--validate는 --plan/--ww-ref와 함께 사용하지 않습니다.')
-    if (values.character !== undefined && !/^\d+$/.test(values.character))
+    if (
+      values.validate &&
+      (values.plan || values['ww-ref'] || values['asset-ref'])
+    )
+      throw new Error(
+        '--validate는 --plan/--ww-ref/--asset-ref와 함께 사용하지 않습니다.',
+      )
+    if (values.character?.some((id) => !/^\d+$/.test(id)))
       throw new Error('공명자 ID는 숫자 문자열이어야 합니다.')
     if (values['ww-ref'] && !/^[0-9a-f]{40}$/.test(values['ww-ref']))
       throw new Error('WW_Data commit은 40자리 SHA여야 합니다.')
+    if (values['asset-ref'] && !/^[0-9a-f]{40}$/.test(values['asset-ref']))
+      throw new Error('WW_Asset commit은 40자리 SHA여야 합니다.')
   } catch (error) {
     console.error(errorMessage(error))
     console.error(help)
@@ -73,8 +82,8 @@ export async function main(args: string[]) {
     }
     const result = await runSync(
       root,
-      remoteSources(values['ww-ref']),
-      values.all ? { all: true } : { character: values.character! },
+      remoteSources(values['ww-ref'], values['asset-ref'], root),
+      values.all ? { all: true } : { characters: values.character! },
       values.plan,
     )
     if (result.plan)

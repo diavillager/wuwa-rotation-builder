@@ -18,18 +18,26 @@ import {
   type ExistingRecord,
 } from './io'
 import type { Sources, WwSnapshot } from './sources'
+import { assetCandidates, type AssetSnapshot } from './assets'
+import { carryLatestReview } from '../../tools/character-review/carry'
 
-export type Mode = { all: true } | { character: string }
+export type Mode =
+  { all: true } | { character: string } | { characters: string[] }
 export function planTargets(
   list: { characterId: string }[],
   existing: ExistingRecord[],
   mode: Mode,
 ): string[] {
-  if ('character' in mode) {
-    const id = sourceId(mode.character)
-    if (!list.some((row) => row.characterId === id))
-      throw new Error(`Encore 목록에 ${id}가 없습니다.`)
-    return [id]
+  if (!('all' in mode)) {
+    const ids = ('character' in mode ? [mode.character] : mode.characters).map(
+      sourceId,
+    )
+    if (!ids.length || new Set(ids).size !== ids.length)
+      throw new Error('대상이 비어 있거나 중복됩니다.')
+    for (const id of ids)
+      if (!list.some((row) => row.characterId === id))
+        throw new Error(`Encore 목록에 ${id}가 없습니다.`)
+    return ids
   }
   const registered = new Set(
     existing.filter((r) => r.valid).map((r) => r.characterId),
@@ -49,11 +57,13 @@ export interface SyncReport {
   targets: string[]
   registrations: ExistingRecord[]
   wwRef: string | null
+  assetRef: string | null
   results: {
     characterId: string
     status: 'collected' | 'partial' | 'failed'
     candidates: number
     verified: number
+    inheritedReview?: string
   }[]
   errors: { scope: string; message: string }[]
 }
@@ -80,11 +90,13 @@ export async function runSync(
     targets,
     registrations,
     wwRef: null,
+    assetRef: null,
     results: [],
     errors: [],
   }
   await writeJson(path.join(directory, 'sources/encore-list.json'), rawList)
   let ww: WwSnapshot | undefined
+  let assets: AssetSnapshot | undefined
   if (targets.length) {
     try {
       ww = await sources.ww()
@@ -92,6 +104,13 @@ export async function runSync(
       await writeJson(path.join(directory, 'sources/ww-data.json'), ww)
     } catch (error) {
       report.errors.push({ scope: 'ww-data', message: errorMessage(error) })
+    }
+    try {
+      assets = await sources.assets()
+      report.assetRef = assets.ref
+      await writeJson(path.join(directory, 'sources/ww-assets.json'), assets)
+    } catch (error) {
+      report.errors.push({ scope: 'ww-asset', message: errorMessage(error) })
     }
   }
   for (const id of targets) {
@@ -115,8 +134,16 @@ export async function runSync(
         errors.push(`WW_Data: ${errorMessage(error)}`)
       }
     } else errors.push('WW_Data 수집 실패: 실행 report.json 참조')
+    let fromAssets: Candidate[] = []
+    if (assets) {
+      try {
+        fromAssets = assetCandidates(assets, mergeCandidates(encore, fromWw))
+      } catch (error) {
+        errors.push(`WW_Asset: ${errorMessage(error)}`)
+      }
+    } else errors.push('WW_Asset 수집 실패: 실행 report.json 참조')
     const candidates: DownloadedCandidate[] = []
-    for (const candidate of mergeCandidates(encore, fromWw)) {
+    for (const candidate of mergeCandidates(encore, fromWw, fromAssets)) {
       try {
         const bytes = await sources.download(candidate.url)
         const decoded = await decodeWebP(bytes)
@@ -154,11 +181,23 @@ export async function runSync(
     const verified = candidates.filter(
       (c) => c.download.status === 'verified',
     ).length
+    let inheritedReview: string | null = null
+    try {
+      inheritedReview = await carryLatestReview(repoRoot, runId, id)
+    } catch (error) {
+      const message = `검수 이전 실패: ${errorMessage(error)}`
+      errors.push(message)
+      // 초안을 바꾸면 검수 hash가 바뀌므로 별도의 진단으로 보존한다.
+      await writeJson(path.join(characterDirectory, 'carry-error.json'), {
+        message,
+      })
+    }
     report.results.push({
       characterId: id,
       status: errors.length ? (verified ? 'partial' : 'failed') : 'collected',
       candidates: candidates.length,
       verified,
+      ...(inheritedReview ? { inheritedReview } : {}),
     })
     report.errors.push(...errors.map((message) => ({ scope: id, message })))
   }

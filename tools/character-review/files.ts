@@ -117,7 +117,7 @@ export function parseDraft(value: unknown, id: string): ReviewDraft {
     )
       throw new Error('후보 다운로드 상태가 유효하지 않습니다.')
     for (const source of rows(candidate.sources)) {
-      if (!['encore', 'ww-data'].includes(String(source.source)))
+      if (!['encore', 'ww-data', 'ww-asset'].includes(String(source.source)))
         throw new Error('후보 출처가 유효하지 않습니다.')
       for (const key of ['document', 'recordId', 'field', 'originalPath'])
         nonempty(source[key])
@@ -148,6 +148,14 @@ export async function loadSource(
   const directory = targetDirectory(root, target)
   const raw = await readInside(root, path.join(directory, 'draft.json'))
   const draft = parseDraft(JSON.parse(raw.toString('utf8')), target.characterId)
+  const carryError = await optionalFile(
+    root,
+    path.join(directory, 'carry-error.json'),
+  )
+  if (carryError)
+    draft.errors.push(
+      nonempty(object(JSON.parse(carryError.toString('utf8'))).message),
+    )
   let encore: Pick<ReviewSource, 'encoreMatches' | 'encoreErrors'> = {}
   try {
     const savedEncore = await optionalFile(

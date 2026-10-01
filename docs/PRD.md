@@ -255,8 +255,9 @@ Hiyuki(1108), Sanhua(1102), Cartethyia(1409) spike에서 Encore Character API와
 
 1. 현재 저장소의 등록 캐릭터를 확인하고 Encore의 현재 목록과 비교하여 미등록 대상을 찾는다. 폴더만으로 등록 완료를 판정하지 않는다. 최소한 `src/assets/characters/{id}/data/{id}.json`이 존재하고 유효하며 JSON의 `characterId`가 디렉터리 ID와 일치해야 등록된 것으로 본다.
 2. Encore에서 기본 정보, 한국어 이름, 속성, 초상화 후보를 수집한다.
-3. Encore Character API와 WW_Data의 스킬 아이콘 후보를 합집합으로 모은다.
+3. Encore Character API와 WW_Data의 스킬 아이콘 후보를 합집합으로 모으고, 메타데이터에서 확인한 전용 폴더의 WW_Asset_Webp 실제 개별 이미지 목록을 추가한다. 메타데이터에 없는 파일도 미검수 후보로 포함한다. 공용 아이콘은 기존 명시적 참조를 유지하며 전용 폴더의 Atlas 합본은 제외한다.
 4. Encore api-v2 Resource에서 WebP를 다운로드할 때 HTTP 요청 성공, 응답 Content-Type이 기대하는 이미지 형식인지, 저장 파일이 실제 이미지/WebP로 유효하게 열리는지를 확인한다. 다운로드 또는 검증에 실패한 후보는 실패 사실을 기록하며, 조용히 누락하거나 성공·완료 처리하지 않는다.
+   WW_Asset_Webp에서 추가 발견한 후보는 고정 commit의 원본 WebP에도 동일 검증을 적용한다. 경로와 출처 commit을 보존하고 파일명만으로 스킬 의미를 확정하지 않는다.
 5. 후보 ID와 자산 참조를 가진 JSON 초안을 만든다.
 6. **실제 아이콘이 보이는 로컬 검수 UI**에서 사람이 `displayName`, 사용 여부, `normalSwitchAttack`, `intro`, `outro`를 지정한다.
 7. 검수 결과를 최종 공명자 JSON에 반영하고 아래 필수 항목을 검증한다. 하나라도 충족되지 않은 Character는 완료 상태로 취급하지 않는다.

@@ -14,7 +14,7 @@ export const WW_FILES = {
 } as const
 export type WwData = Record<keyof typeof WW_FILES, unknown>
 export interface SourceEvidence {
-  source: 'encore' | 'ww-data'
+  source: 'encore' | 'ww-data' | 'ww-asset'
   document: string
   recordId: string
   field: string
