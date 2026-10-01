@@ -1,12 +1,18 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
     "noEmit": true,
-    "strict": true
+    "strict": true,
+    "jsx": "react-jsx"
   },
-  "include": ["vite.config.ts", "scripts/character-sync/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "scripts/character-sync/**/*.ts",
+    "tools/character-review/**/*.ts",
+    "tools/character-review/**/*.tsx"
+  ]
 }

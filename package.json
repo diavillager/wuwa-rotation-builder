@@ -15,7 +15,9 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "character-sync": "tsx scripts/character-sync/cli.ts",
-    "characters:validate": "tsx scripts/character-sync/cli.ts --validate"
+    "characters:validate": "tsx scripts/character-sync/cli.ts --validate",
+    "character-review": "vite --config tools/character-review/vite.config.ts --configLoader bundle",
+    "character-review:build": "vite build --config tools/character-review/vite.config.ts --configLoader bundle"
   },
   "dependencies": {
     "react": "^18.3.1",
