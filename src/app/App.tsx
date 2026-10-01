@@ -846,7 +846,6 @@ export function App({
               <span className="eyebrow">PARTY SETUP</span>
               <h2>파티 편성</h2>
             </div>
-            <p>슬롯 클릭으로 공명자 선택 · 드래그로 순서 변경</p>
           </div>
           <div className="party-grid">
             {rotation.party.map((id, index) => (
@@ -892,7 +891,9 @@ export function App({
                 )}
                 <span className="party-character-info">
                   <strong>{characterLabel(id)}</strong>
-                  <small>슬롯 {index + 1}</small>
+                  <small>
+                    {catalog.characters.find((item) => item.id === id)?.element}
+                  </small>
                 </span>
               </button>
             ))}
@@ -1036,8 +1037,8 @@ export function App({
           }
         />
         <footer hidden={selectingSlot !== null}>
-          공명자 항목: 연속 입력 · 배치 영역: 커서 라인 편집 · 200ms Hold ·
-          숫자키로 교체
+          A fan-made website for Wuthering Waves. Wuthering Waves and all
+          related assets are © KURO GAMES.
         </footer>
         {pendingReplacement && (
           <div className="confirm-backdrop">

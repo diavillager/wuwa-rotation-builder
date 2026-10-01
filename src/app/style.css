@@ -86,7 +86,7 @@ h2 {
   gap: 12px;
   min-width: 0;
   min-height: 152px;
-  padding: 16px;
+  padding: 10px 16px;
   background: #202932;
   border: 1px solid #34414b;
   border-radius: 12px;
@@ -94,15 +94,16 @@ h2 {
 .slot-index {
   align-self: flex-start;
   color: #87aaa5;
-  font-size: 18px;
+  font-size: 56px;
+  line-height: 76px;
   flex-shrink: 0;
 }
 .portrait-placeholder {
   display: grid;
   place-items: center;
-  width: clamp(72px, 6vw, 96px);
-  height: auto;
-  aspect-ratio: 4 / 5;
+  width: 128px;
+  height: 128px;
+  aspect-ratio: 1;
   border: 1px dashed #66817f;
   border-radius: 10px;
   background: #293941;
@@ -430,9 +431,9 @@ button {
   margin: 0;
 }
 .character-portrait {
-  width: clamp(72px, 6vw, 96px);
-  height: auto;
-  aspect-ratio: 4 / 5;
+  width: 128px;
+  height: 128px;
+  aspect-ratio: 1;
   object-fit: contain;
   flex-shrink: 0;
   pointer-events: none;
@@ -490,7 +491,7 @@ button {
 }
 .header-project .project-save-state {
   font-size: 14px;
-  color: #8fc9b8;
+  color: #fff;
   white-space: nowrap;
   text-align: right;
 }
@@ -686,14 +687,10 @@ button {
   z-index: 1;
   fill: none;
 }
-.wire-flow {
+.wire-flow,
+.wire-transition {
   stroke: #66847e;
   stroke-width: 2;
-  stroke-linejoin: round;
-}
-.wire-transition {
-  stroke: #a6dace;
-  stroke-width: 3;
   stroke-linejoin: round;
 }
 .line-label {
