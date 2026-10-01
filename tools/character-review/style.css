@@ -421,6 +421,13 @@ code {
   gap: 8px;
   margin: 24px 0 14px;
 }
+.reset-reviews {
+  width: 100%;
+  margin-top: 24px;
+  color: #e6b9ac;
+  border-color: #78554c;
+  background: #352b2b;
+}
 .review-actions .primary {
   grid-column: 1/-1;
 }

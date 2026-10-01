@@ -19,6 +19,7 @@ import type { CharacterData } from '../../src/data/characters/contract'
 import { ReviewRepository } from './repository'
 import { candidateSkillId, type ReviewState } from './model'
 import { reviewApi } from './api'
+import { prepareWorkspaceReset } from './reset'
 
 const roots: string[] = [],
   servers: Server[] = []
@@ -148,6 +149,51 @@ function complete(
   return next
 }
 describe('검수 검증과 JSON 전달', () => {
+  it('여러 파일을 연속 Import해도 이전 파일의 이미지와 검수를 백업할 수 있다', async () => {
+    const f = await fixture()
+    const first = await f.repository.backupCharacter(
+      (await f.repository.load(target)).state,
+    )
+    const second = structuredClone(first)
+    second.characterId =
+      second.review.characterId =
+      second.workspace.source.target.characterId =
+      second.workspace.source.draft.characterId =
+        '1103'
+    const restored = new ReviewRepository(f.root)
+    const wrap = (entry: typeof first) => ({
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [entry],
+    })
+    await restored.importFile(wrap(first))
+    await restored.importFile(wrap(second))
+    expect(await restored.backupCharacter(first.review)).toEqual(first)
+    expect(await restored.backupCharacter(second.review)).toEqual(second)
+  })
+  it('전체 초기화는 Import된 원본과 분리하여 수집 원본의 초기 상태를 준비한다', async () => {
+    const f = await fixture()
+    await setWorkspaceTargets(f.root, [target])
+    const state = (await f.repository.load(target)).state
+    const imported = await f.repository.backupCharacter(state)
+    imported.review.displayName = '가져온 이름'
+    imported.workspace.source.draft.basicCandidate.displayName = '가져온 원본'
+    await f.repository.importFile({
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [imported],
+    })
+    const reset = await prepareWorkspaceReset(f.root)
+    expect(reset.characters[0].review).toEqual(state)
+    expect(
+      reset.characters[0].workspace.source.draft.basicCandidate.displayName,
+    ).toBe('검증 공명자')
+    await writeFile(path.join(f.directory, f.candidates[0].asset), '손상')
+    await expect(prepareWorkspaceReset(f.root)).rejects.toThrow('이미지')
+    expect(
+      (await f.repository.backupCharacter(imported.review)).review.displayName,
+    ).toBe('가져온 이름')
+  })
   it('Encore 설명은 백업으로 보존하고 설명 없는 이전 백업도 불러온다', async () => {
     const f = await fixture()
     await writeFile(
@@ -593,5 +639,26 @@ describe('로컬 검수 파일 API', () => {
       ).status,
     ).toBe(200)
     expect(await scanRegistered(f.root)).toEqual([])
+    const resetResponse = await fetch(`${base}/reset`, { ...init, body: '{}' })
+    expect(resetResponse.status).toBe(200)
+    const resetPayload = await resetResponse.json()
+    expect(
+      resetPayload.sessions.map(
+        (s: { state: ReviewState }) => s.state.characterId,
+      ),
+    ).toEqual(['1102'])
+    expect(
+      resetPayload.sessions[0].state.candidates.every(
+        (c: { decision: string }) => c.decision === 'pending',
+      ),
+    ).toBe(true)
+    expect(
+      (
+        await fetch(`${base}/backup`, {
+          ...init,
+          body: JSON.stringify({ states: [second] }),
+        })
+      ).status,
+    ).toBe(200)
   })
 })

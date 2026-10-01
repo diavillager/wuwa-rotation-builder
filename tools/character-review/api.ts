@@ -7,12 +7,13 @@ import { ReviewRepository } from './repository'
 import type { ReviewState } from './model'
 import { listTargets, assertWorkspaceTarget } from './workspace'
 import type { ReviewExport } from './repository'
+import { prepareWorkspaceReset } from './reset'
 
 const ORIGIN = 'http://127.0.0.1:5174'
 export function reviewApi(root: string) {
   const token = randomBytes(32).toString('hex')
   const repository = new ReviewRepository(root)
-  let importedTargets = new Set<string>()
+  const importedTargets = new Set<string>()
   const assertAllowed = async (target: {
     runId: string
     characterId: string
@@ -92,9 +93,15 @@ export function reviewApi(root: string) {
           chunks.push(Buffer.from(chunk))
         }
         const body = object(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+        if (url.pathname === '/api/review/reset') {
+          const file = await prepareWorkspaceReset(root)
+          const sessions = await repository.importFile(file)
+          sessions.forEach((s) => importedTargets.add(snapshotKey(s.state)))
+          return json(200, { sessions, file })
+        }
         if (url.pathname === '/api/review/import') {
           const sessions = await repository.importFile(body.file)
-          importedTargets = new Set(sessions.map((s) => snapshotKey(s.state)))
+          sessions.forEach((s) => importedTargets.add(snapshotKey(s.state)))
           return json(200, { sessions })
         }
         if (

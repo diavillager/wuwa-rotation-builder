@@ -271,7 +271,7 @@ export class ReviewRepository {
       })
     }
     // 한 대상이라도 실패하면 기존 Import 자료와 화면을 바꾸지 않는다.
-    this.imported = staged.imported
+    this.imported = new Map([...this.imported, ...staged.imported])
     return sessions
   }
   async load(

@@ -20,6 +20,7 @@ let root: Root
 let saved: ReviewSession
 let exportFails: boolean
 let importFails: boolean
+let resetFails: boolean
 let result: ReviewValidation
 let postedStates: unknown[]
 let writes: string[]
@@ -76,6 +77,7 @@ beforeEach(() => {
   }
   exportFails = false
   importFails = false
+  resetFails = false
   result = { errors: ['미완료 검수'], summary: [], token: null }
   writes = []
   postedStates = []
@@ -119,6 +121,28 @@ beforeEach(() => {
         }
         session.source.draft.characterId = id
         session.state = { ...session.state, characterId: id }
+      } else if (action === 'reset') {
+        ok = !resetFails
+        const session = {
+          ...structuredClone(saved),
+          state: initialReview(saved.source),
+        }
+        body = resetFails
+          ? { error: '이미지 누락' }
+          : {
+              sessions: [session],
+              file: {
+                format: 'wuwa-character-review-backup',
+                schemaVersion: 2,
+                characters: [
+                  {
+                    characterId: '1102',
+                    review: session.state,
+                    workspace: { source: session.source, images: [] },
+                  },
+                ],
+              },
+            }
       } else if (action === 'import') {
         ok = !importFails
         const file = JSON.parse(init!.body as string).file
@@ -369,8 +393,11 @@ it('분류가 있어도 자동 배정을 켜지 않고 자동 행동과 0~10 타
   ).toBe(10)
   expect(URL.createObjectURL).toHaveBeenCalledOnce()
 })
-it('Import는 목록을 파일 내용으로 교체하고 취소·실패 시 기존 편집을 보존한다', async () => {
+it('Import는 같은 ID만 갱신하며 누락 대상과 취소·실패 시 기존 편집을 보존한다', async () => {
   await render()
+  await click('다음 공명자미검증')
+  await selectCandidate()
+  await click('검증 공명자미검증')
   await selectCandidate()
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
   const upload = async () => {
@@ -394,9 +421,82 @@ it('Import는 목록을 파일 내용으로 교체하고 취소·실패 시 기�
   expect(document.body.textContent).toContain('손상된 백업')
   importFails = false
   await upload()
-  expect(document.querySelectorAll('.target-list button')).toHaveLength(1)
-  expect(document.body.textContent).not.toContain('다음 공명자')
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(2)
+  expect(document.body.textContent).toContain('다음 공명자')
   expect(decision('등록').checked).toBe(false)
+  await click('다음 공명자미검증')
+  expect(decision('등록').checked).toBe(true)
+})
+
+it('Import의 새 ID를 추가하고 기존 검증 결과와 병합 목록을 저장한다', async () => {
+  vi.useFakeTimers()
+  await render()
+  result = { errors: [], summary: [], token: 'ok' }
+  await click('검수 내용 검증')
+  const extra = structuredClone(saved)
+  extra.state.characterId =
+    extra.source.target.characterId =
+    extra.source.draft.characterId =
+      '1209'
+  extra.source.target.displayName = '새 공명자'
+  const value = {
+    characters: [{ review: extra.state, workspace: { source: extra.source } }],
+  }
+  const file = new File(['{}'], 'extra.json')
+  Object.defineProperty(file, 'text', {
+    value: async () => JSON.stringify(value),
+  })
+  const input = document.querySelector<HTMLInputElement>(
+    '[aria-label="검수 JSON 파일"]',
+  )!
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] })
+  await act(async () =>
+    input.dispatchEvent(new Event('change', { bubbles: true })),
+  )
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(3)
+  expect(document.querySelector('.review-status')?.textContent).toBe('통과')
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(650)
+  })
+  const record = vi.mocked(writeSavedReview).mock.calls.at(-1)![0]
+  expect(record.file.characters.map((c) => c.characterId)).toEqual([
+    '1102',
+    '1103',
+    '1209',
+  ])
+  expect(record.validatedIds).toEqual(['1102'])
+})
+
+it('초기화는 확인 후 원본 초기값을 복원·저장하며 취소와 실패 시 편집을 유지한다', async () => {
+  vi.useFakeTimers()
+  await render()
+  await selectCandidate()
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  await click('전체 검수 초기화')
+  expect(writes).not.toContain('reset')
+  expect(decision('등록').checked).toBe(true)
+  confirm.mockReturnValue(true)
+  resetFails = true
+  await click('전체 검수 초기화')
+  expect(document.body.textContent).toContain('초기화 실패')
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(2)
+  expect(decision('등록').checked).toBe(true)
+  resetFails = false
+  await click('전체 검수 초기화')
+  expect(decision('등록').checked).toBe(false)
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(1)
+  expect(
+    document.querySelector('.attribute-tabs [aria-pressed="true"]')
+      ?.textContent,
+  ).toBe('응결')
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(650)
+  })
+  const record = vi.mocked(writeSavedReview).mock.calls.at(-1)![0]
+  expect(record.mode).toBe('workspace')
+  expect(record.file.characters[0].review.candidates[0].decision).toBe(
+    'pending',
+  )
 })
 it('자동 배정과 별도 정렬 버튼을 분리하고 해제해도 정렬 순서를 유지한다', async () => {
   saved.source.draft.candidates.push({

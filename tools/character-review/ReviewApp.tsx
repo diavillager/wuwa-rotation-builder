@@ -400,7 +400,7 @@ export function ReviewApp() {
     if (
       dirty &&
       !window.confirm(
-        '현재 편집을 JSON 파일의 공명자 목록과 검수 내용으로 교체합니다. 계속할까요?',
+        'JSON에 포함된 공명자의 검수 내용을 갱신합니다. 파일에 없는 공명자는 유지합니다. 계속할까요?',
       )
     )
       return
@@ -426,6 +426,65 @@ export function ReviewApp() {
       storageMode.current = 'import'
       restoreBlocked.current = false
       setReadyToSave(true)
+      const imported = new Map(
+        response.sessions.map((session) => [
+          session.state.characterId,
+          {
+            session,
+            state: session.state,
+            baseline: JSON.stringify(session.state),
+          },
+        ]),
+      )
+      setWorks((current) => [
+        ...current.map((w) => imported.get(w.state.characterId) ?? w),
+        ...[...imported.values()].filter(
+          (w) =>
+            !current.some(
+              (existing) => existing.state.characterId === w.state.characterId,
+            ),
+        ),
+      ])
+      if (!activeId) setActiveId(response.sessions[0]?.state.characterId ?? '')
+      setResults((current) =>
+        current.filter((result) => !imported.has(result.characterId)),
+      )
+      setNotice(
+        `${response.sessions.length}명의 검수를 추가·갱신했습니다. 파일에 없는 공명자는 유지했습니다.`,
+      )
+    } catch (e) {
+      setFailure((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const resetReviews = async () => {
+    if (
+      !window.confirm(
+        '모든 검수 내용을 초기화하고 전체 공명자 목록을 복원합니다. 필요한 내용은 먼저 JSON으로 백업해 주세요. 초기화할까요?',
+      )
+    )
+      return
+    setBusy(true)
+    setFailure('')
+    setNotice('')
+    try {
+      const response = await request<{
+        sessions: ReviewSession[]
+        file: ReviewBackup
+      }>('/api/review/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Review-Token': token,
+        },
+        body: '{}',
+      })
+      backupCache.current = Promise.resolve(response.file)
+      storageMode.current = 'workspace'
+      restoreBlocked.current = false
+      setStorageError('')
+      setReadyToSave(true)
       setWorks(
         response.sessions.map((session) => ({
           session,
@@ -433,14 +492,18 @@ export function ReviewApp() {
           baseline: JSON.stringify(session.state),
         })),
       )
-      setActiveId(response.sessions[0]?.state.characterId ?? '')
+      setActiveId(
+        (
+          response.sessions.find((s) => s.state.attribute === '응결') ??
+          response.sessions[0]
+        )?.state.characterId ?? '',
+      )
+      setSelectedElement('응결')
       setResults([])
       setErrors([])
-      setNotice(
-        `${response.sessions.length}명의 검수를 불러왔습니다. 현재 목록을 파일의 목록으로 교체했습니다.`,
-      )
-    } catch (e) {
-      setFailure((e as Error).message)
+      setNotice(`${response.sessions.length}명의 전체 검수를 초기화했습니다.`)
+    } catch (error) {
+      setFailure(`초기화 실패: ${(error as Error).message}`)
     } finally {
       setBusy(false)
     }
@@ -753,6 +816,13 @@ export function ReviewApp() {
                 ))}
               </div>
             )}
+            <button
+              className="reset-reviews"
+              disabled={busy}
+              onClick={() => void resetReviews()}
+            >
+              전체 검수 초기화
+            </button>
           </section>
         </aside>
         {state && source && active ? (
