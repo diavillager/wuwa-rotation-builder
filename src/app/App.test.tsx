@@ -70,6 +70,28 @@ async function dragDrop(source: Element, target: Element) {
 }
 
 describe('App 실제 입력 연결', () => {
+  it.each([10, 500])(
+    '교체 자동 행동도 조작 안내 대신 스킬명 툴팁을 사용한다 (%dms)',
+    async (duration) => {
+      await hover(emptyLine())
+      await key('keydown', 'Digit2')
+      await key('keyup', 'Digit2', duration)
+      const cards = [...grid().querySelectorAll('.auto-card')]
+      expect(cards).toHaveLength(duration === 10 ? 1 : 2)
+      const names = demoCatalog.characters.flatMap((character) =>
+        character.skills.map((skill) => skill.displayName),
+      )
+      for (const card of cards) {
+        expect(card.hasAttribute('title')).toBe(false)
+        expect(card.querySelector('[title]')).toBeNull()
+        expect(names).toContain(card.getAttribute('data-skill-tooltip'))
+        await hover(card)
+        expect(document.querySelector('[role="tooltip"]')?.textContent).toBe(
+          card.getAttribute('data-skill-tooltip'),
+        )
+      }
+    },
+  )
   it('빈 입력은 키와 Tap/Hold만 표시하고 연결 스킬은 키 뒤에 추가한다', async () => {
     await hover(emptyLine())
     await key('keydown', 'KeyE')
@@ -136,7 +158,8 @@ describe('App 실제 입력 연결', () => {
     expect(card.textContent).toContain('기본 공격')
     expect(card.textContent).toContain(skill.displayName)
     expect(card.textContent).not.toContain('InputBlock으로 드래그')
-    expect(card.getAttribute('title')).toBe(skill.displayName)
+    expect(card.getAttribute('data-skill-tooltip')).toBe(skill.displayName)
+    expect(card.hasAttribute('title')).toBe(false)
     expect(card.querySelector('img')?.getAttribute('src')).toBe(skill.assetUrl)
     const line = grid().querySelector('.line-label')!
     expect(line.querySelector('img')?.getAttribute('src')).toBe(
@@ -155,9 +178,9 @@ describe('App 실제 입력 연결', () => {
     expect(linked.querySelector('img')?.getAttribute('src')).toBe(
       skill.assetUrl,
     )
-    expect(linked.querySelector('[title]')?.getAttribute('title')).toBe(
-      skill.displayName,
-    )
+    expect(linked.getAttribute('data-skill-tooltip')).toBe(skill.displayName)
+    expect(linked.querySelector('[title]')).toBeNull()
+    expect(linked.hasAttribute('title')).toBe(false)
     await act(async () =>
       document.querySelector<HTMLButtonElement>('.party-slot')!.click(),
     )

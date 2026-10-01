@@ -844,6 +844,25 @@ button {
   top: 0;
   pointer-events: none;
 }
+.skill-tooltip {
+  position: fixed;
+  z-index: 1100;
+  pointer-events: none;
+  max-width: min(360px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+  padding: 10px 14px;
+  border: 1px solid #6c9e96;
+  border-radius: 9px;
+  background: #202f32;
+  box-shadow: 0 8px 24px #0008;
+  color: #edf5f1;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
 .auto-card {
   position: relative;
   z-index: 2;

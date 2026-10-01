@@ -56,6 +56,7 @@ import { attachCaptureEvents } from './input-events'
 import { applyCapturedInput } from './input-command'
 import { attachDragScroll } from './drag-scroll'
 import { showDragPreview } from './drag-preview'
+import { SkillTooltip } from './SkillTooltip'
 import { usePartySelectorScroll } from './use-party-selector-scroll'
 import type { ProjectReferences } from '../domain/project'
 
@@ -156,10 +157,15 @@ export function App({
             draggable={false}
           />
         )}
-        <span title={skillLabel(id)}>{skill?.category ?? skillLabel(id)}</span>
+        <span>{skill?.category ?? skillLabel(id)}</span>
       </>
     )
   }
+  const skillTooltipName = (id: string) =>
+    catalog.characters
+      .flatMap((character) => character.skills)
+      .find((skill) => skill.id === id)?.displayName ??
+    references?.skills.find((skill) => skill.id === id)?.displayName
   const [editor, setEditor] = useState(() =>
     createEditorHistory(
       initialRotation ??
@@ -572,7 +578,7 @@ export function App({
               changeSkillStage(state, cycleId, action.id, skill.id, change),
             )
           }}
-          title="휠로 단수 변경 · Backspace로 삭제"
+          data-skill-tooltip={skillTooltipName(skill.skillRef)}
         >
           {skillContent(skill.skillRef)}
           {skill.stage > 0 && <small>{skill.stage}단</small>}
@@ -731,7 +737,9 @@ export function App({
                           className="auto-card"
                           data-action-column={column.id}
                           data-action-id={column.action.id}
-                          title="읽기 전용 · Backspace로 삭제"
+                          data-skill-tooltip={skillTooltipName(
+                            column.action.skillRef,
+                          )}
                         >
                           <small>
                             {column.action.kind === 'outro'
@@ -972,7 +980,7 @@ export function App({
                     <div
                       className="catalog-skill"
                       key={skill.id}
-                      title={skill.displayName}
+                      data-skill-tooltip={skill.displayName}
                       draggable
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = 'copy'
@@ -1016,6 +1024,15 @@ export function App({
             {renderCycle('repeat')}
           </div>
         </div>
+        <SkillTooltip
+          disabled={
+            drag !== null ||
+            selectingSlot !== null ||
+            pendingReplacement !== null ||
+            hideEditor ||
+            locked
+          }
+        />
         <footer hidden={selectingSlot !== null}>
           공명자 항목: 연속 입력 · 배치 영역: 커서 라인 편집 · 200ms Hold ·
           숫자키로 교체
