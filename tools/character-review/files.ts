@@ -185,7 +185,8 @@ export async function loadSource(
   return {
     ...encore,
     target: {
-      ...target,
+      runId: target.runId,
+      characterId: target.characterId,
       displayName: current?.displayName ?? draft.basicCandidate.displayName,
     },
     draft,

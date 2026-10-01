@@ -272,7 +272,51 @@ describe('명시적인 Encore 의미와 검수 순서', () => {
       displayName: '변주',
       candidateId: null,
     }))
+    expect(linkCategorizedActions(assigned).autoActions.intro).toBe(
+      assigned.autoActions.intro,
+    )
+    assigned.autoActions.intro = null
     expect(linkCategorizedActions(assigned).autoActions.intro).toBeNull()
+  })
+  it('기본 공격이 여럿이어도 Encore의 명시적 기본 공격과 수동 연결을 유지한다', () => {
+    const { state, source } = fixture()
+    state.existingSkills = [
+      {
+        skillId: 'manual-basic',
+        category: '기본 공격',
+        displayName: '직접 분류',
+        visible: true,
+        candidateId: null,
+      },
+    ]
+    const assigned = assignEncore(state, source)
+    const primary = assigned.candidates.find((c) => c.category === '기본 공격')!
+    expect(assigned.autoActions.normalSwitchAttack).toBe(
+      candidateSkillId(state.characterId, primary.candidateId),
+    )
+    assigned.autoActions.normalSwitchAttack = 'manual-basic'
+    expect(assignEncore(assigned, source).autoActions.normalSwitchAttack).toBe(
+      'manual-basic',
+    )
+    expect(
+      undoEncore(assigned, {
+        before: state,
+        after: assignEncore(state, source),
+        manual: ['autoActions:normalSwitchAttack'],
+      }).autoActions.normalSwitchAttack,
+    ).toBe('manual-basic')
+  })
+  it('같은 분류는 0~10 타수로 정렬하고 동일 타수의 현재 순서를 보존한다', () => {
+    const { state, source } = fixture()
+    state.candidates.forEach((c, i) => {
+      c.category = '기본 공격'
+      c.hitCount = [10, 3, 0, 3, 1][i]
+    })
+    const sorted = sortReviewCardsByCategory(state, source)
+    expect(sorted.cardOrder).toEqual(
+      [2, 4, 1, 3, 0].map((i) => state.candidates[i].candidateId),
+    )
+    expect(sorted.candidates).toEqual(state.candidates)
   })
   it('배열 이동은 ID와 필드를 보존하고 목록 경계를 넘지 않는다', () => {
     const { state } = fixture()

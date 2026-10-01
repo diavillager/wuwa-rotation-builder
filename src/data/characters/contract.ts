@@ -2,12 +2,14 @@ import { ELEMENTS, type Element } from '../../app/catalog'
 import {
   AUTO_CATEGORIES,
   isSkillCategory,
+  validHitCount,
   type SkillCategory,
 } from './categories'
 
 export interface CharacterSkillData {
   skillId: string
   category?: SkillCategory
+  hitCount?: number
   displayName: string
   visible: boolean
   asset: string
@@ -81,9 +83,19 @@ export function validateCharacterData(
     if (skill.visible) text(skill.displayName, '노출 스킬 이름')
     if (skill.category !== undefined && !isSkillCategory(skill.category))
       throw new Error('지원하지 않는 스킬 분류입니다.')
+    if (
+      !validHitCount(
+        skill.hitCount,
+        skill.category as SkillCategory | undefined,
+      )
+    )
+      throw new Error('타수는 지원하는 분류의 0~10 정수여야 합니다.')
     return {
       skillId,
       ...(isSkillCategory(skill.category) ? { category: skill.category } : {}),
+      ...(skill.hitCount !== undefined
+        ? { hitCount: skill.hitCount as number }
+        : {}),
       displayName: skill.displayName,
       visible: skill.visible,
       asset: asset(skill.asset),
@@ -99,9 +111,9 @@ export function validateCharacterData(
       const matches = skills.filter(
         (s) => s.visible && s.category === AUTO_CATEGORIES[kind],
       )
-      if (matches.length !== 1 || matches[0].skillId !== id)
+      if (!matches.some((s) => s.skillId === id))
         throw new Error(
-          `${kind}: 노출된 ${AUTO_CATEGORIES[kind]} 하나에 연결해야 합니다.`,
+          `${kind}: 노출된 ${AUTO_CATEGORIES[kind]} 중 하나에 연결해야 합니다.`,
         )
     }
     autoActions[kind] = id

@@ -64,6 +64,25 @@ const assetsFor = (data: CharacterData) =>
   )
 
 describe('최종 Character 계약', () => {
+  it('같은 기본 공격 분류가 여럿이어도 지정한 ID와 타수를 보존한다', () => {
+    const data = fixture()
+    data.skills[0].category = '기본 공격'
+    data.skills[0].hitCount = 0
+    data.skills[1].category = '변주 스킬'
+    data.skills[2].category = '반주 스킬'
+    data.skills.push({
+      ...data.skills[0],
+      skillId: 'test-a:normal-10',
+      hitCount: 10,
+    })
+    expect(validateCharacterData(data, 'test-a')).toEqual(data)
+    data.autoActions.normalSwitchAttack = 'test-a:normal-10'
+    expect(
+      validateCharacterData(data, 'test-a').autoActions.normalSwitchAttack,
+    ).toBe('test-a:normal-10')
+    data.skills[4].hitCount = 11
+    expect(() => validateCharacterData(data, 'test-a')).toThrow('타수')
+  })
   it('명시적 검수·속성·노출·자동 행동 참조를 읽고 입력키 의미는 추론하지 않는다', () => {
     const data = fixture()
     expect(validateCharacterData(data, 'test-a')).toEqual(data)

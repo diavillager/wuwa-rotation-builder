@@ -98,6 +98,9 @@ export async function loadCharacterCatalog(
             id: skill.skillId,
             displayName: skill.displayName,
             ...(skill.category ? { category: skill.category } : {}),
+            ...(skill.hitCount !== undefined
+              ? { hitCount: skill.hitCount }
+              : {}),
             visible: skill.visible,
             asset: characterAssetId(data.characterId, skill.asset),
             assetUrl: visible.some((item) => item.asset === skill.asset)

@@ -11,7 +11,10 @@ import {
   type ReviewState,
 } from './model'
 
-export function linkCategorizedActions(state: ReviewState): ReviewState {
+export function linkCategorizedActions(
+  state: ReviewState,
+  source?: ReviewSource,
+): ReviewState {
   const all = [
     ...state.existingSkills.map((s) => ({ ...s, id: s.skillId })),
     ...state.candidates.map((c) => ({
@@ -26,7 +29,19 @@ export function linkCategorizedActions(state: ReviewState): ReviewState {
     const matches = all.filter(
       (s) => s.visible && s.category === AUTO_CATEGORIES[kind],
     )
-    autoActions[kind] = matches.length === 1 ? matches[0].id : null
+    if (matches.some((s) => s.id === autoActions[kind])) continue
+    const encoreIds = new Set(
+      Object.entries(source?.encoreMatches ?? {})
+        .filter(([, match]) => match.category === AUTO_CATEGORIES[kind])
+        .map(([id]) => candidateSkillId(state.characterId, id)),
+    )
+    const explicit = matches.filter((s) => encoreIds.has(s.id))
+    autoActions[kind] =
+      explicit.length === 1
+        ? explicit[0].id
+        : matches.length === 1
+          ? matches[0].id
+          : null
   }
   return { ...state, autoActions }
 }
@@ -61,7 +76,7 @@ export function assignEncore(
       candidate.decision =
         match.category === '고유 스킬' ? 'exclude' : 'include'
   }
-  return linkCategorizedActions(next)
+  return linkCategorizedActions(next, source)
 }
 
 export function sortReviewCardsByCategory(
@@ -83,7 +98,10 @@ export function sortReviewCardsByCategory(
   const cardOrder = reviewCards(state, source)
     .sort(
       (a, b) =>
-        excludedRank(a) - excludedRank(b) || categoryRank(a) - categoryRank(b),
+        excludedRank(a) - excludedRank(b) ||
+        categoryRank(a) - categoryRank(b) ||
+        (state[a.group][a.index].hitCount ?? 0) -
+          (state[b.group][b.index].hitCount ?? 0),
     )
     .map((card) => card.key)
   return { ...state, cardOrder }
@@ -159,5 +177,5 @@ export function undoEncore(
     )
       next.autoActions[kind] = receipt.before.autoActions[kind]
   }
-  return linkCategorizedActions(next)
+  return next
 }

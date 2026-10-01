@@ -1,5 +1,16 @@
 import { ELEMENTS } from '../../src/app/catalog'
-import { isSkillCategory } from '../../src/data/characters/categories'
+import { isDeepStrictEqual } from 'node:util'
+import {
+  imageKeys,
+  parseSnapshot,
+  snapshotKey,
+  type LoadedSnapshot,
+  type ReviewSnapshot,
+} from './snapshot'
+import {
+  isSkillCategory,
+  validHitCount,
+} from '../../src/data/characters/categories'
 import {
   validateCharacterData,
   type CharacterData,
@@ -61,6 +72,7 @@ export function parseReview(value: unknown, source: ReviewSource): ReviewState {
     throw new Error('기존 공개 Skill ID를 삭제하거나 변경할 수 없습니다.')
   for (const skill of state.existingSkills) {
     if (
+      !validHitCount(skill.hitCount, skill.category) ||
       (skill.category !== undefined && !isSkillCategory(skill.category)) ||
       typeof skill.displayName !== 'string' ||
       typeof skill.visible !== 'boolean' ||
@@ -87,6 +99,7 @@ export function parseReview(value: unknown, source: ReviewSource): ReviewState {
     throw new Error('검수 후보가 누락되거나 추가되었습니다.')
   for (const candidate of state.candidates)
     if (
+      !validHitCount(candidate.hitCount, candidate.category) ||
       (candidate.category !== undefined &&
         !isSkillCategory(candidate.category)) ||
       typeof candidate.displayName !== 'string' ||
@@ -112,13 +125,159 @@ interface Prepared extends ReviewValidation {
   data: CharacterData | null
   assets: Map<string, Uint8Array>
 }
-/** 읽기와 검증만 수행한다. ExportでもDB・検수 파일을 쓰지 않는다. */
+/** 읽기와 검증만 수행한다. Export에서도 DB·검수 파일을 쓰지 않는다. */
 export class ReviewRepository {
+  private imported = new Map<string, LoadedSnapshot>()
   constructor(readonly root: string) {}
+  async source(
+    target: Pick<ReviewTarget, 'runId' | 'characterId'>,
+  ): Promise<ReviewSource> {
+    return (
+      this.imported.get(snapshotKey(target))?.source ??
+      loadSource(this.root, target)
+    )
+  }
+  async image(source: ReviewSource, key: string): Promise<Buffer> {
+    const imported = this.imported.get(snapshotKey(source.target))
+    if (imported) {
+      const bytes = imported.images.get(key)
+      if (!bytes) throw new Error('복원 이미지가 없습니다.')
+      return bytes
+    }
+    return key.startsWith('candidate:')
+      ? readCandidateAsset(this.root, source, key.slice(10))
+      : readCurrentAsset(this.root, source, key.slice(8))
+  }
+  async backupCharacter(state: ReviewState) {
+    const source = await this.source(state)
+    const review = parseReview(state, source)
+    const images: ReviewSnapshot['images'] = []
+    for (const key of imageKeys(source).keys()) {
+      const bytes = await this.image(source, key)
+      await decodeWebP(bytes)
+      images.push({
+        key,
+        sha256: sha256(bytes),
+        base64: bytes.toString('base64'),
+      })
+    }
+    return {
+      characterId: state.characterId,
+      review,
+      workspace: { source, images },
+    }
+  }
+  async importFile(value: unknown): Promise<ReviewSession[]> {
+    const file = object(value)
+    if (
+      !['wuwa-character-review', 'wuwa-character-review-backup'].includes(
+        String(file.format),
+      ) ||
+      ![1, 2].includes(file.schemaVersion as number) ||
+      !Array.isArray(file.characters) ||
+      !file.characters.length ||
+      file.characters.length > 200
+    )
+      throw new Error('지원하지 않는 검수 JSON 파일입니다.')
+    if (
+      file.format === 'wuwa-character-review-backup' &&
+      file.schemaVersion !== 2
+    )
+      throw new Error('지원하지 않는 백업 버전입니다.')
+    if (
+      file.format === 'wuwa-character-review' &&
+      file.status !== 'pending-agent-validation'
+    )
+      throw new Error('지원하지 않는 검수 Export 상태입니다.')
+    const staged = new ReviewRepository(this.root)
+    const sessions: ReviewSession[] = []
+    const ids = new Set<string>()
+    for (const entry of file.characters) {
+      const row = object(entry)
+      const raw = object(row.review) as unknown as ReviewState
+      if (row.characterId !== raw.characterId || ids.has(raw.characterId))
+        throw new Error('Import 공명자 ID 오류 또는 중복입니다.')
+      ids.add(raw.characterId)
+      let restored: LoadedSnapshot
+      if (file.schemaVersion === 2)
+        restored = await parseSnapshot(row.workspace)
+      else {
+        // 이전 Export는 후보 전체를 담지 않아 로컬 수집 원본이 남아 있을 때만 복원한다.
+        try {
+          restored = await parseSnapshot(
+            (await this.backupCharacter(raw)).workspace,
+          )
+        } catch {
+          throw new Error(
+            '이전 형식 파일의 로컬 수집 원본을 찾거나 검증할 수 없습니다. 새 검수 백업 파일이 필요합니다.',
+          )
+        }
+      }
+      const state = parseReview(raw, restored.source)
+      const skillIds = new Set([
+        ...state.existingSkills.map((s) => s.skillId),
+        ...state.candidates.map((c) =>
+          candidateSkillId(state.characterId, c.candidateId),
+        ),
+      ])
+      if (
+        Object.values(state.autoActions).some(
+          (id) => id !== null && !skillIds.has(id),
+        )
+      )
+        throw new Error('복원 자동 행동 참조가 존재하지 않습니다.')
+      staged.imported.set(snapshotKey(state), restored)
+      if (file.format === 'wuwa-character-review') {
+        const prepared = await staged.prepare(state)
+        if (prepared.errors.length || !prepared.data)
+          throw new Error(prepared.errors.join('\n'))
+        const character = validateCharacterData(
+          { ...object(row.character), reviewStatus: 'approved' },
+          state.characterId,
+        )
+        if (!isDeepStrictEqual(character, prepared.data))
+          throw new Error('Export 데이터와 검수 내용이 일치하지 않습니다.')
+        if (
+          !Array.isArray(row.assets) ||
+          row.assets.length !== prepared.assets.size
+        )
+          throw new Error('Export 이미지 목록이 일치하지 않습니다.')
+        const seen = new Set<string>()
+        for (const value of row.assets) {
+          const asset = object(value)
+          if (
+            typeof asset.path !== 'string' ||
+            typeof asset.base64 !== 'string' ||
+            seen.has(asset.path)
+          )
+            throw new Error('Export 이미지 형식 오류입니다.')
+          seen.add(asset.path)
+          const bytes = Buffer.from(asset.base64, 'base64')
+          const expected = prepared.assets.get(asset.path)
+          if (
+            !expected ||
+            asset.mimeType !== 'image/webp' ||
+            sha256(bytes) !== asset.sha256 ||
+            !bytes.equals(Buffer.from(expected))
+          )
+            throw new Error('Export 이미지가 검수 원본과 일치하지 않습니다.')
+        }
+      }
+      sessions.push({
+        source: restored.source,
+        state,
+        revision: null,
+        conflict: restored.source.currentError,
+      })
+    }
+    // 한 대상이라도 실패하면 기존 Import 자료와 화면을 바꾸지 않는다.
+    this.imported = staged.imported
+    return sessions
+  }
   async load(
     target: Pick<ReviewTarget, 'runId' | 'characterId'>,
   ): Promise<ReviewSession> {
-    const source = await loadSource(this.root, target)
+    const source = await this.source(target)
     return {
       source,
       state: initialReview(source),
@@ -132,19 +291,19 @@ export class ReviewRepository {
     const assets = new Map<string, Uint8Array>()
     let data: CharacterData | null = null
     try {
-      const source = await loadSource(this.root, value)
+      const source = await this.source(value)
       const state = parseReview(value, source)
       if (source.currentError) throw new Error(source.currentError)
       const currentHashes: Record<string, string> = {}
       const candidateAsset = async (id: string): Promise<string> => {
-        const bytes = await readCandidateAsset(this.root, source, id)
+        const bytes = await this.image(source, `candidate:${id}`)
         const decoded = await decodeWebP(bytes)
         const relative = `assets/${decoded.sha256}.webp`
         assets.set(relative, bytes)
         return relative
       }
       const currentAsset = async (relative: string) => {
-        const bytes = await readCurrentAsset(this.root, source, relative)
+        const bytes = await this.image(source, `current:${relative}`)
         await decodeWebP(bytes)
         currentHashes[relative] = sha256(bytes)
         assets.set(relative, bytes)
@@ -183,6 +342,7 @@ export class ReviewRepository {
         skills.push({
           skillId: skill.skillId,
           ...(skill.category ? { category: skill.category } : {}),
+          ...(skill.hitCount !== undefined ? { hitCount: skill.hitCount } : {}),
           displayName: skill.displayName.trim(),
           visible: skill.visible,
           asset,
@@ -209,6 +369,9 @@ export class ReviewRepository {
           skills.push({
             skillId: candidateSkillId(state.characterId, candidate.candidateId),
             ...(candidate.category ? { category: candidate.category } : {}),
+            ...(candidate.hitCount !== undefined
+              ? { hitCount: candidate.hitCount }
+              : {}),
             displayName: candidate.displayName.trim(),
             visible: true,
             asset,
@@ -311,7 +474,7 @@ export class ReviewRepository {
     const prepared = await this.prepare(state)
     if (prepared.errors.length || !prepared.data)
       throw new Error(prepared.errors.join('\n') || '검증 실패')
-    const source = await loadSource(this.root, state)
+    const source = await this.source(state)
     parseReview(state, source)
     return {
       characterId: state.characterId,
@@ -321,6 +484,7 @@ export class ReviewRepository {
         reviewStatus: 'pending-agent-validation' as const,
       },
       review: structuredClone(state),
+      workspace: (await this.backupCharacter(state)).workspace,
       sources: source.draft.candidates.map((c) => ({
         candidateId: c.candidateId,
         resourcePath: c.resourcePath,
@@ -341,7 +505,7 @@ export type ExportCharacter = Awaited<
 >
 export interface ReviewExport {
   format: 'wuwa-character-review'
-  schemaVersion: 1
+  schemaVersion: 2
   status: 'pending-agent-validation'
   characters: ExportCharacter[]
 }

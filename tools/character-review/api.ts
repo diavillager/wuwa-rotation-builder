@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { randomBytes } from 'node:crypto'
 import { errorMessage, decodeWebP } from '../../scripts/character-sync/io'
 import { object } from '../../scripts/character-sync/candidates'
-import { loadSource, readCandidateAsset, readCurrentAsset } from './files'
+import { snapshotKey } from './snapshot'
 import { ReviewRepository } from './repository'
 import type { ReviewState } from './model'
 import { listTargets, assertWorkspaceTarget } from './workspace'
@@ -12,6 +12,14 @@ const ORIGIN = 'http://127.0.0.1:5174'
 export function reviewApi(root: string) {
   const token = randomBytes(32).toString('hex')
   const repository = new ReviewRepository(root)
+  let importedTargets = new Set<string>()
+  const assertAllowed = async (target: {
+    runId: string
+    characterId: string
+  }) => {
+    if (!importedTargets.has(snapshotKey(target)))
+      await assertWorkspaceTarget(root, target)
+  }
   return async (
     request: IncomingMessage,
     response: ServerResponse,
@@ -41,19 +49,18 @@ export function reviewApi(root: string) {
           runId: url.searchParams.get('runId') ?? '',
           characterId: url.searchParams.get('characterId') ?? '',
         }
-        await assertWorkspaceTarget(root, target)
+        await assertAllowed(target)
         if (url.pathname === '/api/review/load')
           return json(200, await repository.load(target))
         if (url.pathname === '/api/review/image') {
-          const source = await loadSource(root, target)
+          const source = await repository.source(target)
           const candidate = url.searchParams.get('candidateId')
-          const bytes = candidate
-            ? await readCandidateAsset(root, source, candidate)
-            : await readCurrentAsset(
-                root,
-                source,
-                url.searchParams.get('asset') ?? '',
-              )
+          const bytes = await repository.image(
+            source,
+            candidate
+              ? `candidate:${candidate}`
+              : `current:${url.searchParams.get('asset') ?? ''}`,
+          )
           await decodeWebP(bytes)
           response.writeHead(200, {
             'Content-Type': 'image/webp',
@@ -77,13 +84,25 @@ export function reviewApi(root: string) {
         let size = 0
         for await (const chunk of request) {
           size += chunk.length
-          if (size > 2 * 1024 * 1024)
+          if (
+            size >
+            (url.pathname === '/api/review/import' ? 64 : 2) * 1024 * 1024
+          )
             return json(413, { error: '검수 요청이 너무 큽니다.' })
           chunks.push(Buffer.from(chunk))
         }
         const body = object(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+        if (url.pathname === '/api/review/import') {
+          const sessions = await repository.importFile(body.file)
+          importedTargets = new Set(sessions.map((s) => snapshotKey(s.state)))
+          return json(200, { sessions })
+        }
         if (
-          !['/api/review/validate', '/api/review/export'].includes(url.pathname)
+          ![
+            '/api/review/validate',
+            '/api/review/export',
+            '/api/review/backup',
+          ].includes(url.pathname)
         )
           return json(404, { error: '지원하지 않는 검수 요청입니다.' })
         if (
@@ -97,7 +116,19 @@ export function reviewApi(root: string) {
         )
         if (new Set(states.map((s) => s.characterId)).size !== states.length)
           throw new Error('중복 공명자입니다.')
-        for (const state of states) await assertWorkspaceTarget(root, state)
+        for (const state of states) await assertAllowed(state)
+        if (url.pathname === '/api/review/backup') {
+          const characters = []
+          for (const state of states)
+            characters.push(await repository.backupCharacter(state))
+          return json(200, {
+            file: {
+              format: 'wuwa-character-review-backup',
+              schemaVersion: 2,
+              characters,
+            },
+          })
+        }
         const results = []
         const characters: ReviewExport['characters'] = []
         for (const state of states) {
@@ -121,7 +152,7 @@ export function reviewApi(root: string) {
           await repository.exportCharacter(character.review)
         const file: ReviewExport = {
           format: 'wuwa-character-review',
-          schemaVersion: 1,
+          schemaVersion: 2,
           status: 'pending-agent-validation',
           characters,
         }

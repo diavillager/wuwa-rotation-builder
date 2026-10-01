@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { ELEMENTS } from '../../src/app/catalog'
 import {
   SKILL_CATEGORIES,
+  supportsHitCount,
   type SkillCategory,
 } from '../../src/data/characters/categories'
 import {
   assignEncore,
   sortReviewCardsByCategory,
-  linkCategorizedActions,
   undoEncore,
   reviewFieldKey,
   type AssignmentReceipt,
@@ -63,6 +63,7 @@ export function ReviewApp() {
   const [results, setResults] = useState<Result[]>([])
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const dragging = useRef<{ key: string; x: number; y: number } | null>(null)
+  const importInput = useRef<HTMLInputElement>(null)
   const active = works.find((w) => w.state.characterId === activeId)
   const state = active?.state
   const source = active?.session.source
@@ -131,7 +132,7 @@ export function ReviewApp() {
           ? w
           : {
               ...w,
-              state: linkCategorizedActions(edit(w.state)),
+              state: edit(w.state),
               receipt: w.receipt
                 ? {
                     ...w.receipt,
@@ -172,13 +173,13 @@ export function ReviewApp() {
     setNotice('')
     setFailure('')
   }
-  const submit = async (action: 'validate' | 'export') => {
+  const submit = async (action: 'validate' | 'export' | 'backup') => {
     setBusy(true)
     setFailure('')
     setNotice('')
     try {
       const response = await request<{
-        results: Result[]
+        results?: Result[]
         file?: ReviewExport
       }>(`/api/review/${action}`, {
         method: 'POST',
@@ -188,9 +189,9 @@ export function ReviewApp() {
         },
         body: JSON.stringify({ states: works.map((w) => w.state) }),
       })
-      setResults(response.results)
-      const passed = response.results.filter((r) => !r.errors.length)
-      if (action === 'export' && response.file) {
+      if (response.results) setResults(response.results)
+      const passed = (response.results ?? []).filter((r) => !r.errors.length)
+      if (action !== 'validate' && response.file) {
         const url = URL.createObjectURL(
           new Blob([JSON.stringify(response.file, null, 2) + '\n'], {
             type: 'application/json',
@@ -198,7 +199,10 @@ export function ReviewApp() {
         )
         const link = document.createElement('a')
         link.href = url
-        link.download = 'wuwa-character-review.json'
+        link.download =
+          action === 'backup'
+            ? 'wuwa-character-review-backup.json'
+            : 'wuwa-character-review.json'
         document.body.append(link)
         link.click()
         link.remove()
@@ -214,12 +218,59 @@ export function ReviewApp() {
           ),
         )
         setNotice(
-          `${exported.size}명의 JSON을 내보냈습니다. 파일을 에이전트에게 전달하면 재검증 후 DB에 반영합니다.${response.results.length > exported.size ? ' 미완료 공명자는 제외했습니다.' : ''}`,
+          action === 'backup'
+            ? `${exported.size}명의 미완성 검수와 이미지까지 백업했습니다. JSON Import로 다시 불러올 수 있습니다.`
+            : `${exported.size}명의 JSON을 내보냈습니다. 파일을 에이전트에게 전달하면 재검증 후 DB에 반영합니다.${(response.results?.length ?? 0) > exported.size ? ' 미완료 공명자는 제외했습니다.' : ''}`,
         )
       } else
         setNotice(
-          `누락 검증: ${passed.length}명 통과 / ${response.results.length}명`,
+          `누락 검증: ${passed.length}명 통과 / ${response.results?.length ?? 0}명`,
         )
+    } catch (e) {
+      setFailure((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const importFile = async (file: File) => {
+    if (
+      dirty &&
+      !window.confirm(
+        '현재 편집을 JSON 파일의 공명자 목록과 검수 내용으로 교체합니다. 계속할까요?',
+      )
+    )
+      return
+    setBusy(true)
+    setFailure('')
+    setNotice('')
+    try {
+      if (file.size > 60 * 1024 * 1024)
+        throw new Error('JSON 파일은 60MB 이하여야 합니다.')
+      const value: unknown = JSON.parse(await file.text())
+      const response = await request<{ sessions: ReviewSession[] }>(
+        '/api/review/import',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Review-Token': token,
+          },
+          body: JSON.stringify({ file: value }),
+        },
+      )
+      setWorks(
+        response.sessions.map((session) => ({
+          session,
+          state: session.state,
+          baseline: JSON.stringify(session.state),
+        })),
+      )
+      setActiveId(response.sessions[0]?.state.characterId ?? '')
+      setResults([])
+      setErrors([])
+      setNotice(
+        `${response.sessions.length}명의 검수를 불러왔습니다. 현재 목록을 파일의 목록으로 교체했습니다.`,
+      )
     } catch (e) {
       setFailure((e as Error).message)
     } finally {
@@ -228,7 +279,7 @@ export function ReviewApp() {
   }
   const fieldChange = (
     card: (typeof cards)[number],
-    field: 'category' | 'displayName' | 'decision',
+    field: 'category' | 'displayName' | 'decision' | 'hitCount',
     value: unknown,
   ) => {
     change(
@@ -237,7 +288,16 @@ export function ReviewApp() {
           return {
             ...s,
             candidates: s.candidates.map((c) =>
-              c.candidateId === card.key ? { ...c, [field]: value } : c,
+              c.candidateId === card.key
+                ? {
+                    ...c,
+                    [field]: value,
+                    ...(field === 'category' &&
+                    !supportsHitCount(value as SkillCategory | undefined)
+                      ? { hitCount: undefined }
+                      : {}),
+                  }
+                : c,
             ),
           }
         return {
@@ -247,6 +307,10 @@ export function ReviewApp() {
               ? {
                   ...c,
                   [field]: value,
+                  ...(field === 'category' &&
+                  !supportsHitCount(value as SkillCategory | undefined)
+                    ? { hitCount: undefined }
+                    : {}),
                   ...(field === 'decision'
                     ? { visible: value === 'include' }
                     : {}),
@@ -255,7 +319,12 @@ export function ReviewApp() {
           ),
         }
       },
-      [reviewFieldKey(card.group, card.key, field)],
+      [
+        reviewFieldKey(card.group, card.key, field),
+        ...(field === 'hitCount'
+          ? [reviewFieldKey(card.group, card.key, 'category')]
+          : []),
+      ],
     )
   }
   const humanError = (message: string) =>
@@ -348,10 +417,6 @@ export function ReviewApp() {
                   <label key={kind}>
                     {AUTO_LABELS[kind]}
                     <select
-                      disabled={[
-                        ...state.existingSkills,
-                        ...state.candidates,
-                      ].some((c) => !!c.category)}
                       value={state.autoActions[kind] ?? ''}
                       onChange={(e) =>
                         change(
@@ -391,6 +456,31 @@ export function ReviewApp() {
               페이지에서만 유지됩니다.
             </p>
             <div className="review-actions">
+              <button
+                disabled={busy || !works.length}
+                onClick={() => void submit('backup')}
+              >
+                검수 백업
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => importInput.current?.click()}
+              >
+                JSON Import
+              </button>
+              <input
+                ref={importInput}
+                className="sr-only"
+                type="file"
+                accept=".json,application/json"
+                aria-label="검수 JSON 파일"
+                disabled={busy}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (file) void importFile(file)
+                }}
+              />
               <button
                 disabled={busy || !works.length}
                 onClick={() => void submit('validate')}
@@ -637,6 +727,9 @@ export function ReviewApp() {
                           {decision !== 'exclude' && item.category && (
                             <span className="category-badge">
                               {item.category}
+                              {supportsHitCount(item.category) &&
+                                !!item.hitCount &&
+                                ` · ${item.hitCount}타`}
                             </span>
                           )}
                         </div>
@@ -723,6 +816,28 @@ export function ReviewApp() {
                             ))}
                           </select>
                         </label>
+                        {supportsHitCount(item.category) && (
+                          <label>
+                            타수
+                            <select
+                              aria-label={`후보 ${position + 1} 타수`}
+                              value={item.hitCount ?? 0}
+                              onChange={(e) =>
+                                fieldChange(
+                                  card,
+                                  'hitCount',
+                                  Number(e.target.value),
+                                )
+                              }
+                            >
+                              {Array.from({ length: 11 }, (_, i) => (
+                                <option key={i} value={i}>
+                                  {i === 0 ? '0타 (미지정)' : `${i}타`}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                         <label>
                           스킬명
                           <input

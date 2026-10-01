@@ -13,6 +13,7 @@ import {
 let root: Root
 let saved: ReviewSession
 let exportFails: boolean
+let importFails: boolean
 let result: ReviewValidation
 let postedStates: unknown[]
 let writes: string[]
@@ -66,6 +67,7 @@ beforeEach(() => {
     conflict: null,
   }
   exportFails = false
+  importFails = false
   result = { errors: ['미완료 검수'], summary: [], token: null }
   writes = []
   postedStates = []
@@ -109,6 +111,17 @@ beforeEach(() => {
         }
         session.source.draft.characterId = id
         session.state = { ...session.state, characterId: id }
+      } else if (action === 'import') {
+        ok = !importFails
+        body = importFails
+          ? { error: '손상된 백업' }
+          : { sessions: [structuredClone(saved)] }
+      } else if (action === 'backup') {
+        body = {
+          file: {
+            characters: [{ characterId: '1102' }, { characterId: '1103' }],
+          },
+        }
       } else if (action === 'validate')
         body = {
           results: [
@@ -250,6 +263,72 @@ it('공명자를 오가도 페이지 메모리에 편집을 유지하며 서버 
     root = createRoot(document.querySelector('#root')!)
   })
   await render()
+  expect(decision('등록').checked).toBe(false)
+})
+it('분류가 있어도 자동 배정을 켜지 않고 자동 행동과 0~10 타수를 직접 지정한다', async () => {
+  saved.state.candidates[0] = {
+    ...saved.state.candidates[0],
+    category: '기본 공격',
+    displayName: '직접 스킬',
+    decision: 'include',
+  }
+  await render()
+  const action = document.querySelector<HTMLSelectElement>(
+    '.decision-panel select',
+  )!
+  expect(action.disabled).toBe(false)
+  await act(async () => {
+    action.value = '1102:skill:one'
+    action.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  const hits = document.querySelector<HTMLSelectElement>(
+    '[aria-label="후보 1 타수"]',
+  )!
+  expect([...hits.options].map((o) => o.value)).toEqual(
+    Array.from({ length: 11 }, (_, i) => String(i)),
+  )
+  await act(async () => {
+    hits.value = '10'
+    hits.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  expect(document.querySelector('.category-badge')?.textContent).toBe(
+    '기본 공격 · 10타',
+  )
+  expect(action.value).toBe('1102:skill:one')
+  await click('검수 백업')
+  expect(
+    (postedStates[0] as { candidates: { hitCount: number }[] }).candidates[0]
+      .hitCount,
+  ).toBe(10)
+  expect(URL.createObjectURL).toHaveBeenCalledOnce()
+})
+it('Import는 목록을 파일 내용으로 교체하고 취소·실패 시 기존 편집을 보존한다', async () => {
+  await render()
+  await selectCandidate()
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  const upload = async () => {
+    const file = new File(['{}'], 'backup.json', { type: 'application/json' })
+    Object.defineProperty(file, 'text', { value: async () => '{}' })
+    const input = document.querySelector<HTMLInputElement>(
+      '[aria-label="검수 JSON 파일"]',
+    )!
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] })
+    await act(async () =>
+      input.dispatchEvent(new Event('change', { bubbles: true })),
+    )
+  }
+  await upload()
+  expect(writes).toEqual([])
+  confirm.mockReturnValue(true)
+  importFails = true
+  await upload()
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(2)
+  expect(decision('등록').checked).toBe(true)
+  expect(document.body.textContent).toContain('손상된 백업')
+  importFails = false
+  await upload()
+  expect(document.querySelectorAll('.target-list button')).toHaveLength(1)
+  expect(document.body.textContent).not.toContain('다음 공명자')
   expect(decision('등록').checked).toBe(false)
 })
 it('자동 배정과 별도 정렬 버튼을 분리하고 해제해도 정렬 순서를 유지한다', async () => {

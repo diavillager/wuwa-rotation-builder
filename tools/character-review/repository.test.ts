@@ -148,6 +148,98 @@ function complete(
   return next
 }
 describe('검수 검증과 JSON 전달', () => {
+  it('미완성 백업은 수집 폴더 없는 저장소에서도 목록·타수·순서·이미지를 복원한다', async () => {
+    const f = await fixture()
+    const state = (await f.repository.load(target)).state
+    state.candidates[0].category = '기본 공격'
+    state.candidates[0].hitCount = 10
+    state.cardOrder = state.candidates.map((c) => c.candidateId).reverse()
+    const backup = await f.repository.backupCharacter(state)
+    const emptyRoot = await mkdtemp(
+      path.join(path.resolve(tmpdir()), 'wuwa-review-test-'),
+    )
+    roots.push(emptyRoot)
+    const restored = new ReviewRepository(emptyRoot)
+    const sessions = await restored.importFile({
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [backup],
+    })
+    expect(sessions[0].state).toEqual(state)
+    expect(
+      await restored.image(
+        sessions[0].source,
+        `candidate:${f.candidates[1].candidateId}`,
+      ),
+    ).toEqual(f.bytes)
+    expect(await restored.backupCharacter(sessions[0].state)).toEqual(backup)
+    expect(await readdir(emptyRoot)).toEqual([])
+    const broken = structuredClone(backup)
+    broken.workspace.images[0].base64 = Buffer.from('broken').toString('base64')
+    await expect(
+      restored.importFile({
+        format: 'wuwa-character-review-backup',
+        schemaVersion: 2,
+        characters: [broken],
+      }),
+    ).rejects.toThrow('hash')
+    expect(await restored.backupCharacter(state)).toEqual(backup)
+  })
+  it('Export round trip은 내용·참조·이미지를 검증하고 이전 형식도 원본이 있으면 읽는다', async () => {
+    const f = await fixture()
+    const state = complete(
+      (await f.repository.load(target)).state,
+      f.candidates,
+    )
+    state.candidates.forEach((c, i) => {
+      c.category = ['기본 공격', '변주 스킬', '반주 스킬'][i] as
+        '기본 공격' | '변주 스킬' | '반주 스킬'
+    })
+    state.candidates[0].hitCount = 3
+    const exported = await f.repository.exportCharacter(state)
+    const file = {
+      format: 'wuwa-character-review',
+      schemaVersion: 2,
+      status: 'pending-agent-validation',
+      characters: [exported],
+    }
+    expect(
+      (await new ReviewRepository(f.root).importFile(file))[0].state,
+    ).toEqual(state)
+    const old = structuredClone(exported) as Partial<typeof exported>
+    delete old.workspace
+    expect(
+      (
+        await f.repository.importFile({
+          ...file,
+          schemaVersion: 1,
+          characters: [old],
+        })
+      )[0].state,
+    ).toEqual(state)
+    const broken = structuredClone(file)
+    broken.characters[0].character.skills[0].displayName = '검수와 다른 값'
+    await expect(f.repository.importFile(broken)).rejects.toThrow('검수 내용')
+    const duplicated = { ...file, characters: [exported, exported] }
+    await expect(f.repository.importFile(duplicated)).rejects.toThrow('중복')
+    const badReference = structuredClone(file)
+    badReference.characters[0].review.autoActions.intro = 'missing'
+    await expect(f.repository.importFile(badReference)).rejects.toThrow('참조')
+  })
+  it.each([-1, 11, 1.5])(
+    '잘못된 타수 %s를 백업과 Export에서 거부한다',
+    async (hitCount) => {
+      const f = await fixture()
+      const state = complete(
+        (await f.repository.load(target)).state,
+        f.candidates,
+      )
+      state.candidates[0].category = '기본 공격'
+      state.candidates[0].hitCount = hitCount
+      await expect(f.repository.backupCharacter(state)).rejects.toThrow('형식')
+      await expect(f.repository.exportCharacter(state)).rejects.toThrow('형식')
+    },
+  )
   it('미완성 검수는 검증 오류로 남고 Export는 DB나 검수 파일을 만들지 않는다', async () => {
     const f = await fixture()
     const state = (await f.repository.load(target)).state
@@ -427,5 +519,38 @@ describe('로컬 검수 파일 API', () => {
     )
     expect(image.headers.get('content-type')).toBe('image/webp')
     expect(Buffer.from(await image.arrayBuffer())).toEqual(f.bytes)
+    await setWorkspaceTargets(f.root, [target])
+    const importedFile = {
+      format: 'wuwa-character-review-backup',
+      schemaVersion: 2,
+      characters: [await f.repository.backupCharacter(second)],
+    }
+    const imported = await fetch(`${base}/import`, {
+      ...init,
+      body: JSON.stringify({ file: importedFile }),
+    })
+    expect(imported.status).toBe(200)
+    expect(
+      (await imported.json()).sessions.map(
+        (s: { state: ReviewState }) => s.state.characterId,
+      ),
+    ).toEqual(['1103'])
+    expect(
+      (
+        await fetch(`${base}/validate`, {
+          ...init,
+          body: JSON.stringify({ states: [second] }),
+        })
+      ).status,
+    ).toBe(200)
+    expect(
+      (
+        await fetch(`${base}/backup`, {
+          ...init,
+          body: JSON.stringify({ states: [second] }),
+        })
+      ).status,
+    ).toBe(200)
+    expect(await scanRegistered(f.root)).toEqual([])
   })
 })

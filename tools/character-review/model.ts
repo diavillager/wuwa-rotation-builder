@@ -46,6 +46,7 @@ export interface ReviewState {
   portraitCandidateId: string | null
   cardOrder?: string[]
   existingSkills: {
+    hitCount?: number
     category?: SkillCategory
     skillId: string
     displayName: string
@@ -54,6 +55,7 @@ export interface ReviewState {
     candidateId: string | null
   }[]
   candidates: {
+    hitCount?: number
     category?: SkillCategory
     candidateId: string
     displayName: string
@@ -90,6 +92,7 @@ export function initialReview(source: ReviewSource): ReviewState {
       current?.skills.map((s) => ({
         skillId: s.skillId,
         ...(s.category ? { category: s.category } : {}),
+        ...(s.hitCount !== undefined ? { hitCount: s.hitCount } : {}),
         displayName: s.displayName,
         visible: s.visible,
         candidateId: null,
@@ -113,15 +116,17 @@ export function initialReview(source: ReviewSource): ReviewState {
   }
 }
 export function selectableSkills(state: ReviewState) {
+  const name = (s: { displayName: string; hitCount?: number }) =>
+    `${s.displayName}${s.hitCount ? ` · ${s.hitCount}타` : ''}`
   return [
     ...state.existingSkills
       .filter((s) => s.visible)
-      .map((s) => ({ id: s.skillId, name: s.displayName })),
+      .map((s) => ({ id: s.skillId, name: name(s) })),
     ...state.candidates
       .filter((c) => c.decision === 'include')
       .map((c) => ({
         id: candidateSkillId(state.characterId, c.candidateId),
-        name: c.displayName,
+        name: name(c),
       })),
   ]
 }
