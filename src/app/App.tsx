@@ -1,4 +1,16 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
+import {
+  createEditorHistory,
+  recordRotationEdit,
+  undoCycle,
+  redoCycle,
+} from '../domain/cycle-history'
 import {
   addSkill,
   changeSkillStage,
@@ -83,15 +95,22 @@ function replacementNotice(before: Rotation, after: Rotation) {
 export function App() {
   const demo = demoEnabled()
   const catalog: CharacterCatalog = demo ? demoCatalog : emptyCatalog
-  const [rotation, setRotation] = useState<Rotation>(() =>
-    demo
-      ? new URLSearchParams(window.location.search).get('demo') === 'continuity'
-        ? createContinuityDemoRotation()
-        : new URLSearchParams(window.location.search).get('demo') === 'input'
-          ? createInputDemoRotation()
-          : createDemoRotation()
-      : createRotation(['slot-one', 'slot-two', 'slot-three']),
+  const [editor, setEditor] = useState(() =>
+    createEditorHistory(
+      demo
+        ? new URLSearchParams(window.location.search).get('demo') ===
+          'continuity'
+          ? createContinuityDemoRotation()
+          : new URLSearchParams(window.location.search).get('demo') === 'input'
+            ? createInputDemoRotation()
+            : createDemoRotation()
+        : createRotation(['slot-one', 'slot-two', 'slot-three']),
+    ),
   )
+  const rotation = editor.rotation
+  const setRotation = useCallback((next: Rotation) => {
+    setEditor((current) => recordRotationEdit(current, next))
+  }, [])
   const [focusedCycle, setFocusedCycle] = useState<CycleId>('opening')
   const [selectingSlot, setSelectingSlot] = useState<number | null>(null)
   const { shellRef, prepareOpen } = usePartySelectorScroll(selectingSlot)
@@ -236,7 +255,7 @@ export function App() {
       adapter.dispose()
       captureRef.current = null
     }
-  }, [catalog])
+  }, [catalog, setRotation])
 
   const applyReplacement = (slotIndex: 0 | 1 | 2, replacementId: string) => {
     try {
@@ -265,6 +284,21 @@ export function App() {
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '편집 오류')
     }
+  }
+
+  const restoreCycle = (cycleId: CycleId, direction: 'undo' | 'redo') => {
+    if (selectingSlot !== null || pendingReplacement !== null || drag !== null)
+      return
+    captureRef.current?.cancel()
+    revealColumnRef.current = null
+    const next =
+      direction === 'undo'
+        ? undoCycle(editor, cycleId)
+        : redoCycle(editor, cycleId)
+    liveRef.current.rotation = next.rotation
+    setEditor(next)
+    setFocusedCycle(cycleId)
+    setNotice('')
   }
 
   useEffect(() => {
@@ -465,9 +499,39 @@ export function App() {
             </span>
             <h2>{title}</h2>
           </div>
-          <span className="status">
-            {focusedCycle === cycleId ? '편집 중' : 'Cycle'}
-          </span>
+          <div className="cycle-tools">
+            {focusedCycle === cycleId && (
+              <span className="status">편집 중</span>
+            )}
+            <button
+              type="button"
+              aria-label={`${title} 실행 취소`}
+              title="실행 취소"
+              disabled={
+                editor.histories[cycleId].past.length === 0 ||
+                drag !== null ||
+                pendingReplacement !== null ||
+                selectingSlot !== null
+              }
+              onClick={() => restoreCycle(cycleId, 'undo')}
+            >
+              <span aria-hidden="true">↶</span>
+            </button>
+            <button
+              type="button"
+              aria-label={`${title} 다시 실행`}
+              title="다시 실행"
+              disabled={
+                editor.histories[cycleId].future.length === 0 ||
+                drag !== null ||
+                pendingReplacement !== null ||
+                selectingSlot !== null
+              }
+              onClick={() => restoreCycle(cycleId, 'redo')}
+            >
+              <span aria-hidden="true">↷</span>
+            </button>
+          </div>
         </div>
         <div
           className="timeline-scroll"
@@ -808,7 +872,7 @@ export function App() {
             </h2>
             <p id="replacement-confirm-description">
               기존 공명자와 연결된 행동·교체가 개막 및 반복 사이클에서
-              정리됩니다.
+              정리됩니다. 두 사이클의 실행 취소·다시 실행 기록도 초기화됩니다.
             </p>
             <div className="confirm-actions">
               <button autoFocus onClick={() => setPendingReplacement(null)}>

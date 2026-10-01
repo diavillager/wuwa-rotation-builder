@@ -49,7 +49,7 @@
 
 - UI의 line index와 파티 숫자 `1/2/3`은 표시 위치이며 영구 identity가 아니다. 행동·Transition은 공명자 ID와 도메인의 `switchId`를 유지한다.
 - Cycle별 `columns`, `transitions`, `suppression`, `activeCharacterId`는 서로 독립적이다. 화면용 배열을 Rotation에 다시 저장하거나 라인별 독립 Timeline을 만들지 않는다.
-- 모든 편집은 완결된 새 `Rotation`을 한 번에 반영한다. 이 경계는 후속 Undo/Redo 이력의 한 편집 단위가 된다.
+- 모든 편집은 완결된 새 `Rotation`을 한 번에 반영한다. 사이클 편집은 후속 Cycle별 Undo/Redo 이력의 한 편집 단위가 되며, 파티 순서·공명자 변경과 이에 따른 초기화는 이력에서 제외한다.
 - 스킬 및 공명자 표시용 메타데이터는 `Rotation`의 행동 순서나 AutoAction 존재 여부를 재구성하지 않는다.
 
 ## 주요 구현 방법

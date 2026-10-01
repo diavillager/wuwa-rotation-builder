@@ -59,7 +59,8 @@
 - [x] MVP는 프로젝트 생성·이름 변경·복제·삭제, 여러 RotationProject의 IndexedDB 저장·자동저장, JSON Import/Export를 포함한다. Import는 새 ID의 프로젝트로 추가한다. 새 프로젝트에는 `새 로테이션 1` 식으로 자동 이름을 붙이고 이후 변경할 수 있으며 `createdAt/updatedAt`을 저장한다.
 - [x] 백업은 `app: wuwa-rotation-builder`, `schemaVersion`, ID 참조와 최소 snapshot(displayName/asset 등)을 포함한다. 이미지 바이너리/Base64 이미지는 넣지 않는다. 공개된 asset/skill ID는 호환을 위해 삭제/rename보다 비활성화한다.
 - [x] Skill/Character 참조는 매번 로드할 때 현재 ID 데이터→저장된 최소 snapshot→복구 불가 시 missing 상태 순서로 해석한다. 유사 이름이나 다른 Skill로 자동 대체하지 않는다. 과거에 snapshot/missing을 사용했어도 현재 앱에 동일 ID가 다시 있으면 현재 데이터를 우선한다. fallback 판정은 영구 고정 상태가 아니며 AutoAction suppression과 구분한다.
-- [x] Undo/Redo는 열린 로테이션 편집만 대상으로 한다. 블록 및 스킬 편집, 교체/자동행동, AutoAction 삭제, 파티 순서, 공명자 교체로 인한 라인 초기화, 개막/반복 내용 변경을 포함한다. 프로젝트 생성/삭제/복제/Import/이름 변경은 제외한다.
+- [x] Undo/Redo는 열린 로테이션의 사이클 편집만 대상으로 하며 개막·반복의 이력은 독립적으로 관리한다. 각 사이클 제목 오른쪽의 버튼은 해당 사이클의 블록 및 스킬 편집, 숫자키 교체/자동행동, AutoAction 삭제, 내용 변경만 되돌리거나 다시 실행한다. 파티 순서 변경, 파티 슬롯 공명자 변경과 이에 따른 두 사이클 초기화, 프로젝트 생성/삭제/복제/Import/이름 변경은 제외한다.
+- [x] 파티 순서만 변경하면 두 사이클 이력을 유지하고 Undo/Redo는 현재 파티 순서와 소유권을 보존한다. 파티 슬롯의 공명자를 실제로 변경하면 양쪽 Undo/Redo 이력을 모두 비우고 이후 편집부터 새 이력을 쌓는다. 같은 공명자 선택·변경 취소는 이력을 유지한다. 기존 변경 확인창에 두 사이클의 이력 초기화도 안내한다.
 - [x] 향후 외부 DB는 Repository 계층으로 확장할 수 있도록 한다.
 
 ## 6. 공명자 데이터와 개발용 Skill
