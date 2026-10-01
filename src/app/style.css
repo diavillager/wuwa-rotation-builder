@@ -745,7 +745,7 @@ button {
 }
 .timeline-cell {
   min-height: 0;
-  padding: 5px;
+  padding: 5px 10px;
   display: flex;
   align-items: center;
   background: transparent;
@@ -759,6 +759,7 @@ button {
   display: flex;
   align-items: stretch;
   gap: 3px;
+  min-width: 160px;
   max-width: none;
   height: calc(var(--timeline-line-size, 85.3333px) - 10px);
   padding: 3px;
@@ -784,6 +785,8 @@ button {
 }
 .skill-placeholder {
   align-self: center;
+  flex: 1;
+  text-align: center;
   color: #819398;
   font-size: 10px;
   white-space: nowrap;
@@ -791,13 +794,16 @@ button {
 .linked-skill {
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
+  flex: 1;
   padding: 3px;
-  min-width: 60px;
+  min-width: 80px;
   border-radius: 5px;
   background: #3b6158;
   font-size: 10px;
   line-height: 1.2;
+  text-align: center;
   cursor: grab;
   white-space: nowrap;
 }
@@ -807,6 +813,7 @@ button {
 .linked-skill .skill-icon {
   width: 28px;
   height: 28px;
+  margin: 0;
 }
 .drag-preview {
   position: fixed;
